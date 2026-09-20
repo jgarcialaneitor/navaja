@@ -10,13 +10,101 @@ summaries, and read the full text of the resolutions you pick.
 
 `navaja-mcp` exposes three tools for an MCP client:
 
-- `buscar_sentencias` — free-text search. No captcha is needed.
+- `buscar_sentencias` — search by free text and the site's advanced filters.
+  No captcha is needed.
 - `ver_texto_completo` — fetch the full text of a resolution.
 - `estado_servidor` — runtime configuration snapshot.
 
 Search, metadata and the automatic summaries come straight from the public
 results page. Only the full-text step can trigger the site's
 `Control Descargas masivas` captcha.
+
+## Search filters
+
+`buscar_sentencias` takes free text plus the filters the site's own advanced
+form offers. Each one was verified against the live endpoint, by measurement
+rather than by reading the front-end.
+
+| Argument | Site field | Accepted values |
+| --- | --- | --- |
+| `texto` | `TEXT` | free text; optional when another criterion is present |
+| `fecha_desde` / `fecha_hasta` | `FECHARESOLUCIONDESDE` / `FECHARESOLUCIONHASTA` | `YYYY-MM-DD` or `DD/MM/AAAA` |
+| `jurisdiccion` | `JURISDICCION` | `CIVIL`, `PENAL`, `CONTENCIOSO`, `SOCIAL`, `MILITAR` |
+| `tipo_resolucion` | `TIPORESOLUCION` | `SENTENCIA`, `AUTO` |
+| `roj` / `ecli` | `ROJ` / `ECLI` | exact identifier |
+| `num_resolucion` / `num_recurso` | `NUMERORESOLUCION` / `NUMERORECURSO` | as printed in the resolution |
+| `ponente` | `PONENTE` | magistrate's name |
+| `voces` | `VOCES` | subject vocabulary, e.g. `TRÁFICO DE DROGAS` |
+| `localizacion` | `VALUESCOMUNIDAD` | see below |
+| `coleccion` | `databasematch` | `AN` (every jurisdiction), `TS` (Tribunal Supremo only) |
+| `orden` | `sort` | `reciente`, `antiguo` |
+| `campos_extra` | anything else | raw form fields, applied last |
+
+Filters combine with AND. The site's own term matching is AND too and has no
+relevance ranking, so results come back ordered by resolution date, and recall
+within one query depends on how you word it. The site caps a query at 200
+records, which is why a broad query returns the same ceiling for every wording.
+
+### Location
+
+`localizacion` takes a list. Each entry is either the site's own form, with the
+level in the suffix, or a bare place name, which means a comunidad autónoma:
+
+```python
+buscar_sentencias(texto="tráfico de drogas", localizacion=["MELILLA(C)"])
+buscar_sentencias(localizacion=["Barcelona(P)", "Melilla(S)"])
+buscar_sentencias(localizacion=["Melilla"])   # the same as "MELILLA(C)"
+```
+
+The levels are `(C)` comunidad autónoma, `(P)` provincia and `(S)` sede.
+Entries are OR-ed with each other and AND-ed with the other filters. Names are
+the site's uppercase vocabulary; the site publishes it at
+
+```
+POST /search/jurisprudencia.action
+  action=getComunidades&field=COMUNIDAD|PROVINCIA|SEDE&publicinterface=true
+```
+
+which returns pipe-separated `KEY&LABEL` pairs (`MELILLA&MELILLA`,
+`PAÍS VASCO&PAÍS VASCO`).
+
+The value is the label the site displays, not an internal id: a search with
+Melilla selected sends `MELILLA(C) | `. The codes the front-end keeps in its own
+checkbox values (`ALL@ALL@MELILLA`) are ignored by the server, so a client that
+sends those gets unfiltered results and no error.
+
+### Pagination and the 200-record ceiling
+
+`records_por_pagina` is one of 10, 20, 30 or 50, and `pagina` is a real page
+number: navaja converts it to the site's record offset, which counts records,
+not pages. A page whose window would pass record 200 is refused rather than
+requested, because past the ceiling the site silently clamps the offset and
+returns the whole result set again — 200 records that look like a normal page.
+
+Getting this wrong is not hypothetical. The previous release forwarded the page
+number as the offset, so page 2 repeated nine of page 1's ten results.
+
+### When the site does not answer
+
+A search that matches nothing is an answer: it returns an empty result page.
+Three other outcomes are errors, told apart by the response body because the
+shapes are the same size as legitimate ones:
+
+- the site rejects the request as invalid → `SearchRequestError`
+- the site serves its `Control de grandes paginaciones` challenge →
+  `SearchGatedError`
+- the site returns more records than the page asked for → `SearchError`
+
+navaja does not solve that challenge, and it never reports a refused search as
+an empty result set.
+
+### Not modelled
+
+`ID_NORMA`, `SUBTIPORESOLUCION`, `INSTITUCION`, `SECCION`, `SECCIONAUTO`,
+`SECCIONSOLOPLENO`, `TIPOORGANOPUB` and the `TIPOINTERES_*` flags are reachable
+through `campos_extra`. `ID_NORMA` needs an id space navaja does not know how to
+address: a non-matching id comes back as a legitimate zero-hit page, not as an
+error.
 
 ## How full-text retrieval works
 
@@ -183,7 +271,7 @@ uv run pytest          # deterministic, runs against saved fixtures
 NAVAJA_LIVE=1 uv run pytest -m live   # opt-in: hits the real site
 ```
 
-Current suite: `125 passed, 1 skipped`.
+Current suite: `192 passed, 1 skipped`.
 
 Tests never touch the live site unless `NAVAJA_LIVE=1` is set.
 

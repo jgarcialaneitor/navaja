@@ -104,14 +104,14 @@ Pagination: `records_por_pagina` in `{10, 20, 30, 50}`; `pagina >= 1`;
       the offset semantics, and a response larger than the requested page
       (the clamped window) must not be reported as a normal page. Work unit
       `0dba1c8`.
-- [ ] 4. `server.py`: expose the filters on `buscar_sentencias` with typed
+- [x] 4. `server.py`: expose the filters on `buscar_sentencias` with typed
       parameters, ISO date strings in, enums for the closed vocabularies,
       `texto` optional under the at-least-one-criterion rule, and
       `extra_fields` documented as the escape hatch. The tool docstring states
-      each accepted value set and the 200-record ceiling.
-- [ ] 5. Documentation: README filter table, the location grammar and the
+      each accepted value set and the 200-record ceiling. Work unit `efffad5`.
+- [x] 5. Documentation: README filter table, the location grammar and the
       vocabulary endpoint, what remains unsupported, and the evidence for each
-      claim. Close this file with the verification record.
+      claim. Close this file with the verification record. Work unit `task 5's commit follows this document update`.
 
 ## Evidence
 
@@ -213,6 +213,26 @@ worktree rather than trusting it.
   assert that no request was sent, the default `sort` token is asserted, and
   `recordsPerPage` is asserted for a value other than the default.
 
+### Task 5 verification (task 5's commit follows this document update)
+
+- Added the `## Search filters` section to `README.md`, including the argument
+  table, Location, Pagination and the 200-record ceiling, When the site does
+  not answer, and Not modelled subsections. Refreshed the development suite
+  count to `192 passed, 1 skipped`.
+- Final state: all five tasks closed.
+- Work-unit commits in order:
+  - `67c4885`
+  - `5b42dbe`
+  - `5dc7800`
+  - `b9cc3e6`
+  - `0dba1c8`
+  - `efffad5`
+  - task 5's commit follows this document update
+- Process lesson: a delegated writer reported the full-suite count as 119 when
+  it was actually 157, and on another occasion its summary never reached the
+  parent at all, so the parent re-measured both times instead of trusting the
+  report.
+
 ## Notes
 
 - The location vocabulary is discoverable without hardcoding names:
@@ -225,3 +245,7 @@ worktree rather than trusting it.
   is present. `TEXT=""` with no criteria is a bad request.
 - `ccaa` is not the location field; it was probed and returned mixed
   municipalities.
+- `_coerce_enum` accepts a member name as well as the site's token, because
+  `Orden`'s members are named for the caller while their values are the site's
+  tokens, and removing that coercion from the tool broke the tool's own test
+  until the coercion was added to the client.
