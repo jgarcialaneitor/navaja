@@ -116,7 +116,8 @@ Out of scope, deliberately:
 - UNVERIFIED: the live CENDOJ captcha round-trip (real `stickyImg` image ->
   human answer -> actual PDF or HTML response) has not been exercised against
   the live site. It requires a human with a browser and a real document URL.
-- Commit: _pending_
+- Commit: `4899472e7f94592bd800fba24f7bd1450569b908` — "feat: add navaja, an
+  MCP server for personal CENDOJ research" (18 files, 4093 insertions).
 
 ## Notes
 
