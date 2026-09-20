@@ -21,10 +21,13 @@ import httpx
 import pytest
 
 from navaja.captcha import (
+    CaptchaBusyError,
+    CaptchaServer,
     CaptchaTimeoutError,
     resolve_captcha_host,
     resolve_captcha_token,
     serve_captcha,
+    stop_shared_captcha_server,
 )
 
 TINY_PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 20
@@ -86,6 +89,23 @@ def _token_from_url(url: str) -> str:
     return url.rstrip("/").split("/")[-1]
 
 
+def _challenge_id_from_page(page: httpx.Response) -> str:
+    match = re.search(
+        r'<input[^>]*name="challenge"[^>]*value="([^"]+)"',
+        page.text,
+    )
+    assert match is not None, "form page is missing challenge hidden field"
+    return match.group(1)
+
+
+@pytest.fixture(autouse=True)
+def _reset_shared_captcha_server():
+    """Stop and clear the shared captcha listener registry around every test."""
+    stop_shared_captcha_server()
+    yield
+    stop_shared_captcha_server()
+
+
 def test_refuses_all_ipv4_interfaces():
     with pytest.raises(ValueError, match="0\\.0\\.0\\.0"):
         serve_captcha(TINY_PNG, host="0.0.0.0", port=0, timeout=0.1)
@@ -128,6 +148,7 @@ def test_serves_image_at_token_path_and_returns_answer():
     page = httpx.get(url)
     assert page.status_code == 200
     assert "<form" in page.text
+    challenge_id = _challenge_id_from_page(page)
 
     image = httpx.get(f"http://127.0.0.1:{port}/{token}/captcha.png")
     assert image.status_code == 200
@@ -142,7 +163,7 @@ def test_serves_image_at_token_path_and_returns_answer():
 
     httpx.post(
         f"http://127.0.0.1:{port}/{token}/",
-        data={"captcha": "abc 123"},
+        data={"captcha": "abc 123", "challenge": challenge_id},
     )
     thread.join(timeout=5.0)
 
@@ -159,14 +180,16 @@ def test_wrong_token_post_returns_404():
 
     resp = httpx.post(
         f"http://127.0.0.1:{port}/wrong-token/",
-        data={"captcha": "x"},
+        data={"captcha": "x", "challenge": "1"},
     )
     assert resp.status_code == 404
 
     # Shut down the real server cleanly so the test thread does not hang.
+    page = httpx.get(url)
+    challenge_id = _challenge_id_from_page(page)
     httpx.post(
         f"http://127.0.0.1:{port}/{token}/",
-        data={"captcha": "x"},
+        data={"captcha": "x", "challenge": challenge_id},
     )
     thread.join(timeout=5.0)
 
@@ -183,10 +206,11 @@ def test_supplied_valid_token_is_honored():
     page = httpx.get(f"http://127.0.0.1:{port}/{token}/")
     assert page.status_code == 200
     assert "<form" in page.text
+    challenge_id = _challenge_id_from_page(page)
 
     httpx.post(
         f"http://127.0.0.1:{port}/{token}/",
-        data={"captcha": "solved"},
+        data={"captcha": "solved", "challenge": challenge_id},
     )
     thread.join(timeout=5.0)
 
@@ -212,51 +236,93 @@ def test_invalid_token_raises_value_error(bad_token):
 # --- Socket lifecycle regression tests --------------------------------------
 
 
-def test_timeout_releases_port_immediately_without_gc():
-    """Regression: serve_captcha must close its listening socket on timeout.
+def test_timeout_keeps_listener_bound_on_repeated_timeouts():
+    """A timeout no longer tears the listener down.
 
-    The port must be reusable immediately, without relying on garbage
-    collection, and repeatedly on the same fixed port.
+    The port stays bound across repeated timeouts on the same fixed port and
+    URL. stop_shared_captcha_server() is what finally releases the port.
     """
     port = _free_port()
+    token = "reuse-token-12345"
+    first_url: str | None = None
     for i in range(3):
         with pytest.raises(CaptchaTimeoutError):
-            serve_captcha(TINY_PNG, host="127.0.0.1", port=port, timeout=0.1)
-        assert _port_is_free("127.0.0.1", port), (
-            f"port {port} still bound after timeout iteration {i}"
+            serve_captcha(
+                TINY_PNG, host="127.0.0.1", port=port, timeout=0.1, token=token
+            )
+        assert not _port_is_free("127.0.0.1", port), (
+            f"listener released port {port} after timeout iteration {i}"
         )
+        if first_url is None:
+            first_url = f"http://127.0.0.1:{port}/{token}/"
+    assert first_url is not None
+
+    stop_shared_captcha_server()
+    assert _port_is_free("127.0.0.1", port), (
+        f"port {port} still bound after stop_shared_captcha_server()"
+    )
 
 
-def test_successful_answer_releases_port_immediately():
+def test_successful_answer_keeps_listener_bound_and_allows_second_challenge():
     port = _free_port()
     result, thread, stderr = _run_server(TINY_PNG, port, timeout=5.0)
 
     url = _wait_for_url(stderr, time.monotonic() + 2.0)
     assert url is not None, "server did not print its form URL"
-    token = _token_from_url(url)
 
-    httpx.post(
-        f"http://127.0.0.1:{port}/{token}/",
-        data={"captcha": "solved"},
-    )
+    page = httpx.get(url)
+    challenge_id = _challenge_id_from_page(page)
+    httpx.post(url, data={"captcha": "solved", "challenge": challenge_id})
     thread.join(timeout=5.0)
 
     assert result.get("answer") == "solved"
-    # The socket must be closed immediately; a fresh bind on the same port
-    # should succeed.
-    with pytest.raises(CaptchaTimeoutError):
-        serve_captcha(TINY_PNG, host="127.0.0.1", port=port, timeout=0.1)
+    # The listener must stay bound after the challenge is answered.
+    assert not _port_is_free("127.0.0.1", port)
+
+    # A second challenge on the same listener should work without a rebind.
+    result2: dict[str, Any] = {}
+
+    def target2() -> None:
+        with contextlib.redirect_stderr(io.StringIO()):
+            try:
+                result2["answer"] = serve_captcha(
+                    TINY_PNG, host="127.0.0.1", port=port, timeout=5.0
+                )
+            except Exception as exc:  # pragma: no cover
+                result2["exc"] = exc
+
+    thread2 = threading.Thread(target=target2, daemon=True)
+    thread2.start()
+    # Wait for the second challenge to be registered.
+    page2 = httpx.get(url)
+    challenge_id2 = _challenge_id_from_page(page2)
+    httpx.post(url, data={"captcha": "again", "challenge": challenge_id2})
+    thread2.join(timeout=5.0)
+
+    assert result2.get("answer") == "again"
 
 
-def test_handler_exception_still_releases_port(monkeypatch):
+def test_handler_exception_makes_caller_timeout_and_keeps_listener_bound(
+    monkeypatch,
+):
     def raising_do_GET(self):  # noqa: N802
         raise RuntimeError("simulated handler failure")
 
     monkeypatch.setattr("navaja.captcha._Handler.do_GET", raising_do_GET)
     port = _free_port()
-    with pytest.raises(CaptchaTimeoutError):
-        serve_captcha(TINY_PNG, host="127.0.0.1", port=port, timeout=0.3)
-    assert _port_is_free("127.0.0.1", port)
+    result, thread, stderr = _run_server(TINY_PNG, port, timeout=0.5)
+
+    url = _wait_for_url(stderr, time.monotonic() + 2.0)
+    assert url is not None, "server did not print its form URL"
+
+    # Trigger the broken handler; the blocked caller must time out, not hang.
+    # An unhandled handler exception drops the connection without a response.
+    with pytest.raises(httpx.RemoteProtocolError):
+        httpx.get(url)
+    thread.join(timeout=5.0)
+
+    assert isinstance(result.get("exc"), CaptchaTimeoutError)
+    assert not _port_is_free("127.0.0.1", port)
 
 
 def test_bind_to_occupied_port_raises_clear_error():
@@ -271,6 +337,281 @@ def test_bind_to_occupied_port_raises_clear_error():
             serve_captcha(TINY_PNG, host="127.0.0.1", port=port, timeout=0.1)
 
 
+def _start_idle_listener(port: int, token: str) -> str:
+    """Start the shared listener and let the only challenge time out.
+
+    Returns the form URL; the listener remains bound but idle.
+    """
+    result: dict[str, Any] = {}
+    stderr_capture = io.StringIO()
+
+    def target() -> None:
+        with contextlib.redirect_stderr(stderr_capture):
+            try:
+                serve_captcha(
+                    TINY_PNG,
+                    host="127.0.0.1",
+                    port=port,
+                    timeout=0.1,
+                    token=token,
+                )
+            except CaptchaTimeoutError:
+                result["timeout"] = True
+            except Exception as exc:  # pragma: no cover
+                result["exc"] = exc
+
+    thread = threading.Thread(target=target, daemon=True)
+    thread.start()
+    url = _wait_for_url(stderr_capture, time.monotonic() + 2.0)
+    assert url is not None, "server did not print its form URL"
+    thread.join(timeout=2.0)
+    assert result.get("timeout") is True
+    return url
+
+
+def test_idle_page_contains_refresh_directive_and_running_message():
+    port = _free_port()
+    token = "idle-page-token-01"
+    url = _start_idle_listener(port, token)
+
+    page = httpx.get(url)
+    assert page.status_code == 200
+    assert "http-equiv=\"refresh\"" in page.text
+    assert "content=\"5\"" in page.text
+    assert "No hay ningún captcha pendiente" in page.text
+    assert "Navaja está en ejecución" in page.text
+
+
+def test_png_returns_404_while_idle():
+    port = _free_port()
+    token = "idle-png-token-002"
+    _start_idle_listener(port, token)
+
+    resp = httpx.get(f"http://127.0.0.1:{port}/{token}/captcha.png")
+    assert resp.status_code == 404
+    assert "Not found" in resp.text
+
+
+def test_post_while_idle_returns_idle_page_and_changes_no_state():
+    port = _free_port()
+    token = "idle-post-token-03"
+    url = _start_idle_listener(port, token)
+
+    resp = httpx.post(url, data={"captcha": "ignored"})
+    assert resp.status_code == 200
+    assert "no había ningún captcha pendiente" in resp.text.lower()
+
+    # A subsequent GET must still be idle, not suddenly create a challenge.
+    page = httpx.get(url)
+    assert page.status_code == 200
+    assert "No hay ningún captcha pendiente" in page.text
+
+
+def test_concurrent_challenge_raises_captcha_busy_error():
+    port = _free_port()
+    token = "busy-token-0000001"
+    result, thread, stderr = _run_server(TINY_PNG, port, timeout=5.0, token=token)
+
+    url = _wait_for_url(stderr, time.monotonic() + 2.0)
+    assert url is not None, "server did not print its form URL"
+
+    with pytest.raises(CaptchaBusyError):
+        serve_captcha(
+            TINY_PNG, host="127.0.0.1", port=port, token=token, timeout=0.1
+        )
+
+    page = httpx.get(url)
+    challenge_id = _challenge_id_from_page(page)
+    httpx.post(url, data={"captcha": "done", "challenge": challenge_id})
+    thread.join(timeout=5.0)
+    assert result.get("answer") == "done"
+
+
+def test_stop_shared_captcha_server_releases_port():
+    port = _free_port()
+    result, thread, stderr = _run_server(TINY_PNG, port, timeout=2.0)
+
+    url = _wait_for_url(stderr, time.monotonic() + 2.0)
+    assert url is not None, "server did not print its form URL"
+    assert not _port_is_free("127.0.0.1", port)
+
+    stop_shared_captcha_server()
+    assert _port_is_free("127.0.0.1", port)
+    thread.join(timeout=5.0)
+    assert isinstance(result.get("exc"), CaptchaTimeoutError)
+
+
+def test_wrong_token_returns_404_while_idle():
+    port = _free_port()
+    token = "idle-wrong-token-04"
+    _start_idle_listener(port, token)
+
+    resp = httpx.get(f"http://127.0.0.1:{port}/wrong-token/")
+    assert resp.status_code == 404
+    assert "Not found" in resp.text
+
+
+def test_different_token_on_existing_listener_raises_value_error():
+    port = _free_port()
+    token_a = "token-conflict-aaaa"
+    token_b = "token-conflict-bbbb"
+    result, thread, stderr = _run_server(
+        TINY_PNG, port, timeout=5.0, token=token_a
+    )
+
+    url = _wait_for_url(stderr, time.monotonic() + 2.0)
+    assert url is not None, "server did not print its form URL"
+
+    with pytest.raises(ValueError, match="different token"):
+        serve_captcha(
+            TINY_PNG,
+            host="127.0.0.1",
+            port=port,
+            token=token_b,
+            timeout=0.1,
+        )
+
+    page = httpx.get(url)
+    challenge_id = _challenge_id_from_page(page)
+    httpx.post(url, data={"captcha": "x", "challenge": challenge_id})
+    thread.join(timeout=5.0)
+
+
+def test_form_page_includes_challenge_hidden_field():
+    port = _free_port()
+    token = "hidden-field-token1"
+    result, thread, stderr = _run_server(TINY_PNG, port, token=token)
+
+    url = _wait_for_url(stderr, time.monotonic() + 2.0)
+    assert url is not None, "server did not print its form URL"
+
+    page = httpx.get(url)
+    assert page.status_code == 200
+    assert '<input type="hidden" name="challenge"' in page.text
+
+    challenge_id = _challenge_id_from_page(page)
+    assert challenge_id.isdigit()
+
+    httpx.post(url, data={"captcha": "x", "challenge": challenge_id})
+    thread.join(timeout=5.0)
+
+
+def test_post_missing_challenge_id_is_discarded():
+    port = _free_port()
+    token = "missing-id-token01"
+    result, thread, stderr = _run_server(TINY_PNG, port, token=token)
+
+    url = _wait_for_url(stderr, time.monotonic() + 2.0)
+    assert url is not None, "server did not print its form URL"
+
+    # Submit without the challenge identifier.
+    resp = httpx.post(url, data={"captcha": "answer"})
+    assert resp.status_code == 200
+    assert "fue descartada" in resp.text.lower()
+    assert thread.is_alive()
+
+    page = httpx.get(url)
+    challenge_id = _challenge_id_from_page(page)
+    httpx.post(url, data={"captcha": "real", "challenge": challenge_id})
+    thread.join(timeout=5.0)
+    assert result.get("answer") == "real"
+
+
+def test_stale_post_after_timeout_is_discarded_and_new_challenge_unanswered():
+    port = _free_port()
+    token = "stale-token-00001"
+    result1, thread1, stderr1 = _run_server(
+        TINY_PNG, port, timeout=0.5, token=token
+    )
+
+    url = _wait_for_url(stderr1, time.monotonic() + 2.0)
+    assert url is not None, "server did not print its form URL"
+
+    page1 = httpx.get(url)
+    challenge_id_a = _challenge_id_from_page(page1)
+    thread1.join(timeout=2.0)
+    assert isinstance(result1.get("exc"), CaptchaTimeoutError)
+
+    # Register challenge B on the same listener.
+    result2, thread2, _stderr2 = _run_server(
+        TINY_PNG, port, timeout=5.0, token=token
+    )
+    page2 = httpx.get(url)
+    challenge_id_b = _challenge_id_from_page(page2)
+    assert challenge_id_b != challenge_id_a
+
+    # POST the stale answer for challenge A.
+    resp = httpx.post(
+        url,
+        data={"captcha": "stale answer", "challenge": challenge_id_a},
+    )
+    assert resp.status_code == 200
+    assert "fue descartada" in resp.text.lower()
+    assert thread2.is_alive(), "live challenge B must still be pending"
+
+    # Challenge B remains answerable with its own identifier.
+    httpx.post(
+        url,
+        data={"captcha": "correct", "challenge": challenge_id_b},
+    )
+    thread2.join(timeout=5.0)
+    assert result2.get("answer") == "correct"
+
+
+def test_stale_page_does_not_claim_nothing_pending_during_live_challenge():
+    port = _free_port()
+    token = "stale-msg-token01"
+    result, thread, stderr = _run_server(TINY_PNG, port, token=token)
+
+    url = _wait_for_url(stderr, time.monotonic() + 2.0)
+    assert url is not None, "server did not print its form URL"
+
+    page = httpx.get(url)
+    challenge_id = _challenge_id_from_page(page)
+
+    resp = httpx.post(
+        url,
+        data={"captcha": "x", "challenge": str(int(challenge_id) + 1)},
+    )
+    assert resp.status_code == 200
+    assert "fue descartada" in resp.text.lower()
+    assert "No hay ningún captcha pendiente" not in resp.text
+
+    httpx.post(url, data={"captcha": "x", "challenge": challenge_id})
+    thread.join(timeout=5.0)
+
+
+def test_stop_without_start_releases_listening_socket():
+    port = _free_port()
+    token = "stop-no-start-01"
+    server = CaptchaServer(("127.0.0.1", port), token=token)
+    assert not _port_is_free("127.0.0.1", port)
+    server.stop()
+    assert _port_is_free("127.0.0.1", port)
+
+
+def test_url_is_not_announced_for_busy_challenge():
+    port = _free_port()
+    token = "busy-announce-token1"
+    result, thread, stderr = _run_server(TINY_PNG, port, token=token)
+
+    url = _wait_for_url(stderr, time.monotonic() + 2.0)
+    assert url is not None, "server did not print its form URL"
+
+    stderr2 = io.StringIO()
+    with pytest.raises(CaptchaBusyError):
+        with contextlib.redirect_stderr(stderr2):
+            serve_captcha(
+                TINY_PNG, host="127.0.0.1", port=port, token=token, timeout=0.1
+            )
+    assert "http://" not in stderr2.getvalue()
+
+    page = httpx.get(url)
+    challenge_id = _challenge_id_from_page(page)
+    httpx.post(url, data={"captcha": "x", "challenge": challenge_id})
+    thread.join(timeout=5.0)
+
+
 def test_stable_token_is_persisted_and_reused(monkeypatch, tmp_path):
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
     port = _free_port()
@@ -282,9 +623,11 @@ def test_stable_token_is_persisted_and_reused(monkeypatch, tmp_path):
     assert re.fullmatch(r"[A-Za-z0-9_-]{32,}", token)
 
     # Shut down the real server cleanly so the test thread does not hang.
+    page = httpx.get(f"http://127.0.0.1:{port}/{token}/")
+    challenge_id = _challenge_id_from_page(page)
     httpx.post(
         f"http://127.0.0.1:{port}/{token}/",
-        data={"captcha": "x"},
+        data={"captcha": "x", "challenge": challenge_id},
     )
     thread.join(timeout=5.0)
 

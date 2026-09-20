@@ -7,6 +7,7 @@ image in a browser and types the answer.
 
 from __future__ import annotations
 
+import atexit
 import contextlib
 import errno
 import fcntl
@@ -19,6 +20,7 @@ import struct
 import sys
 import tempfile
 import threading
+from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
@@ -208,7 +210,7 @@ def resolve_captcha_token(
 
     If the state file is unreadable or its contents fail validation, a new
     token is generated and the file is rewritten. The token value itself is
-    never logged or echoed.
+    never logged or echoed in error messages.
 
     Args:
         token_path: optional path to the state file. When ``None``, the
@@ -255,63 +257,282 @@ class CaptchaTimeoutError(TimeoutError):
     """Raised when the human does not answer the captcha in time."""
 
 
-class _CaptchaServer(HTTPServer):
+class CaptchaBusyError(RuntimeError):
+    """Raised when a captcha challenge is already pending on the listener."""
+
+
+class _Challenge:
+    """A single captcha challenge slot.
+
+    The first answer wins. The slot is reset per challenge instead of
+    latched once per server instance.
+    """
+
+    __slots__ = ("challenge_id", "image_png", "event", "answer", "done")
+
+    def __init__(self, challenge_id: int, image_png: bytes) -> None:
+        self.challenge_id = challenge_id
+        self.image_png = image_png
+        self.event = threading.Event()
+        self.answer: str | None = None
+        self.done = False
+
+
+class CaptchaServer(HTTPServer):
+    """Long-lived captcha form listener.
+
+    One ``CaptchaServer`` is bound to a single ``(host, port)`` address and
+    reused for every challenge in the process. It keeps the socket open until
+    :meth:`stop` is called.
+    """
+
     token: str
-    image_png: bytes
-    answer: str | None = None
-    answered: threading.Event
-    timeout_seconds: float
-    _timeout_timer: threading.Timer | None = None
-    _finished: bool = False
+    _challenge: _Challenge | None
+    _challenge_id: int
+    _closed: bool
     _lock: threading.Lock
+    _thread: threading.Thread | None
 
     def __init__(
         self,
         server_address: tuple[str, int],
-        image_png: bytes,
-        timeout: float,
-        RequestHandlerClass: type[BaseHTTPRequestHandler],
         *,
         token: str,
     ) -> None:
         self.token = token
-        self.image_png = image_png
-        self.answered = threading.Event()
-        self.timeout_seconds = timeout
+        self._challenge = None
+        self._challenge_id = 0
+        self._closed = False
         self._lock = threading.Lock()
-        super().__init__(server_address, RequestHandlerClass)
+        self._thread = None
+        super().__init__(server_address, _Handler)
 
-    def start_timeout(self) -> None:
-        self._timeout_timer = threading.Timer(
-            self.timeout_seconds, self._shutdown_on_timeout
+    @property
+    def url(self) -> str:
+        """The stable form URL for this listener."""
+        host, port = self.server_address
+        return f"http://{host}:{port}/{self.token}/"
+
+    def start(self) -> None:
+        """Start ``serve_forever`` on a daemon thread; idempotent."""
+        with self._lock:
+            if self._thread is not None and self._thread.is_alive():
+                return
+            self._thread = threading.Thread(target=self.serve_forever, daemon=True)
+            self._thread.start()
+
+    def stop(self) -> None:
+        """Stop the listener and release its socket; idempotent.
+
+        Safe to call from any thread except the serving thread itself.
+        """
+        with self._lock:
+            if self._closed:
+                return
+            self._closed = True
+            thread = self._thread
+
+        # Calling shutdown() from the serving thread would deadlock because it
+        # waits for serve_forever() to return on the same thread.
+        if thread is not None and thread is not threading.current_thread():
+            try:
+                self.shutdown()
+            except Exception as exc:
+                print(
+                    f"Captcha server stop warning: shutdown failed: {exc}",
+                    file=sys.stderr,
+                )
+            thread.join(timeout=5.0)
+
+        try:
+            self.server_close()
+        except Exception as exc:
+            # Do not let a socket-close failure hide a leak, but keep the
+            # shutdown path non-throwing.
+            print(
+                f"Captcha server stop warning: could not close socket: {exc}",
+                file=sys.stderr,
+            )
+
+        with self._lock:
+            self._thread = None
+
+    def is_pending(self) -> bool:
+        """Return whether a challenge is currently waiting for an answer."""
+        with self._lock:
+            return self._challenge is not None and not self._challenge.done
+
+    def current_image(self) -> bytes | None:
+        """Return the current challenge image, or ``None`` when idle."""
+        with self._lock:
+            if self._challenge is None or self._challenge.done:
+                return None
+            return self._challenge.image_png
+
+    def current_challenge_id(self) -> int | None:
+        """Return the id of the pending challenge, or ``None`` when idle."""
+        with self._lock:
+            if self._challenge is None or self._challenge.done:
+                return None
+            return self._challenge.challenge_id
+
+    def challenge(
+        self,
+        image_png: bytes,
+        timeout: float,
+        *,
+        on_registered: Callable[[], None] | None = None,
+    ) -> CaptchaAnswer:
+        """Register a new challenge and block until it is answered or expires.
+
+        Args:
+            on_registered: optional callback invoked after the challenge slot
+                has been registered but before blocking. Useful for announcing
+                the form URL only for challenges that actually exist.
+
+        Raises:
+            CaptchaBusyError: if a challenge is already pending on this
+                listener.
+            CaptchaTimeoutError: if no answer arrives within ``timeout``.
+        """
+        with self._lock:
+            if self._challenge is not None and not self._challenge.done:
+                raise CaptchaBusyError(
+                    "a captcha challenge is already pending on this listener"
+                )
+            self._challenge_id += 1
+            challenge = _Challenge(self._challenge_id, image_png)
+            self._challenge = challenge
+
+        if on_registered is not None:
+            on_registered()
+
+        answered = False
+        try:
+            answered = challenge.event.wait(timeout)
+        finally:
+            with self._lock:
+                if self._challenge is challenge:
+                    self._challenge = None
+
+        if not answered:
+            exc = CaptchaTimeoutError(
+                f"no captcha answer received within {timeout} seconds"
+            )
+            exc.url = self.url
+            raise exc
+
+        with self._lock:
+            answer = challenge.answer
+
+        if answer is None:
+            exc = CaptchaTimeoutError(
+                f"no captcha answer received within {timeout} seconds"
+            )
+            exc.url = self.url
+            raise exc
+
+        return CaptchaAnswer._create(
+            answer, port=self.server_address[1], url=self.url
         )
-        self._timeout_timer.daemon = True
-        self._timeout_timer.start()
 
-    def _shutdown_on_timeout(self) -> None:
-        with self._lock:
-            if self._finished:
-                return
-            self._finished = True
-        self.answered.set()
-        self.shutdown()
+    def finish(self, answer: str | None = None) -> bool:
+        """Deliver an answer for the pending challenge.
 
-    def finish(self, answer: str | None = None) -> None:
+        Returns ``True`` when a challenge was pending and accepted the answer,
+        ``False`` when no challenge was pending (for example, a stale POST).
+        """
         with self._lock:
-            if self._finished:
-                return
-            self._finished = True
-            if self._timeout_timer is not None:
-                self._timeout_timer.cancel()
-            self.answer = answer
-            self.answered.set()
-        # Shutdown blocks until serve_forever exits; run it from a helper thread
-        # to avoid deadlocking inside the request handler.
-        threading.Thread(target=self.shutdown, daemon=True).start()
+            challenge = self._challenge
+            if challenge is None or challenge.done:
+                return False
+            challenge.done = True
+            challenge.answer = answer
+            challenge.event.set()
+        return True
+
+
+def _form_page(token: str, challenge_id: int) -> bytes:
+    image_url = f"/{token}/captcha.png"
+    page = f"""<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CENDOJ captcha</title>
+<style>
+body {{ font-family: system-ui, sans-serif; max-width: 480px; margin: 2rem auto; padding: 0 1rem; }}
+img {{ display: block; margin: 1rem 0; border: 1px solid #ccc; }}
+input {{ font-size: 1.25rem; padding: 0.5rem; width: 100%; box-sizing: border-box; }}
+button {{ font-size: 1rem; padding: 0.5rem 1rem; margin-top: 0.5rem; }}
+</style>
+</head>
+<body>
+<h1>Resuelve el captcha</h1>
+<p>Escribe los caracteres que ves en la imagen y pulsa <strong>Enviar</strong>.</p>
+<img src="{image_url}" alt="captcha">
+<form method="POST" action="/{token}/">
+<input type="hidden" name="challenge" value="{challenge_id}">
+<input type="text" name="captcha" autocomplete="off" autofocus required>
+<button type="submit">Enviar</button>
+</form>
+</body>
+</html>"""
+    return page.encode("utf-8")
+
+
+def _idle_page(notice: str = "") -> bytes:
+    notice_html = f'<p class="notice">{html.escape(notice)}</p>\n' if notice else ""
+    page = f"""<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="refresh" content="5">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CENDOJ captcha</title>
+<style>
+body {{ font-family: system-ui, sans-serif; max-width: 480px; margin: 2rem auto; padding: 0 1rem; }}
+.notice {{ border-left: 4px solid #999; padding-left: 1rem; color: #555; }}
+</style>
+</head>
+<body>
+<p>No hay ningún captcha pendiente en este momento.</p>
+<p>Navaja está en ejecución; esta página se actualizará automáticamente cuando llegue un nuevo desafío.</p>
+{notice_html}</body>
+</html>"""
+    return page.encode("utf-8")
+
+
+def _stale_page(notice: str) -> bytes:
+    page = f"""<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="refresh" content="5">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CENDOJ captcha</title>
+<style>
+body {{ font-family: system-ui, sans-serif; max-width: 480px; margin: 2rem auto; padding: 0 1rem; }}
+.notice {{ border-left: 4px solid #999; padding-left: 1rem; color: #555; }}
+</style>
+</head>
+<body>
+<p class="notice">{html.escape(notice)}</p>
+<p>Si hay un captcha pendiente, la página se actualizará automáticamente.</p>
+</body>
+</html>"""
+    return page.encode("utf-8")
+
+
+_ACK_PAGE = b"""<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="utf-8"><title>Recibido</title></head>
+<body><p>Respuesta recibida. Pod&eacute;s cerrar esta pesta&ntilde;a.</p></body>
+</html>"""
 
 
 class _Handler(BaseHTTPRequestHandler):
-    server: _CaptchaServer
+    server: CaptchaServer
 
     def log_message(self, format: str, *args: object) -> None:
         # Keep the local form silent by default.
@@ -338,7 +559,10 @@ class _Handler(BaseHTTPRequestHandler):
             return
 
         if path == f"/{token}/captcha.png":
-            image = self.server.image_png
+            image = self.server.current_image()
+            if image is None:
+                self._send_404()
+                return
             self.send_response(200)
             self.send_header("Content-Type", "image/png")
             self.send_header("Content-Length", str(len(image)))
@@ -346,31 +570,11 @@ class _Handler(BaseHTTPRequestHandler):
             self.wfile.write(image)
             return
 
-        image_url = f"/{token}/captcha.png"
-        html_page = f"""<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CENDOJ captcha</title>
-<style>
-body {{ font-family: system-ui, sans-serif; max-width: 480px; margin: 2rem auto; padding: 0 1rem; }}
-img {{ display: block; margin: 1rem 0; border: 1px solid #ccc; }}
-input {{ font-size: 1.25rem; padding: 0.5rem; width: 100%; box-sizing: border-box; }}
-button {{ font-size: 1rem; padding: 0.5rem 1rem; margin-top: 0.5rem; }}
-</style>
-</head>
-<body>
-<h1>Resuelve el captcha</h1>
-<p>Escribe los caracteres que ves en la imagen y pulsa <strong>Enviar</strong>.</p>
-<img src="{image_url}" alt="captcha">
-<form method="POST" action="/{token}/">
-<input type="text" name="captcha" autocomplete="off" autofocus required>
-<button type="submit">Enviar</button>
-</form>
-</body>
-</html>"""
-        body = html_page.encode("utf-8")
+        challenge_id = self.server.current_challenge_id()
+        if challenge_id is not None:
+            body = _form_page(token, challenge_id)
+        else:
+            body = _idle_page()
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
@@ -391,25 +595,103 @@ button {{ font-size: 1rem; padding: 0.5rem 1rem; margin-top: 0.5rem; }}
             body_text = raw_body.decode("latin-1")
 
         answer = ""
+        submitted_challenge_id: str | None = None
         for pair in body_text.split("&"):
             if "=" not in pair:
                 continue
             key, value = pair.split("=", 1)
             if key == "captcha":
                 answer = html.unescape(value.replace("+", " ")).strip()
-                break
+            elif key == "challenge":
+                submitted_challenge_id = value
 
-        response = b"""<!DOCTYPE html>
-<html lang="es">
-<head><meta charset="utf-8"><title>Recibido</title></head>
-<body><p>Respuesta recibida. Pod&eacute;s cerrar esta pesta&ntilde;a.</p></body>
-</html>"""
+        current_id = self.server.current_challenge_id()
+        if current_id is None:
+            response = _idle_page(
+                notice="El formulario se envió pero no había ningún captcha pendiente."
+            )
+        elif (
+            submitted_challenge_id is None
+            or submitted_challenge_id != str(current_id)
+        ):
+            response = _stale_page(
+                notice="La respuesta corresponde a un captcha anterior y fue descartada."
+            )
+        else:
+            # ``finish`` can still refuse: the challenge may have expired
+            # between the id check above and this call. Report that honestly
+            # instead of acknowledging an answer nobody received.
+            if self.server.finish(answer):
+                response = _ACK_PAGE
+            else:
+                response = _stale_page(
+                    notice=(
+                        "La respuesta llegó cuando el captcha ya había vencido "
+                        "y fue descartada."
+                    )
+                )
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(response)))
         self.end_headers()
         self.wfile.write(response)
-        self.server.finish(answer)
+
+
+# Process-wide registry of long-lived captcha listeners, keyed by the
+# requested (host, port) pair. ``port=0`` creates a single ephemeral listener
+# per host that is reused for the rest of the process.
+_captcha_server_lock = threading.Lock()
+_captcha_servers: dict[tuple[str, int], CaptchaServer] = {}
+
+
+def _get_or_create_captcha_server(
+    host: str,
+    port: int,
+    token: str,
+) -> CaptchaServer:
+    """Return the shared listener for ``(host, port)``, creating it if needed.
+
+    Raises:
+        ValueError: if a listener already exists for this address but with a
+            different token.
+        RuntimeError: if the address is held by a foreign process.
+    """
+    key = (host, port)
+    with _captcha_server_lock:
+        server = _captcha_servers.get(key)
+        if server is not None:
+            if server.token != token:
+                raise ValueError(
+                    f"captcha server already exists for {host!r} port {port} "
+                    "with a different token"
+                )
+            return server
+
+        try:
+            server = CaptchaServer((host, port), token=token)
+        except OSError as exc:
+            if exc.errno == errno.EADDRINUSE:
+                raise RuntimeError(
+                    f"captcha server cannot bind to {host!r} port {port}: "
+                    "address already in use"
+                ) from exc
+            raise
+
+        _captcha_servers[key] = server
+        server.start()
+        return server
+
+
+def stop_shared_captcha_server() -> None:
+    """Stop every shared captcha listener and clear the registry."""
+    with _captcha_server_lock:
+        servers = list(_captcha_servers.values())
+        _captcha_servers.clear()
+    for server in servers:
+        server.stop()
+
+
+atexit.register(stop_shared_captcha_server)
 
 
 def serve_captcha(
@@ -422,11 +704,19 @@ def serve_captcha(
 ) -> CaptchaAnswer:
     """Show the captcha image to a human and return the typed answer.
 
+    The underlying HTTP listener is created once per ``(host, port)`` address
+    and reused for the lifetime of the process. ``port=0`` therefore creates a
+    single ephemeral listener for ``host`` on first use; the announced URL
+    stays stable afterwards. The listener is stopped by
+    :func:`stop_shared_captcha_server`, which is also registered with
+    :mod:`atexit`.
+
     Args:
         image_png: raw PNG bytes to display.
         host: network interface to bind. Defaults to IPv4 loopback. Tailnet
             users may pass a private Tailnet IP such as ``100.x.y.z``.
-        port: TCP port; ``0`` lets the OS choose a free port.
+        port: TCP port; ``0`` lets the OS choose a free port once, and the
+            same port is reused for every later challenge on this ``host``.
         timeout: seconds to wait for an answer before raising.
         token: optional URL-path token for the captcha form. When ``None``,
             a stable persisted token is resolved from the environment or
@@ -443,9 +733,12 @@ def serve_captcha(
         attributes so the caller can build or log the local form URL.
 
     Raises:
-        ValueError: if ``host`` would bind all network interfaces, or if
-            ``token`` fails validation.
-        RuntimeError: if the requested address is already in use.
+        ValueError: if ``host`` would bind all network interfaces, if
+            ``token`` fails validation, or if the requested address already has
+            a listener with a different token.
+        RuntimeError: if the requested address is already in use by a foreign
+            process.
+        CaptchaBusyError: if a challenge is already pending on this listener.
         CaptchaTimeoutError: if no answer is received within ``timeout``.
     """
     host = _validate_host(host)
@@ -455,60 +748,14 @@ def serve_captcha(
     else:
         _validate_token(token)
 
-    try:
-        server = _CaptchaServer(
-            (host, port), image_png, timeout, _Handler, token=token
+    server = _get_or_create_captcha_server(host, port, token)
+    url = server.url
+
+    def _announce() -> None:
+        print(
+            f"Captcha form binding to {host}; ready at {url}",
+            file=sys.stderr,
+            flush=True,
         )
-    except OSError as exc:
-        if exc.errno == errno.EADDRINUSE:
-            raise RuntimeError(
-                f"captcha server cannot bind to {host!r} port {port}: "
-                "address already in use"
-            ) from exc
-        raise
 
-    actual_port = server.server_address[1]
-    url = f"http://{host}:{actual_port}/{server.token}/"
-
-    print(
-        f"Captcha form binding to {host}; ready at {url}",
-        file=sys.stderr,
-        flush=True,
-    )
-    server.start_timeout()
-
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-
-    in_flight: BaseException | None = None
-    try:
-        server.answered.wait()
-    except BaseException as exc:
-        in_flight = exc
-    finally:
-        try:
-            server.shutdown()
-        except Exception as exc:
-            if in_flight is None:
-                in_flight = exc
-        try:
-            thread.join(timeout=5.0)
-        except Exception as exc:
-            if in_flight is None:
-                in_flight = exc
-        try:
-            server.server_close()
-        except Exception as exc:
-            if in_flight is None:
-                in_flight = exc
-        if in_flight is not None:
-            raise in_flight
-
-    if server.answer is None:
-        exc = CaptchaTimeoutError(
-            f"no captcha answer received within {timeout} seconds"
-        )
-        exc.url = url
-        raise exc
-
-    return CaptchaAnswer._create(server.answer, port=actual_port, url=url)
+    return server.challenge(image_png, timeout, on_registered=_announce)
