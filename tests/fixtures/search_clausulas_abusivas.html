@@ -1,0 +1,708 @@
+<!DOCTYPE aside PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<aside xmlns:autn="http://schemas.autonomy.com/aci/">
+<div class="filtersidebar">
+<div class="lnksearchfilters">
+<a href="#" onclick="javascript:toggleFilters(this); return false;"><span>FILTROS</span></a>
+<div id="jurisprudenciaresults_filters" class="searchfilters">
+<ul>
+<li class="checkfilters">
+<div class="checkfiltersButton">
+<button class="btn btn-primary" href="#" onclick="javascript:toggleCheckfilters('jurisprudencia');">Filtrar</button>
+</div>
+</li>
+<li class="navfiltro" data-totalhits="312202" data-idtab="jurisprudencia" data-name="JURISDICCION">
+<a href="#" onclick="javascript:toggleFilter(this); return false;" data-idtab="jurisprudencia" data-database="AN">Jurisdicci&oacute;n <i class="pull-right fa fa-caret-down" aria-hidden="true"></i></a><button style="display:none;" onclick="javascript:removeCheckfilters('jurisprudencia', 'JURISDICCION', this); return false;" data-l10n-id="results.searchresults.filter.button.delfilter" type="button" class="btn btn-primary btn-sm pull-right delfilter">borrar filtro</button>
+<div id="navpfiltroJurisd" class="navpfiltro nicescroll" style="display:none;" tabindex="0"></div>
+</li>
+<li class="navfiltro" data-totalhits="312202" data-idtab="jurisprudencia" data-name="SUBTIPORESOLUCION">
+<a href="#" onclick="javascript:toggleFilter(this); return false;" data-idtab="jurisprudencia" data-database="AN">Resoluci&oacute;n <i class="pull-right fa fa-caret-down" aria-hidden="true"></i></a><button style="display:none;" onclick="javascript:removeCheckfilters('jurisprudencia', 'SUBTIPORESOLUCION', this); return false;" data-l10n-id="results.searchresults.filter.button.delfilter" type="button" class="btn btn-primary btn-sm pull-right delfilter">borrar filtro</button>
+<div id="navpfiltroResolucion" class="navpfiltro nicescroll" style="display:none;" tabindex="0"></div>
+</li>
+<li class="navfiltro" data-totalhits="312202" data-idtab="jurisprudencia" data-name="TIPOORGANOPUB">
+<a href="#" onclick="javascript:toggleFilter(this); return false;" data-idtab="jurisprudencia" data-database="AN">&Oacute;rgano <i class="pull-right fa fa-caret-down" aria-hidden="true"></i></a><button style="display:none;" id="removeOrg" onclick="javascript:removeCheckfilters('jurisprudencia', 'TIPOORGANOPUB', this); return false;" data-l10n-id="results.searchresults.filter.button.delfilter" type="button" class="btn btn-primary btn-sm pull-right delfilter">borrar filtro</button>
+<div id="navpfiltroOrgano" class="navpfiltro nicescroll" style="display:none;" tabindex="0"></div>
+</li>
+<li class="navfiltro" data-totalhits="312202" data-idtab="jurisprudencia" data-name="ANYO">
+<a href="#" onclick="javascript:toggleFilter(this); return false;" data-idtab="jurisprudencia" data-database="AN">A&ntilde;o <i class="pull-right fa fa-caret-down" aria-hidden="true"></i></a><button style="display:none;" onclick="javascript:removeCheckfilters('jurisprudencia', 'ANYO', this); return false;" data-l10n-id="results.searchresults.filter.button.delfilter" type="button" class="btn btn-primary btn-sm pull-right delfilter">borrar filtro</button>
+<div id="navpfiltroAnyo" class="navpfiltro nicescroll" style="display:none;" tabindex="0"></div>
+</li>
+<li class="navfiltro" data-totalhits="312202" data-idtab="jurisprudencia" data-name="PONENTE">
+<a href="#" onclick="javascript:toggleFilter(this); return false;" data-idtab="jurisprudencia" data-database="AN">Ponente <i class="pull-right fa fa-caret-down" aria-hidden="true"></i></a><button style="display:none;" onclick="javascript:removeCheckfilters('jurisprudencia', 'PONENTE', this); return false;" data-l10n-id="results.searchresults.filter.button.delfilter" type="button" class="btn btn-primary btn-sm pull-right delfilter">borrar filtro</button>
+<div id="navpfiltroPonente" class="navpfiltro nicescroll" style="display:none;" tabindex="0"></div>
+</li>
+<li class="checkfilters">
+<div class="checkfiltersButton">
+<button class="btn btn-primary" href="#" onclick="javascript:toggleCheckfilters('jurisprudencia');">Filtrar</button>
+</div>
+</li>
+</ul>
+</div>
+</div>
+<div class="text-center botonera">
+<a href="#" class="btn btn-default newalert"><img src="/search/img/envbell.png" alt=""> Crear alerta</a>
+</div>
+</div>
+</aside><div class="resultswrapper">
+<div class="toppagination row">
+<form id="frmFilterjurisprudencia" name="frmFilterjurisprudencia" action="#" class="searchform" onsubmit="goToPage('jurisprudencia',$(this).find('.slectnavgoto input').val());">
+<input type="hidden" name="total" id="frmFilterjurisprudencia_total" value="200"><input type="hidden" name="records" id="frmFilterjurisprudencia_records" value="10"><input type="hidden" name="page" id="frmFilterjurisprudencia_page" value="1">
+<div class="col-md-5 numhits hidden-xs">
+<b>312202 resultados</b><span class="limitresults tooltips" title="Solamente se muestran hasta 200 resultados, utilice los filtros para acotar la consulta"> (<i class="fa fa-exclamation-circle" aria-hidden="true"></i> m&aacute;ximo documentos a recuperar 200)</span>
+</div>
+<div class="col-xs-12 col-md-7 sort">
+<div class="pull-right col-xs-12 nopad">
+<div id="jurisprudenciaresults_toppagination" class="pull-right searchpagination top nopad"></div>
+<div class="pull-right sortfield hidden-xs">
+<label for="frmFilterjurisprudencia_cbosort" class="oculta">Ordenar:</label><select id="frmFilterjurisprudencia_cbosort" name="cbosort" onchange="javascript:ordenar('jurisprudencia', true);" class="selectpicker form-control pull-left"><option value="Relevance" data-l10n-id="results.pagination.sort.coincidencia">
+												Coincidencia
+											</option><option value="IN_FECHARESOLUCION:increasing" data-l10n-id="results.pagination.sort.fecha.resol.asc">
+												Fecha Resol. [0..9]
+											</option><option value="IN_FECHARESOLUCION:decreasing" data-l10n-id="results.pagination.sort.fecha.resol.desc" selected="true">
+												Fecha Resol. [9..0]
+											</option><option value="IN_FECHAENTRADA:numberdecreasing">
+												Lo m&aacute;s nuevo
+											</option><option value="IP_TIPOORGANO:alphabetical" data-l10n-id="results.pagination.sort.organo.asc">
+												Organo [a..z]
+											</option><option value="IP_TIPOORGANO:reversealphabetical" data-l10n-id="results.pagination.sort.organo.desc">
+												Organo [z..a]
+											</option></select>
+</div>
+<div class="pull-right hidden-xs">
+<label for="frmFilterjurisprudencia_cboresults" class="hidden-xs cboresults">Ver</label>
+<div class="recordsperpagefield ">
+<select id="frmFilterjurisprudencia_cboresults" onchange="javascript:ordenar('jurisprudencia', true);" class="selectpicker form-control"><option value="10" selected="true">10</option><option value="20">20</option><option value="30">30</option><option value="50">50</option></select>
+</div>
+</div>
+</div>
+</div>
+</form>
+</div>
+<div id="jurisprudenciaresults_searchresults" class="row searchresults">
+<div class="row searchresult doc" id="jurisprudenciaresults_content-11851652" data-ref="11851652" data-db="AN" data-fechares="20260911" data-alertdoc="">
+<div class="col-xs-12 col-sm-12 content">
+<div class="title">
+<a href="#" data-link="https://www.poderjudicial.es/search/AN/openDocument/ab58557b5ca08f54a0a8778d75e36f0d/20260916" onclick="markOpenedDoc($(this));openDocumentNewWindow(this);return false;" class="tooltips new-button hidden-xs" title="Abrir el documento en nueva ventana" data-placement="top" aria-label="Icono Abrir el documento en nueva ventana" data-databasematch="AN" data-reference="11851652" data-statsqueryid="320623240" data-links="clausulas abusivas" data-optimize="20260916" data-start="1" data-lang="1"><i class="fa fa-external-link" aria-hidden="true"></i></a><span class="separator hidden-xs">&nbsp;</span><a href="https://www.poderjudicial.es/search/AN/openDocument/ab58557b5ca08f54a0a8778d75e36f0d/20260916" id="ref-11851652" onclick="markOpenedDoc($(this));openDocumentFromHref(this);return false;" data-databasematch="AN" data-reference="11851652" data-statsqueryid="320623240" data-links="clausulas abusivas" data-optimize="20260916" data-roj="SAP  NA 1461/2026" data-fechares="20260911" data-alertdoc="" data-start="1" data-lang="1" data-langiso="es">SAP Navarra, a 11 de septiembre de 2026 - ROJ: SAP  NA 1461/2026</a>
+</div>
+<div class="metadatos">
+<ul>
+<li>
+<b>ECLI:ES:APNA:2026:1461</b>
+</li>
+<li>N&ordm; de Resoluci&oacute;n: <b>1097/2026</b>
+</li>
+<li>Municipio: <b>Pamplona/Iru&ntilde;a</b>
+</li>
+<li>Ponente: <b>DANIEL RODRIGUEZ ANTUNEZ</b>
+</li>
+<li>N&ordm; Recurso: <b>1497/2024</b>
+</li>
+</ul>
+</div>
+<div class="summary" id="jur-summary-1">
+                                   Resumen Autom&aacute;tico: <b>la sentencia del Juzgado de Primera Instancia nº 3 de Tudela que estimó la demanda interpuesta por Dña. contra Caja Rural de Navarra Sociedad Cooperativa de Crédito, a través de la cual demandaba la nulidad de <font color=red>cláusulas</font> en contrato de préstamo hipotecario firmado entre las partes en escritura pública de fecha 20 de agosto de 2010. En concreto la sentencia apelada declara la nulidad por abusividad de la <font color=red>cláusula</font> reguladora del pago de los gastos de la operación contenida en la escritura, por razón de su imposición indiscriminada a la parte prestataria, condenando a la entidad al reembolso de las cantidades indebidamente abonadas por la parte prestataria en aplicación de tal <font color=red>cláusula</font>, más intereses. SEGUNDO.- La entidad bancaria demandada se alza en apelación contra la referida sentencia planteando la improcedencia de la restitución de cantidades</b>
+</div>
+</div>
+<div class="">
+<div class="info pull-right">
+<ul></ul>
+</div>
+</div>
+<div class="col-xs-12 actions">
+<div class="pull-left docactions">
+<ul>
+<li id="jur-leglink-1" class="hidden-xs hidden legislacion" data-toggle="popover" data-a="jur-legdiv-1" data-placement="bottom" data-pos="1">
+<a href="#" onclick="return false;" class="tooltips" title="Legislaci&oacute;n relacionada" data-placement="top">
+								Legislaci&oacute;n <i class="fa fa-angle-down" aria-hidden="true"></i></a>
+</li>
+</ul>
+<div id="jur-legdiv-1" class="showLegRel hidden popover-content"></div>
+</div>
+<div class="pull-right docactions">
+<ul>
+<li class="social tooltips" title="compartir en Facebook" data-placement="bottom">
+<a href="#" class="fb-button" aria-label="Icono compartir en Facebook" data-href="https://www.poderjudicial.es/search/AN/openDocument/ab58557b5ca08f54a0a8778d75e36f0d/20260916" data-title="ROJ: SAP  NA 1461/2026"><i class="fa fa-facebook-square" aria-hidden="true"></i></a>
+</li>
+<li class="social tooltips twitter" title="compartir en Twitter" data-placement="bottom">
+<a href="#" class="twtr-button" aria-label="Icono compartir en Twitter. Pulse para compartir en Twitter" data-href="https://www.poderjudicial.es/search/AN/openDocument/ab58557b5ca08f54a0a8778d75e36f0d/20260916" data-title="ROJ: SAP  NA 1461/2026">
+<svg class="social_twitter" viewBox="0 0 26 26" aria-hidden="true">
+<g>
+<path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path>
+</g>
+</svg>
+</a>
+</li>
+<li class="social tooltips" title="copiar enlace" data-placement="bottom">
+<a href="#" class="cp-button" aria-label="Icono copiar enlace al portapapeles" data-clipboard-text="https://www.poderjudicial.es/search/AN/openDocument/ab58557b5ca08f54a0a8778d75e36f0d/20260916"><i class="fa fa-clipboard" aria-hidden="true"></i></a>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="row searchresult doc" id="jurisprudenciaresults_content-11853362" data-ref="11853362" data-db="TS" data-fechares="20260910" data-alertdoc="">
+<div class="col-xs-12 col-sm-12 content">
+<div class="title">
+<a href="#" data-link="https://www.poderjudicial.es/search/AN/openDocument/3fb62a5395c8aaa1a0a8778d75e36f0d/20260917" onclick="markOpenedDoc($(this));openDocumentNewWindow(this);return false;" class="tooltips new-button hidden-xs" title="Abrir el documento en nueva ventana" data-placement="top" aria-label="Icono Abrir el documento en nueva ventana" data-databasematch="TS" data-reference="11853362" data-statsqueryid="320623240" data-links="clausulas abusivas" data-optimize="20260917" data-start="2" data-lang="1"><i class="fa fa-external-link" aria-hidden="true"></i></a><span class="separator hidden-xs">&nbsp;</span><a href="https://www.poderjudicial.es/search/AN/openDocument/3fb62a5395c8aaa1a0a8778d75e36f0d/20260917" id="ref-11853362" onclick="markOpenedDoc($(this));openDocumentFromHref(this);return false;" data-databasematch="TS" data-reference="11853362" data-statsqueryid="320623240" data-links="clausulas abusivas" data-optimize="20260917" data-roj="STS 3679/2026" data-fechares="20260910" data-alertdoc="" data-start="2" data-lang="1" data-langiso="es">STS, a 10 de septiembre de 2026 - ROJ: STS 3679/2026</a>
+</div>
+<div class="metadatos">
+<ul>
+<li>
+<b>ECLI:ES:TS:2026:3679</b>
+</li>
+<li>
+<b>Sala de lo Civil</b>
+</li>
+<li>N&ordm; de Resoluci&oacute;n: <b>1413/2026</b>
+</li>
+<li>Municipio: <b>Madrid</b>
+</li>
+<li>Ponente: <b>PEDRO JOSE VELA TORRES</b>
+</li>
+<li>N&ordm; Recurso: <b>288/2022</b>
+</li>
+</ul>
+</div>
+<div class="summary" id="jur-summary-2">
+                                    RESUMEN: <b>Comisión de apertura. Requisitos de validez. Reiteración de la jurisprudencia de la sala</b>
+</div>
+</div>
+<div class="">
+<div class="info pull-right">
+<ul></ul>
+</div>
+</div>
+<div class="col-xs-12 actions">
+<div class="pull-left docactions">
+<ul>
+<li id="jur-leglink-2" class="hidden-xs hidden legislacion" data-toggle="popover" data-a="jur-legdiv-2" data-placement="bottom" data-pos="2">
+<a href="#" onclick="return false;" class="tooltips" title="Legislaci&oacute;n relacionada" data-placement="top">
+								Legislaci&oacute;n <i class="fa fa-angle-down" aria-hidden="true"></i></a>
+</li>
+</ul>
+<div id="jur-legdiv-2" class="showLegRel hidden popover-content"></div>
+</div>
+<div class="pull-right docactions">
+<ul>
+<li class="social tooltips" title="compartir en Facebook" data-placement="bottom">
+<a href="#" class="fb-button" aria-label="Icono compartir en Facebook" data-href="https://www.poderjudicial.es/search/AN/openDocument/3fb62a5395c8aaa1a0a8778d75e36f0d/20260917" data-title="ROJ: STS 3679/2026"><i class="fa fa-facebook-square" aria-hidden="true"></i></a>
+</li>
+<li class="social tooltips twitter" title="compartir en Twitter" data-placement="bottom">
+<a href="#" class="twtr-button" aria-label="Icono compartir en Twitter. Pulse para compartir en Twitter" data-href="https://www.poderjudicial.es/search/AN/openDocument/3fb62a5395c8aaa1a0a8778d75e36f0d/20260917" data-title="ROJ: STS 3679/2026">
+<svg class="social_twitter" viewBox="0 0 26 26" aria-hidden="true">
+<g>
+<path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path>
+</g>
+</svg>
+</a>
+</li>
+<li class="social tooltips" title="copiar enlace" data-placement="bottom">
+<a href="#" class="cp-button" aria-label="Icono copiar enlace al portapapeles" data-clipboard-text="https://www.poderjudicial.es/search/AN/openDocument/3fb62a5395c8aaa1a0a8778d75e36f0d/20260917"><i class="fa fa-clipboard" aria-hidden="true"></i></a>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="row searchresult doc" id="jurisprudenciaresults_content-11853464" data-ref="11853464" data-db="TS" data-fechares="20260910" data-alertdoc="">
+<div class="col-xs-12 col-sm-12 content">
+<div class="title">
+<a href="#" data-link="https://www.poderjudicial.es/search/AN/openDocument/de031efaee4f8d29a0a8778d75e36f0d/20260917" onclick="markOpenedDoc($(this));openDocumentNewWindow(this);return false;" class="tooltips new-button hidden-xs" title="Abrir el documento en nueva ventana" data-placement="top" aria-label="Icono Abrir el documento en nueva ventana" data-databasematch="TS" data-reference="11853464" data-statsqueryid="320623240" data-links="clausulas abusivas" data-optimize="20260917" data-start="3" data-lang="1"><i class="fa fa-external-link" aria-hidden="true"></i></a><span class="separator hidden-xs">&nbsp;</span><a href="https://www.poderjudicial.es/search/AN/openDocument/de031efaee4f8d29a0a8778d75e36f0d/20260917" id="ref-11853464" onclick="markOpenedDoc($(this));openDocumentFromHref(this);return false;" data-databasematch="TS" data-reference="11853464" data-statsqueryid="320623240" data-links="clausulas abusivas" data-optimize="20260917" data-roj="ATS 7882/2026" data-fechares="20260910" data-alertdoc="" data-start="3" data-lang="1" data-langiso="es">ATS, a 10 de septiembre de 2026 - ROJ: ATS 7882/2026</a>
+</div>
+<div class="metadatos">
+<ul>
+<li>
+<b>ECLI:ES:TS:2026:7882A</b>
+</li>
+<li>
+<b>Sala de lo Civil</b>
+</li>
+<li>Municipio: <b>Madrid</b>
+</li>
+<li>Ponente: <b>IGNACIO SANCHO GARGALLO</b>
+</li>
+<li>N&ordm; Recurso: <b>4310/2023</b>
+</li>
+</ul>
+</div>
+<div class="summary" id="jur-summary-3">
+                                    RESUMEN: <b>Condiciones generales de contratación. <font color=red>Cláusula</font> de comisión de apertura en contrato de préstamo hipotecario con consumidor. KUTXABANK S.A.  La sentencia recurrida (AP Álava S 1ª) considera la <font color=red>cláusula</font>  abusiva, señala que hay  desequilibrio porque no responde a servicios prestados a consumidor (se fija como cuantía un porcentaje del capital de préstamo). El recuso defiende que supera control de contenido y de transparencia y que no es precisa la prueba de la efectiva prestación de servicios. La escritura es de fecha de 13/04/2005 y el capital de préstamo 207.950 . Por tanto, no se aplica la Orden 94 por cuantía (superior a 25 millones). Se aplica la Orden 1989 y Circular 1990. C.4.1 comisión de apertura 0,20% del importe del préstamo pagadero una vez. No solapamiento. En la escritura no consta que se facilitase información precontractual al consumidor. Se adjunta a la contestación de la demanda oferta vinculante de fecha de 08/04/2005 pero no consta firmada por el consumidor</b>
+</div>
+</div>
+<div class="">
+<div class="info pull-right">
+<ul></ul>
+</div>
+</div>
+<div class="col-xs-12 actions">
+<div class="pull-left docactions">
+<ul>
+<li id="jur-leglink-3" class="hidden-xs hidden legislacion" data-toggle="popover" data-a="jur-legdiv-3" data-placement="bottom" data-pos="3">
+<a href="#" onclick="return false;" class="tooltips" title="Legislaci&oacute;n relacionada" data-placement="top">
+								Legislaci&oacute;n <i class="fa fa-angle-down" aria-hidden="true"></i></a>
+</li>
+</ul>
+<div id="jur-legdiv-3" class="showLegRel hidden popover-content"></div>
+</div>
+<div class="pull-right docactions">
+<ul>
+<li class="social tooltips" title="compartir en Facebook" data-placement="bottom">
+<a href="#" class="fb-button" aria-label="Icono compartir en Facebook" data-href="https://www.poderjudicial.es/search/AN/openDocument/de031efaee4f8d29a0a8778d75e36f0d/20260917" data-title="ROJ: ATS 7882/2026"><i class="fa fa-facebook-square" aria-hidden="true"></i></a>
+</li>
+<li class="social tooltips twitter" title="compartir en Twitter" data-placement="bottom">
+<a href="#" class="twtr-button" aria-label="Icono compartir en Twitter. Pulse para compartir en Twitter" data-href="https://www.poderjudicial.es/search/AN/openDocument/de031efaee4f8d29a0a8778d75e36f0d/20260917" data-title="ROJ: ATS 7882/2026">
+<svg class="social_twitter" viewBox="0 0 26 26" aria-hidden="true">
+<g>
+<path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path>
+</g>
+</svg>
+</a>
+</li>
+<li class="social tooltips" title="copiar enlace" data-placement="bottom">
+<a href="#" class="cp-button" aria-label="Icono copiar enlace al portapapeles" data-clipboard-text="https://www.poderjudicial.es/search/AN/openDocument/de031efaee4f8d29a0a8778d75e36f0d/20260917"><i class="fa fa-clipboard" aria-hidden="true"></i></a>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="row searchresult doc" id="jurisprudenciaresults_content-11853361" data-ref="11853361" data-db="TS" data-fechares="20260910" data-alertdoc="">
+<div class="col-xs-12 col-sm-12 content">
+<div class="title">
+<a href="#" data-link="https://www.poderjudicial.es/search/AN/openDocument/1eabcb851929f391a0a8778d75e36f0d/20260917" onclick="markOpenedDoc($(this));openDocumentNewWindow(this);return false;" class="tooltips new-button hidden-xs" title="Abrir el documento en nueva ventana" data-placement="top" aria-label="Icono Abrir el documento en nueva ventana" data-databasematch="TS" data-reference="11853361" data-statsqueryid="320623240" data-links="clausulas abusivas" data-optimize="20260917" data-start="4" data-lang="1"><i class="fa fa-external-link" aria-hidden="true"></i></a><span class="separator hidden-xs">&nbsp;</span><a href="https://www.poderjudicial.es/search/AN/openDocument/1eabcb851929f391a0a8778d75e36f0d/20260917" id="ref-11853361" onclick="markOpenedDoc($(this));openDocumentFromHref(this);return false;" data-databasematch="TS" data-reference="11853361" data-statsqueryid="320623240" data-links="clausulas abusivas" data-optimize="20260917" data-roj="STS 3678/2026" data-fechares="20260910" data-alertdoc="" data-start="4" data-lang="1" data-langiso="es">STS, a 10 de septiembre de 2026 - ROJ: STS 3678/2026</a>
+</div>
+<div class="metadatos">
+<ul>
+<li>
+<b>ECLI:ES:TS:2026:3678</b>
+</li>
+<li>
+<b>Sala de lo Civil</b>
+</li>
+<li>N&ordm; de Resoluci&oacute;n: <b>1412/2026</b>
+</li>
+<li>Municipio: <b>Madrid</b>
+</li>
+<li>Ponente: <b>PEDRO JOSE VELA TORRES</b>
+</li>
+<li>N&ordm; Recurso: <b>232/2022</b>
+</li>
+</ul>
+</div>
+<div class="summary" id="jur-summary-4">
+                                    RESUMEN: <b>Comisión de apertura. Requisitos de validez. Reiteración de la jurisprudencia de la sala</b>
+</div>
+</div>
+<div class="">
+<div class="info pull-right">
+<ul></ul>
+</div>
+</div>
+<div class="col-xs-12 actions">
+<div class="pull-left docactions">
+<ul>
+<li id="jur-leglink-4" class="hidden-xs hidden legislacion" data-toggle="popover" data-a="jur-legdiv-4" data-placement="bottom" data-pos="4">
+<a href="#" onclick="return false;" class="tooltips" title="Legislaci&oacute;n relacionada" data-placement="top">
+								Legislaci&oacute;n <i class="fa fa-angle-down" aria-hidden="true"></i></a>
+</li>
+</ul>
+<div id="jur-legdiv-4" class="showLegRel hidden popover-content"></div>
+</div>
+<div class="pull-right docactions">
+<ul>
+<li class="social tooltips" title="compartir en Facebook" data-placement="bottom">
+<a href="#" class="fb-button" aria-label="Icono compartir en Facebook" data-href="https://www.poderjudicial.es/search/AN/openDocument/1eabcb851929f391a0a8778d75e36f0d/20260917" data-title="ROJ: STS 3678/2026"><i class="fa fa-facebook-square" aria-hidden="true"></i></a>
+</li>
+<li class="social tooltips twitter" title="compartir en Twitter" data-placement="bottom">
+<a href="#" class="twtr-button" aria-label="Icono compartir en Twitter. Pulse para compartir en Twitter" data-href="https://www.poderjudicial.es/search/AN/openDocument/1eabcb851929f391a0a8778d75e36f0d/20260917" data-title="ROJ: STS 3678/2026">
+<svg class="social_twitter" viewBox="0 0 26 26" aria-hidden="true">
+<g>
+<path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path>
+</g>
+</svg>
+</a>
+</li>
+<li class="social tooltips" title="copiar enlace" data-placement="bottom">
+<a href="#" class="cp-button" aria-label="Icono copiar enlace al portapapeles" data-clipboard-text="https://www.poderjudicial.es/search/AN/openDocument/1eabcb851929f391a0a8778d75e36f0d/20260917"><i class="fa fa-clipboard" aria-hidden="true"></i></a>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="row searchresult doc" id="jurisprudenciaresults_content-11853409" data-ref="11853409" data-db="TS" data-fechares="20260910" data-alertdoc="">
+<div class="col-xs-12 col-sm-12 content">
+<div class="title">
+<a href="#" data-link="https://www.poderjudicial.es/search/AN/openDocument/5877e93b9e58e0e7a0a8778d75e36f0d/20260917" onclick="markOpenedDoc($(this));openDocumentNewWindow(this);return false;" class="tooltips new-button hidden-xs" title="Abrir el documento en nueva ventana" data-placement="top" aria-label="Icono Abrir el documento en nueva ventana" data-databasematch="TS" data-reference="11853409" data-statsqueryid="320623240" data-links="clausulas abusivas" data-optimize="20260917" data-start="5" data-lang="1"><i class="fa fa-external-link" aria-hidden="true"></i></a><span class="separator hidden-xs">&nbsp;</span><a href="https://www.poderjudicial.es/search/AN/openDocument/5877e93b9e58e0e7a0a8778d75e36f0d/20260917" id="ref-11853409" onclick="markOpenedDoc($(this));openDocumentFromHref(this);return false;" data-databasematch="TS" data-reference="11853409" data-statsqueryid="320623240" data-links="clausulas abusivas" data-optimize="20260917" data-roj="ATS 7824/2026" data-fechares="20260910" data-alertdoc="" data-start="5" data-lang="1" data-langiso="es">ATS, a 10 de septiembre de 2026 - ROJ: ATS 7824/2026</a>
+</div>
+<div class="metadatos">
+<ul>
+<li>
+<b>ECLI:ES:TS:2026:7824A</b>
+</li>
+<li>
+<b>Sala de lo Civil</b>
+</li>
+<li>Municipio: <b>Madrid</b>
+</li>
+<li>Ponente: <b>NURIA AUXILIADORA ORELLANA CANO</b>
+</li>
+<li>N&ordm; Recurso: <b>4329/2023</b>
+</li>
+</ul>
+</div>
+<div class="summary" id="jur-summary-5">
+                                    RESUMEN: <b>Condiciones generales de contratación. <font color=red>Cláusula</font> de comisión de apertura en contrato de préstamo hipotecario con consumidor. KUTXABANK S.A.  La sentencia recurrida (AP Álava S 1ª) considera la <font color=red>cláusula</font> abusiva, señala que hay  desequilibrio porque no responde a servicios prestados a consumidor (se fija como cuantía un porcentaje del capital de préstamo). El recuso defiende que supera control de contenido y de transparencia y que no es precisa la prueba de la efectiva prestación de servicios. La escritura es de fecha de 20/05/2005 05 y el capital de préstamo 305.000 . Por tanto, no se aplica la Orden 94 por cuantía (superior a 25 millones). Se aplica la Orden 1989 y Circular 1990. C.4.1 comisión de apertura 0,20% del importe del préstamo pagadero una vez. No solapamiento. En la escritura no consta que se facilitase información precontractual al consumidor. En contestación a la demanda no se aporta oferta vinculante</b>
+</div>
+</div>
+<div class="">
+<div class="info pull-right">
+<ul></ul>
+</div>
+</div>
+<div class="col-xs-12 actions">
+<div class="pull-left docactions">
+<ul>
+<li id="jur-leglink-5" class="hidden-xs hidden legislacion" data-toggle="popover" data-a="jur-legdiv-5" data-placement="bottom" data-pos="5">
+<a href="#" onclick="return false;" class="tooltips" title="Legislaci&oacute;n relacionada" data-placement="top">
+								Legislaci&oacute;n <i class="fa fa-angle-down" aria-hidden="true"></i></a>
+</li>
+</ul>
+<div id="jur-legdiv-5" class="showLegRel hidden popover-content"></div>
+</div>
+<div class="pull-right docactions">
+<ul>
+<li class="social tooltips" title="compartir en Facebook" data-placement="bottom">
+<a href="#" class="fb-button" aria-label="Icono compartir en Facebook" data-href="https://www.poderjudicial.es/search/AN/openDocument/5877e93b9e58e0e7a0a8778d75e36f0d/20260917" data-title="ROJ: ATS 7824/2026"><i class="fa fa-facebook-square" aria-hidden="true"></i></a>
+</li>
+<li class="social tooltips twitter" title="compartir en Twitter" data-placement="bottom">
+<a href="#" class="twtr-button" aria-label="Icono compartir en Twitter. Pulse para compartir en Twitter" data-href="https://www.poderjudicial.es/search/AN/openDocument/5877e93b9e58e0e7a0a8778d75e36f0d/20260917" data-title="ROJ: ATS 7824/2026">
+<svg class="social_twitter" viewBox="0 0 26 26" aria-hidden="true">
+<g>
+<path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path>
+</g>
+</svg>
+</a>
+</li>
+<li class="social tooltips" title="copiar enlace" data-placement="bottom">
+<a href="#" class="cp-button" aria-label="Icono copiar enlace al portapapeles" data-clipboard-text="https://www.poderjudicial.es/search/AN/openDocument/5877e93b9e58e0e7a0a8778d75e36f0d/20260917"><i class="fa fa-clipboard" aria-hidden="true"></i></a>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="row searchresult doc" id="jurisprudenciaresults_content-11853363" data-ref="11853363" data-db="TS" data-fechares="20260909" data-alertdoc="">
+<div class="col-xs-12 col-sm-12 content">
+<div class="title">
+<a href="#" data-link="https://www.poderjudicial.es/search/AN/openDocument/d8408a21ab6d34b4a0a8778d75e36f0d/20260917" onclick="markOpenedDoc($(this));openDocumentNewWindow(this);return false;" class="tooltips new-button hidden-xs" title="Abrir el documento en nueva ventana" data-placement="top" aria-label="Icono Abrir el documento en nueva ventana" data-databasematch="TS" data-reference="11853363" data-statsqueryid="320623240" data-links="clausulas abusivas" data-optimize="20260917" data-start="6" data-lang="1"><i class="fa fa-external-link" aria-hidden="true"></i></a><span class="separator hidden-xs">&nbsp;</span><a href="https://www.poderjudicial.es/search/AN/openDocument/d8408a21ab6d34b4a0a8778d75e36f0d/20260917" id="ref-11853363" onclick="markOpenedDoc($(this));openDocumentFromHref(this);return false;" data-databasematch="TS" data-reference="11853363" data-statsqueryid="320623240" data-links="clausulas abusivas" data-optimize="20260917" data-roj="STS 3680/2026" data-fechares="20260909" data-alertdoc="" data-start="6" data-lang="1" data-langiso="es">STS, a 09 de septiembre de 2026 - ROJ: STS 3680/2026</a>
+</div>
+<div class="metadatos">
+<ul>
+<li>
+<b>ECLI:ES:TS:2026:3680</b>
+</li>
+<li>
+<b>Sala de lo Civil</b>
+</li>
+<li>N&ordm; de Resoluci&oacute;n: <b>1393/2026</b>
+</li>
+<li>Municipio: <b>Madrid</b>
+</li>
+<li>Ponente: <b>NURIA AUXILIADORA ORELLANA CANO</b>
+</li>
+<li>N&ordm; Recurso: <b>2810/2019</b>
+</li>
+</ul>
+</div>
+<div class="summary" id="jur-summary-6">
+                                    RESUMEN: <b>Préstamo hipotecario con una <font color=red>cláusula</font> de intereses remuneratorios que incluye el IRPH como índice de referencia. Parámetros del control de transparencia y abusividad tras las sentencias de pleno 1590/2025 y 1591/2025, las dos de 11 de noviembre, dictadas de conformidad con las SSTJUE de 13 de julio de 2023 (C-265/22) y de 12 de diciembre de 2024 (C-300/23). La declaración de la falta de transparencia de la <font color=red>cláusula</font> es condición necesaria, pero no suficiente para la apreciación de la abusividad. Control de abusividad de la <font color=red>cláusula</font> según los parámetros de la sentencia de la referida sentencia de pleno 1591/2025, de 11 de noviembre. Cómputo del plazo de prescripción de la acción de restitución de los gastos indebidamente abonados. Reiteración de jurisprudencia. En los casos de compraventa con subrogación y novación del préstamo, cuando no consten desglosados en las facturas, con la debida separación, los gastos que corresponden a la compraventa, por una parte, y los de la subrogación y novación del préstamo, por otra, procede diferir a ejecución de sentencia la determinación del importe que corresponda pagar a la entidad demandada, con exclusión de los gastos de la compraventa, conforme a los criterios fijados por esta sala en las sentencias 457/2020, de 24 de julio y sentencia 555/2020, de 26 de octubre</b>
+</div>
+</div>
+<div class="">
+<div class="info pull-right">
+<ul></ul>
+</div>
+</div>
+<div class="col-xs-12 actions">
+<div class="pull-left docactions">
+<ul>
+<li id="jur-leglink-6" class="hidden-xs hidden legislacion" data-toggle="popover" data-a="jur-legdiv-6" data-placement="bottom" data-pos="6">
+<a href="#" onclick="return false;" class="tooltips" title="Legislaci&oacute;n relacionada" data-placement="top">
+								Legislaci&oacute;n <i class="fa fa-angle-down" aria-hidden="true"></i></a>
+</li>
+</ul>
+<div id="jur-legdiv-6" class="showLegRel hidden popover-content"></div>
+</div>
+<div class="pull-right docactions">
+<ul>
+<li class="social tooltips" title="compartir en Facebook" data-placement="bottom">
+<a href="#" class="fb-button" aria-label="Icono compartir en Facebook" data-href="https://www.poderjudicial.es/search/AN/openDocument/d8408a21ab6d34b4a0a8778d75e36f0d/20260917" data-title="ROJ: STS 3680/2026"><i class="fa fa-facebook-square" aria-hidden="true"></i></a>
+</li>
+<li class="social tooltips twitter" title="compartir en Twitter" data-placement="bottom">
+<a href="#" class="twtr-button" aria-label="Icono compartir en Twitter. Pulse para compartir en Twitter" data-href="https://www.poderjudicial.es/search/AN/openDocument/d8408a21ab6d34b4a0a8778d75e36f0d/20260917" data-title="ROJ: STS 3680/2026">
+<svg class="social_twitter" viewBox="0 0 26 26" aria-hidden="true">
+<g>
+<path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path>
+</g>
+</svg>
+</a>
+</li>
+<li class="social tooltips" title="copiar enlace" data-placement="bottom">
+<a href="#" class="cp-button" aria-label="Icono copiar enlace al portapapeles" data-clipboard-text="https://www.poderjudicial.es/search/AN/openDocument/d8408a21ab6d34b4a0a8778d75e36f0d/20260917"><i class="fa fa-clipboard" aria-hidden="true"></i></a>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="row searchresult doc" id="jurisprudenciaresults_content-11853360" data-ref="11853360" data-db="TS" data-fechares="20260909" data-alertdoc="">
+<div class="col-xs-12 col-sm-12 content">
+<div class="title">
+<a href="#" data-link="https://www.poderjudicial.es/search/AN/openDocument/8ffd77bff9af41aea0a8778d75e36f0d/20260917" onclick="markOpenedDoc($(this));openDocumentNewWindow(this);return false;" class="tooltips new-button hidden-xs" title="Abrir el documento en nueva ventana" data-placement="top" aria-label="Icono Abrir el documento en nueva ventana" data-databasematch="TS" data-reference="11853360" data-statsqueryid="320623240" data-links="clausulas abusivas" data-optimize="20260917" data-start="7" data-lang="1"><i class="fa fa-external-link" aria-hidden="true"></i></a><span class="separator hidden-xs">&nbsp;</span><a href="https://www.poderjudicial.es/search/AN/openDocument/8ffd77bff9af41aea0a8778d75e36f0d/20260917" id="ref-11853360" onclick="markOpenedDoc($(this));openDocumentFromHref(this);return false;" data-databasematch="TS" data-reference="11853360" data-statsqueryid="320623240" data-links="clausulas abusivas" data-optimize="20260917" data-roj="STS 3677/2026" data-fechares="20260909" data-alertdoc="" data-start="7" data-lang="1" data-langiso="es">STS, a 09 de septiembre de 2026 - ROJ: STS 3677/2026</a>
+</div>
+<div class="metadatos">
+<ul>
+<li>
+<b>ECLI:ES:TS:2026:3677</b>
+</li>
+<li>
+<b>Sala de lo Civil</b>
+</li>
+<li>N&ordm; de Resoluci&oacute;n: <b>1397/2026</b>
+</li>
+<li>Municipio: <b>Madrid</b>
+</li>
+<li>Ponente: <b>PEDRO JOSE VELA TORRES</b>
+</li>
+<li>N&ordm; Recurso: <b>380/2022</b>
+</li>
+</ul>
+</div>
+<div class="summary" id="jur-summary-7">
+                                    RESUMEN: <b>Comisión de apertura. Requisitos de validez. Reiteración de la jurisprudencia de la Sala</b>
+</div>
+</div>
+<div class="">
+<div class="info pull-right">
+<ul></ul>
+</div>
+</div>
+<div class="col-xs-12 actions">
+<div class="pull-left docactions">
+<ul>
+<li id="jur-leglink-7" class="hidden-xs hidden legislacion" data-toggle="popover" data-a="jur-legdiv-7" data-placement="bottom" data-pos="7">
+<a href="#" onclick="return false;" class="tooltips" title="Legislaci&oacute;n relacionada" data-placement="top">
+								Legislaci&oacute;n <i class="fa fa-angle-down" aria-hidden="true"></i></a>
+</li>
+</ul>
+<div id="jur-legdiv-7" class="showLegRel hidden popover-content"></div>
+</div>
+<div class="pull-right docactions">
+<ul>
+<li class="social tooltips" title="compartir en Facebook" data-placement="bottom">
+<a href="#" class="fb-button" aria-label="Icono compartir en Facebook" data-href="https://www.poderjudicial.es/search/AN/openDocument/8ffd77bff9af41aea0a8778d75e36f0d/20260917" data-title="ROJ: STS 3677/2026"><i class="fa fa-facebook-square" aria-hidden="true"></i></a>
+</li>
+<li class="social tooltips twitter" title="compartir en Twitter" data-placement="bottom">
+<a href="#" class="twtr-button" aria-label="Icono compartir en Twitter. Pulse para compartir en Twitter" data-href="https://www.poderjudicial.es/search/AN/openDocument/8ffd77bff9af41aea0a8778d75e36f0d/20260917" data-title="ROJ: STS 3677/2026">
+<svg class="social_twitter" viewBox="0 0 26 26" aria-hidden="true">
+<g>
+<path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path>
+</g>
+</svg>
+</a>
+</li>
+<li class="social tooltips" title="copiar enlace" data-placement="bottom">
+<a href="#" class="cp-button" aria-label="Icono copiar enlace al portapapeles" data-clipboard-text="https://www.poderjudicial.es/search/AN/openDocument/8ffd77bff9af41aea0a8778d75e36f0d/20260917"><i class="fa fa-clipboard" aria-hidden="true"></i></a>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="row searchresult doc" id="jurisprudenciaresults_content-11853349" data-ref="11853349" data-db="TS" data-fechares="20260909" data-alertdoc="">
+<div class="col-xs-12 col-sm-12 content">
+<div class="title">
+<a href="#" data-link="https://www.poderjudicial.es/search/AN/openDocument/494288d35cbc77dfa0a8778d75e36f0d/20260917" onclick="markOpenedDoc($(this));openDocumentNewWindow(this);return false;" class="tooltips new-button hidden-xs" title="Abrir el documento en nueva ventana" data-placement="top" aria-label="Icono Abrir el documento en nueva ventana" data-databasematch="TS" data-reference="11853349" data-statsqueryid="320623240" data-links="clausulas abusivas" data-optimize="20260917" data-start="8" data-lang="1"><i class="fa fa-external-link" aria-hidden="true"></i></a><span class="separator hidden-xs">&nbsp;</span><a href="https://www.poderjudicial.es/search/AN/openDocument/494288d35cbc77dfa0a8778d75e36f0d/20260917" id="ref-11853349" onclick="markOpenedDoc($(this));openDocumentFromHref(this);return false;" data-databasematch="TS" data-reference="11853349" data-statsqueryid="320623240" data-links="clausulas abusivas" data-optimize="20260917" data-roj="STS 3665/2026" data-fechares="20260909" data-alertdoc="" data-start="8" data-lang="1" data-langiso="es">STS, a 09 de septiembre de 2026 - ROJ: STS 3665/2026</a>
+</div>
+<div class="metadatos">
+<ul>
+<li>
+<b>ECLI:ES:TS:2026:3665</b>
+</li>
+<li>
+<b>Sala de lo Civil</b>
+</li>
+<li>N&ordm; de Resoluci&oacute;n: <b>1399/2026</b>
+</li>
+<li>Municipio: <b>Madrid</b>
+</li>
+<li>Ponente: <b>PEDRO JOSE VELA TORRES</b>
+</li>
+<li>N&ordm; Recurso: <b>5672/2023</b>
+</li>
+</ul>
+</div>
+<div class="summary" id="jur-summary-8">
+                                    RESUMEN: <b>Comisión de apertura. Requisitos de validez. Reiteración de la jurisprudencia de la sala</b>
+</div>
+</div>
+<div class="">
+<div class="info pull-right">
+<ul></ul>
+</div>
+</div>
+<div class="col-xs-12 actions">
+<div class="pull-left docactions">
+<ul>
+<li id="jur-leglink-8" class="hidden-xs hidden legislacion" data-toggle="popover" data-a="jur-legdiv-8" data-placement="bottom" data-pos="8">
+<a href="#" onclick="return false;" class="tooltips" title="Legislaci&oacute;n relacionada" data-placement="top">
+								Legislaci&oacute;n <i class="fa fa-angle-down" aria-hidden="true"></i></a>
+</li>
+</ul>
+<div id="jur-legdiv-8" class="showLegRel hidden popover-content"></div>
+</div>
+<div class="pull-right docactions">
+<ul>
+<li class="social tooltips" title="compartir en Facebook" data-placement="bottom">
+<a href="#" class="fb-button" aria-label="Icono compartir en Facebook" data-href="https://www.poderjudicial.es/search/AN/openDocument/494288d35cbc77dfa0a8778d75e36f0d/20260917" data-title="ROJ: STS 3665/2026"><i class="fa fa-facebook-square" aria-hidden="true"></i></a>
+</li>
+<li class="social tooltips twitter" title="compartir en Twitter" data-placement="bottom">
+<a href="#" class="twtr-button" aria-label="Icono compartir en Twitter. Pulse para compartir en Twitter" data-href="https://www.poderjudicial.es/search/AN/openDocument/494288d35cbc77dfa0a8778d75e36f0d/20260917" data-title="ROJ: STS 3665/2026">
+<svg class="social_twitter" viewBox="0 0 26 26" aria-hidden="true">
+<g>
+<path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path>
+</g>
+</svg>
+</a>
+</li>
+<li class="social tooltips" title="copiar enlace" data-placement="bottom">
+<a href="#" class="cp-button" aria-label="Icono copiar enlace al portapapeles" data-clipboard-text="https://www.poderjudicial.es/search/AN/openDocument/494288d35cbc77dfa0a8778d75e36f0d/20260917"><i class="fa fa-clipboard" aria-hidden="true"></i></a>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="row searchresult doc" id="jurisprudenciaresults_content-11853371" data-ref="11853371" data-db="TS" data-fechares="20260909" data-alertdoc="">
+<div class="col-xs-12 col-sm-12 content">
+<div class="title">
+<a href="#" data-link="https://www.poderjudicial.es/search/AN/openDocument/543dcc7aa66084e7a0a8778d75e36f0d/20260917" onclick="markOpenedDoc($(this));openDocumentNewWindow(this);return false;" class="tooltips new-button hidden-xs" title="Abrir el documento en nueva ventana" data-placement="top" aria-label="Icono Abrir el documento en nueva ventana" data-databasematch="TS" data-reference="11853371" data-statsqueryid="320623240" data-links="clausulas abusivas" data-optimize="20260917" data-start="9" data-lang="1"><i class="fa fa-external-link" aria-hidden="true"></i></a><span class="separator hidden-xs">&nbsp;</span><a href="https://www.poderjudicial.es/search/AN/openDocument/543dcc7aa66084e7a0a8778d75e36f0d/20260917" id="ref-11853371" onclick="markOpenedDoc($(this));openDocumentFromHref(this);return false;" data-databasematch="TS" data-reference="11853371" data-statsqueryid="320623240" data-links="clausulas abusivas" data-optimize="20260917" data-roj="ATS 7786/2026" data-fechares="20260909" data-alertdoc="" data-start="9" data-lang="1" data-langiso="es">ATS, a 09 de septiembre de 2026 - ROJ: ATS 7786/2026</a>
+</div>
+<div class="metadatos">
+<ul>
+<li>
+<b>ECLI:ES:TS:2026:7786A</b>
+</li>
+<li>
+<b>Sala de lo Civil</b>
+</li>
+<li>Municipio: <b>Madrid</b>
+</li>
+<li>Ponente: <b>NURIA AUXILIADORA ORELLANA CANO</b>
+</li>
+<li>N&ordm; Recurso: <b>2380/2019</b>
+</li>
+</ul>
+</div>
+<div class="summary" id="jur-summary-9">
+                                    RESUMEN: <b>CONDICIONES GENERALES DE LA CONTRATACIÓN. <font color=red>CLÁUSULA</font> SUELO.  COMISIÓN DE APERTURA. Recurso de casación, al amparo del ordinal 3º del artículo 477.2 LEC, frente a sentencia dictada en juicio ordinario sobre nulidad de condiciones generales de la contratación.- Inadmisión del motivo segundo del recurso de casación por falta de acreditación de la existencia de interés casacional (art. 483.2.3.º LEC) en la medida en que la sentencia recurrida no se opone a la doctrina de la sala en la materia litigiosa.- Escritura de préstamo de 30 de abril de 2009 con comisión de apertura no desproporcionada (1,5%), no hay solapamiento, el notario advierto de que no hay discrepancias entre la oferta vinculante y la escritura, y que el prestatario renuncia a su derecho a examinar la escritura en los tres días anteriores a su otorgamiento. Admisión del motivo primero del recurso de casación</b>
+</div>
+</div>
+<div class="">
+<div class="info pull-right">
+<ul></ul>
+</div>
+</div>
+<div class="col-xs-12 actions">
+<div class="pull-left docactions">
+<ul>
+<li id="jur-leglink-9" class="hidden-xs hidden legislacion" data-toggle="popover" data-a="jur-legdiv-9" data-placement="bottom" data-pos="9">
+<a href="#" onclick="return false;" class="tooltips" title="Legislaci&oacute;n relacionada" data-placement="top">
+								Legislaci&oacute;n <i class="fa fa-angle-down" aria-hidden="true"></i></a>
+</li>
+</ul>
+<div id="jur-legdiv-9" class="showLegRel hidden popover-content"></div>
+</div>
+<div class="pull-right docactions">
+<ul>
+<li class="social tooltips" title="compartir en Facebook" data-placement="bottom">
+<a href="#" class="fb-button" aria-label="Icono compartir en Facebook" data-href="https://www.poderjudicial.es/search/AN/openDocument/543dcc7aa66084e7a0a8778d75e36f0d/20260917" data-title="ROJ: ATS 7786/2026"><i class="fa fa-facebook-square" aria-hidden="true"></i></a>
+</li>
+<li class="social tooltips twitter" title="compartir en Twitter" data-placement="bottom">
+<a href="#" class="twtr-button" aria-label="Icono compartir en Twitter. Pulse para compartir en Twitter" data-href="https://www.poderjudicial.es/search/AN/openDocument/543dcc7aa66084e7a0a8778d75e36f0d/20260917" data-title="ROJ: ATS 7786/2026">
+<svg class="social_twitter" viewBox="0 0 26 26" aria-hidden="true">
+<g>
+<path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path>
+</g>
+</svg>
+</a>
+</li>
+<li class="social tooltips" title="copiar enlace" data-placement="bottom">
+<a href="#" class="cp-button" aria-label="Icono copiar enlace al portapapeles" data-clipboard-text="https://www.poderjudicial.es/search/AN/openDocument/543dcc7aa66084e7a0a8778d75e36f0d/20260917"><i class="fa fa-clipboard" aria-hidden="true"></i></a>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="row searchresult doc" id="jurisprudenciaresults_content-11853359" data-ref="11853359" data-db="TS" data-fechares="20260909" data-alertdoc="">
+<div class="col-xs-12 col-sm-12 content">
+<div class="title">
+<a href="#" data-link="https://www.poderjudicial.es/search/AN/openDocument/05ac33b3bb5a9078a0a8778d75e36f0d/20260917" onclick="markOpenedDoc($(this));openDocumentNewWindow(this);return false;" class="tooltips new-button hidden-xs" title="Abrir el documento en nueva ventana" data-placement="top" aria-label="Icono Abrir el documento en nueva ventana" data-databasematch="TS" data-reference="11853359" data-statsqueryid="320623240" data-links="clausulas abusivas" data-optimize="20260917" data-start="10" data-lang="1"><i class="fa fa-external-link" aria-hidden="true"></i></a><span class="separator hidden-xs">&nbsp;</span><a href="https://www.poderjudicial.es/search/AN/openDocument/05ac33b3bb5a9078a0a8778d75e36f0d/20260917" id="ref-11853359" onclick="markOpenedDoc($(this));openDocumentFromHref(this);return false;" data-databasematch="TS" data-reference="11853359" data-statsqueryid="320623240" data-links="clausulas abusivas" data-optimize="20260917" data-roj="STS 3676/2026" data-fechares="20260909" data-alertdoc="" data-start="10" data-lang="1" data-langiso="es">STS, a 09 de septiembre de 2026 - ROJ: STS 3676/2026</a>
+</div>
+<div class="metadatos">
+<ul>
+<li>
+<b>ECLI:ES:TS:2026:3676</b>
+</li>
+<li>
+<b>Sala de lo Civil</b>
+</li>
+<li>N&ordm; de Resoluci&oacute;n: <b>1396/2026</b>
+</li>
+<li>Municipio: <b>Madrid</b>
+</li>
+<li>Ponente: <b>PEDRO JOSE VELA TORRES</b>
+</li>
+<li>N&ordm; Recurso: <b>365/2022</b>
+</li>
+</ul>
+</div>
+<div class="summary" id="jur-summary-10">
+                                    RESUMEN: <b>Comisión de apertura. Requisitos de validez. Reiteración de la jurisprudencia de la sala</b>
+</div>
+</div>
+<div class="">
+<div class="info pull-right">
+<ul></ul>
+</div>
+</div>
+<div class="col-xs-12 actions">
+<div class="pull-left docactions">
+<ul>
+<li id="jur-leglink-10" class="hidden-xs hidden legislacion" data-toggle="popover" data-a="jur-legdiv-10" data-placement="bottom" data-pos="10">
+<a href="#" onclick="return false;" class="tooltips" title="Legislaci&oacute;n relacionada" data-placement="top">
+								Legislaci&oacute;n <i class="fa fa-angle-down" aria-hidden="true"></i></a>
+</li>
+</ul>
+<div id="jur-legdiv-10" class="showLegRel hidden popover-content"></div>
+</div>
+<div class="pull-right docactions">
+<ul>
+<li class="social tooltips" title="compartir en Facebook" data-placement="bottom">
+<a href="#" class="fb-button" aria-label="Icono compartir en Facebook" data-href="https://www.poderjudicial.es/search/AN/openDocument/05ac33b3bb5a9078a0a8778d75e36f0d/20260917" data-title="ROJ: STS 3676/2026"><i class="fa fa-facebook-square" aria-hidden="true"></i></a>
+</li>
+<li class="social tooltips twitter" title="compartir en Twitter" data-placement="bottom">
+<a href="#" class="twtr-button" aria-label="Icono compartir en Twitter. Pulse para compartir en Twitter" data-href="https://www.poderjudicial.es/search/AN/openDocument/05ac33b3bb5a9078a0a8778d75e36f0d/20260917" data-title="ROJ: STS 3676/2026">
+<svg class="social_twitter" viewBox="0 0 26 26" aria-hidden="true">
+<g>
+<path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path>
+</g>
+</svg>
+</a>
+</li>
+<li class="social tooltips" title="copiar enlace" data-placement="bottom">
+<a href="#" class="cp-button" aria-label="Icono copiar enlace al portapapeles" data-clipboard-text="https://www.poderjudicial.es/search/AN/openDocument/05ac33b3bb5a9078a0a8778d75e36f0d/20260917"><i class="fa fa-clipboard" aria-hidden="true"></i></a>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+<div class="bottompagination row">
+<form id="bottomfrmFilterjurisprudencia" name="frmFilterjurisprudencia" action="#" class="searchform" onsubmit="goToPage('jurisprudencia',$(this).find('.slectnavgoto input').val());">
+<div id="jurisprudenciaresults_bottompagination" class="pull-right searchpagination searchform bottom"></div>
+</form>
+</div>
+</div>

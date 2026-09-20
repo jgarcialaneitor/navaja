@@ -1,0 +1,35 @@
+# Local Pi runtime state
+.atl/
+.engram/
+
+# Secrets and credentials — never track
+*.pw
+*.key
+*.pem
+.env
+.env.*
+.agente-ia-*
+
+# Config backups
+*.bak-*
+*.bak.*
+
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+.venv/
+venv/
+
+# Packaging metadata
+*.egg-info/
+
+# pytest cache
+.pytest_cache/
+
+# uv cache
+.uv/
+
+# Local browser profile (cookies; must never be committed)
+.navaja-profile/
