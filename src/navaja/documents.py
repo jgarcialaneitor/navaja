@@ -27,7 +27,7 @@ class DocumentRef:
     """Reference extracted from a CENDOJ ``openDocument`` URL."""
 
     reference: str
-    """32-character lowercase hex hash."""
+    """16- or 32-character hex hash, exactly as received."""
 
     optimize: str
     """YYYYMMDD optimization/index date token."""
@@ -64,12 +64,16 @@ class FullTextError(RuntimeError):
 
 
 _DOCUMENT_PATH_RE = re.compile(
-    r"^/search/AN/openDocument/([0-9a-f]{32})/(\d{8})/?\Z"
+    r"^/search/AN/openDocument/([0-9a-fA-F]{16}|[0-9a-fA-F]{32})/(\d{8})/?\Z"
 )
 
 
 def parse_document_url(url: str) -> DocumentRef:
     """Parse a CENDOJ ``openDocument`` URL into a :class:`DocumentRef`.
+
+    The path must contain a 16- or 32-character hex reference followed by an
+    ``YYYYMMDD`` optimization token. The reference is preserved exactly as it
+    appears in the URL.
 
     Raises:
         ValueError: if the URL does not match the expected shape.
@@ -81,7 +85,7 @@ def parse_document_url(url: str) -> DocumentRef:
     match = _DOCUMENT_PATH_RE.match(parsed.path)
     if not match:
         raise ValueError(
-            "URL path must be /search/AN/openDocument/<32-hex-hash>/<YYYYMMDD>"
+            "URL path must be /search/AN/openDocument/<16-or-32-hex-hash>/<YYYYMMDD>"
         )
 
     reference, optimize = match.groups()

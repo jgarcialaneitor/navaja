@@ -72,7 +72,17 @@ Out of scope, deliberately:
       - Add offline tests for host resolution, token persistence, file modes,
         malformed-file recovery and concurrent-safe writes.
       - Verified: `78 passed, 1 skipped` (`uv run pytest`).
-- [ ] 10. Fix the search-result parser gap for Tribunal Supremo rulings:
+- [x] 10. Fix the reproducible socket leak in `serve_captcha`:
+      `server.shutdown()` stops the `serve_forever` loop but does not close
+      the listening socket, so the port stayed bound until garbage collection.
+      Added `server_close()` in the `finally` block on every exit path
+      (success, timeout, exception while waiting, exception in handler) and
+      a clear `RuntimeError` when binding fails with `EADDRINUSE`. Added
+      regression tests: three consecutive timeouts on the same fixed port
+      without `gc.collect()`, successful answer releases the port, handler
+      exception still releases the port, and occupied-port bind error is
+      actionable. Verified: `96 passed, 1 skipped` (`uv run pytest`).
+- [ ] 11. Fix the search-result parser gap for Tribunal Supremo rulings:
       `Sentencia.sede` is `None` for STS/ATS rulings because `_parse_title`
       expects the `"<TIPO> <SEDE>, a <fecha>"` shape used by SAP titles. The
       Supreme Court title does not include the seat in that position, but the
@@ -158,3 +168,8 @@ Out of scope, deliberately:
   - Results carry `div.searchresult.doc[data-ref]`, with `.title a[data-roj]`,
     `.metadatos li` and `.summary` (automatic summary).
   - `HEAD` requests return HTTP 500; only `GET`/`POST` are supported.
+- Socket lifecycle fix (task 10): the `finally` block in `serve_captcha`
+  now calls `server.shutdown()`, `thread.join()` and `server.server_close()`,
+  preserving any in-flight exception. Occupied ports raise a clear
+  `RuntimeError` naming the host and port. Regression coverage in
+  `tests/test_captcha.py`.

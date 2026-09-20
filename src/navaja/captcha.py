@@ -8,6 +8,7 @@ image in a browser and types the answer.
 from __future__ import annotations
 
 import contextlib
+import errno
 import fcntl
 import html
 import os
@@ -444,6 +445,7 @@ def serve_captcha(
     Raises:
         ValueError: if ``host`` would bind all network interfaces, or if
             ``token`` fails validation.
+        RuntimeError: if the requested address is already in use.
         CaptchaTimeoutError: if no answer is received within ``timeout``.
     """
     host = _validate_host(host)
@@ -453,7 +455,18 @@ def serve_captcha(
     else:
         _validate_token(token)
 
-    server = _CaptchaServer((host, port), image_png, timeout, _Handler, token=token)
+    try:
+        server = _CaptchaServer(
+            (host, port), image_png, timeout, _Handler, token=token
+        )
+    except OSError as exc:
+        if exc.errno == errno.EADDRINUSE:
+            raise RuntimeError(
+                f"captcha server cannot bind to {host!r} port {port}: "
+                "address already in use"
+            ) from exc
+        raise
+
     actual_port = server.server_address[1]
     url = f"http://{host}:{actual_port}/{server.token}/"
 
@@ -467,11 +480,29 @@ def serve_captcha(
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
 
+    in_flight: BaseException | None = None
     try:
         server.answered.wait()
+    except BaseException as exc:
+        in_flight = exc
     finally:
-        server.shutdown()
-        thread.join(timeout=5.0)
+        try:
+            server.shutdown()
+        except Exception as exc:
+            if in_flight is None:
+                in_flight = exc
+        try:
+            thread.join(timeout=5.0)
+        except Exception as exc:
+            if in_flight is None:
+                in_flight = exc
+        try:
+            server.server_close()
+        except Exception as exc:
+            if in_flight is None:
+                in_flight = exc
+        if in_flight is not None:
+            raise in_flight
 
     if server.answer is None:
         exc = CaptchaTimeoutError(

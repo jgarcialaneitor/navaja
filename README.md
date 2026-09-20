@@ -124,7 +124,7 @@ on the same machine.
 Fetch a single document from the command line with the `navaja-doc` script:
 
 ```bash
-navaja-doc "https://www.poderjudicial.es/search/AN/openDocument/<32-hex-hash>/<YYYYMMDD>"
+navaja-doc "https://www.poderjudicial.es/search/AN/openDocument/<16-or-32-hex-hash>/<YYYYMMDD>"
 ```
 
 To get a real document URL right now, run:

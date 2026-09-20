@@ -60,6 +60,26 @@ def test_parse_document_url_accepts_real_shape():
     _assert_access_url(ref)
 
 
+def test_parse_document_url_accepts_16_character_hash():
+    reference = "d4a421d6eba4fbfa"
+    optimize = "20170502"
+    url = f"https://www.poderjudicial.es/search/AN/openDocument/{reference}/{optimize}"
+    ref = parse_document_url(url)
+    assert isinstance(ref, DocumentRef)
+    assert ref.reference == reference
+    assert ref.optimize == optimize
+    assert reference in ref.access_to_pdf_url
+    assert f"optimize={optimize}" in ref.access_to_pdf_url
+
+
+def test_parse_document_url_preserves_hash_casing():
+    reference = "D4A421D6EBA4FBFA"
+    optimize = "20170502"
+    url = f"https://www.poderjudicial.es/search/AN/openDocument/{reference}/{optimize}"
+    ref = parse_document_url(url)
+    assert ref.reference == reference
+
+
 @pytest.mark.parametrize(
     "url",
     [
@@ -68,6 +88,11 @@ def test_parse_document_url_accepts_real_shape():
         "https://www.poderjudicial.es/search/AN/openDocument/GGBBCCDDEeff00112233445566778899/20260911",
         "https://www.poderjudicial.es/search/AN/openDocument/aabbccddeeff00112233445566778899",
         "https://www.poderjudicial.es/search/AN/openDocument/aabbccddeeff00112233445566778899/202609115",
+        "https://www.poderjudicial.es/search/AN/openDocument/d4a421d6eba4fbf/20170502",
+        "https://www.poderjudicial.es/search/AN/openDocument/d4a421d6eba4fbfaaaaaaaaaaaaaaaa/20210705",
+        "https://www.poderjudicial.es/search/AN/openDocument/d4a421d6eba4fbfaaaaaaaaaaaaaaaaaa/20210705",
+        "https://www.poderjudicial.es/search/AN/openDocument//20170502",
+        "https://www.poderjudicial.es/search/AN/openDocument/d4a421d6eba4fb-f/20170502",
     ],
 )
 def test_parse_document_url_rejects_malformed_urls(url: str):

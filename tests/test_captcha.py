@@ -36,6 +36,16 @@ def _free_port() -> int:
         return int(sock.getsockname()[1])
 
 
+def _port_is_free(host: str, port: int) -> bool:
+    """Return whether ``host:port`` can be bound without SO_REUSEADDR."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        try:
+            sock.bind((host, port))
+        except OSError:
+            return False
+    return True
+
+
 def _wait_for_url(stderr: io.StringIO, deadline: float) -> str | None:
     while time.monotonic() < deadline:
         text = stderr.getvalue()
@@ -197,6 +207,68 @@ def test_supplied_valid_token_is_honored():
 def test_invalid_token_raises_value_error(bad_token):
     with pytest.raises(ValueError, match="token"):
         serve_captcha(TINY_PNG, token=bad_token, timeout=0.1)
+
+
+# --- Socket lifecycle regression tests --------------------------------------
+
+
+def test_timeout_releases_port_immediately_without_gc():
+    """Regression: serve_captcha must close its listening socket on timeout.
+
+    The port must be reusable immediately, without relying on garbage
+    collection, and repeatedly on the same fixed port.
+    """
+    port = _free_port()
+    for i in range(3):
+        with pytest.raises(CaptchaTimeoutError):
+            serve_captcha(TINY_PNG, host="127.0.0.1", port=port, timeout=0.1)
+        assert _port_is_free("127.0.0.1", port), (
+            f"port {port} still bound after timeout iteration {i}"
+        )
+
+
+def test_successful_answer_releases_port_immediately():
+    port = _free_port()
+    result, thread, stderr = _run_server(TINY_PNG, port, timeout=5.0)
+
+    url = _wait_for_url(stderr, time.monotonic() + 2.0)
+    assert url is not None, "server did not print its form URL"
+    token = _token_from_url(url)
+
+    httpx.post(
+        f"http://127.0.0.1:{port}/{token}/",
+        data={"captcha": "solved"},
+    )
+    thread.join(timeout=5.0)
+
+    assert result.get("answer") == "solved"
+    # The socket must be closed immediately; a fresh bind on the same port
+    # should succeed.
+    with pytest.raises(CaptchaTimeoutError):
+        serve_captcha(TINY_PNG, host="127.0.0.1", port=port, timeout=0.1)
+
+
+def test_handler_exception_still_releases_port(monkeypatch):
+    def raising_do_GET(self):  # noqa: N802
+        raise RuntimeError("simulated handler failure")
+
+    monkeypatch.setattr("navaja.captcha._Handler.do_GET", raising_do_GET)
+    port = _free_port()
+    with pytest.raises(CaptchaTimeoutError):
+        serve_captcha(TINY_PNG, host="127.0.0.1", port=port, timeout=0.3)
+    assert _port_is_free("127.0.0.1", port)
+
+
+def test_bind_to_occupied_port_raises_clear_error():
+    port = _free_port()
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", port))
+        sock.listen(1)
+        with pytest.raises(
+            RuntimeError,
+            match=f"cannot bind to '127.0.0.1' port {port}",
+        ):
+            serve_captcha(TINY_PNG, host="127.0.0.1", port=port, timeout=0.1)
 
 
 def test_stable_token_is_persisted_and_reused(monkeypatch, tmp_path):
