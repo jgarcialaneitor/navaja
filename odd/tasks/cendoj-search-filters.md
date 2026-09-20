@@ -168,6 +168,15 @@ first value. Do not repeat that; build the payload with a single `start`.
   have left every test green.
 - `as_dict()` keys and the dataclass field order are unchanged, so the MCP tool
   response shape does not move in this work unit.
+- A later live check through the MCP tool found an off-by-one left in
+  `has_more`: it required two records beyond the page, so a query with
+  `total=11` and 10 records shown reported that there was no more, while page 2
+  then returned the eleventh. Corrected in work unit `33ec950`, with the
+  boundary cases pinned in domain terms (10 of 10 false, 10 of 11 true, one
+  remaining of 11 false, 200 of 200 false, 200 of 201 true). The case that was
+  supposed to cover this asserted the wrong expectation and so pinned the wrong
+  side of the boundary: a test that encodes the formula instead of asking "is
+  there another record?" cannot catch an off-by-one.
 
 ### Task 2 verification (work unit `5dc7800`)
 
