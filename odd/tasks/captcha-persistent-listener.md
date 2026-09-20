@@ -223,6 +223,32 @@ Task 4 — documentation update (no source changes; do not commit).
   as untracked.
 - `git status` after the changes no longer lists `.codegraph/` as untracked.
 
+## Review status (RDD, switch on globally)
+
+The preflight ran. START froze a candidate over `738e018..ddac6f6` — this
+feature's four work-unit commits, not the whole branch. The provider chose one
+consolidated lens (`review-reliability`) at medium tier, 1934 lines, correction
+budget 200.
+
+The reliability lens ran and was admitted (`admission_decision: completed`).
+The provider then required a refuter (`provider_refuter_required`), which means
+the lens raised an inferential blocker rather than a deterministic one.
+
+The refuter **cannot run on this host**: `reviewer-config-invalid` — no model
+is assigned to the `review-refuter` role in the agent model routing config.
+This is host infrastructure, not something this repository can fix, and it is
+the same class of failure recorded for the previous review attempt on this
+project.
+
+State: lineage `review-181cdff137d04c0b` is left in `reviewing`, awaiting that
+refuter. It is **not** an approved review and **not** a completed one; no
+findings were surfaced to the author, and nothing was corrected under it. An
+older lineage, `review-6a1e0c93d5bf4827`, is also still parked in `reviewing`
+from an earlier session.
+
+To unblock: assign a model to the `review-refuter` role, then re-query bound
+STATUS for the lineage. Do not treat the unrun refuter as a pass.
+
 ## Known issues, deliberately not fixed here
 
 - `estado_servidor` raises `ValueError` when `NAVAJA_CAPTCHA_HOST=0.0.0.0`,
