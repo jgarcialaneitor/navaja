@@ -15,7 +15,7 @@ import httpx
 import pytest
 
 from navaja import CendojClient
-from navaja.captcha import CaptchaAnswer
+from navaja.captcha import CaptchaAnswer, CaptchaTimeoutError
 from navaja.cendoj import INDEX_URL, SEARCH_URL
 from navaja.server import (
     buscar_sentencias,
@@ -114,6 +114,45 @@ def _combined_transport(sent: list[httpx.Request] | None = None) -> httpx.MockTr
             return httpx.Response(
                 200,
                 text="<html><body>full text body</body></html>",
+                headers={"content-type": "text/html"},
+            )
+        return httpx.Response(404)
+
+    return httpx.MockTransport(handler)
+
+
+def _captcha_always_transport(sent: list[httpx.Request] | None = None) -> httpx.MockTransport:
+    """Always return the captcha challenge page, so every attempt fails."""
+    if sent is None:
+        sent = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        sent.append(request)
+        url = str(request.url)
+        if url == INDEX_URL:
+            return httpx.Response(200, text="<html><body>form</body></html>")
+        if "action=accessToPDF" in url:
+            return httpx.Response(
+                200,
+                text=(
+                    '<html><img src="/search/stickyImg">'
+                    '<form action="captcha"></form></html>'
+                ),
+                headers={"content-type": "text/html"},
+            )
+        if url.endswith("/search/stickyImg"):
+            return httpx.Response(
+                200, content=b"fake-png", headers={"content-type": "image/png"}
+            )
+        if request.method == "POST" and url.startswith(
+            "https://www.poderjudicial.es/search/contenidos.action"
+        ):
+            return httpx.Response(
+                200,
+                text=(
+                    '<html><img src="/search/stickyImg">'
+                    '<form action="captcha"></form></html>'
+                ),
                 headers={"content-type": "text/html"},
             )
         return httpx.Response(404)
@@ -285,3 +324,113 @@ def test_server_does_not_patch_secrets_for_stable_token():
     assert "import secrets" not in text
     assert "patch.object(secrets" not in text
     assert "token_urlsafe" not in text
+
+
+def test_ver_texto_completo_timeout_returns_structured_failure(monkeypatch):
+    sent: list[httpx.Request] = []
+    SpyClient = _spy_client_class(_fulltext_transport, sent)
+    monkeypatch.setattr("navaja.server.CendojClient", SpyClient)
+
+    exc = CaptchaTimeoutError("no captcha answer received within 0.1 seconds")
+    exc.url = "http://127.0.0.1:8765/test-token/"
+    monkeypatch.setattr(
+        "navaja.cendoj.serve_captcha", lambda *args, **kwargs: (_ for _ in ()).throw(exc)
+    )
+
+    result = ver_texto_completo(DOC_URL, espera_segundos=1)
+
+    assert result["ok"] is False
+    assert result["error_code"] == "captcha_timeout"
+    assert "captcha" in result["error"].lower()
+    assert result["attempts"] is None
+    assert result["requests"] is None
+    assert result["content_type"] is None
+    assert result["text"] is None
+    assert result["captcha_url"] == "http://127.0.0.1:8765/test-token/"
+
+
+def test_ver_texto_completo_timeout_without_url_omits_key(monkeypatch):
+    sent: list[httpx.Request] = []
+    SpyClient = _spy_client_class(_fulltext_transport, sent)
+    monkeypatch.setattr("navaja.server.CendojClient", SpyClient)
+
+    monkeypatch.setattr(
+        "navaja.cendoj.serve_captcha",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            CaptchaTimeoutError("timed out")
+        ),
+    )
+
+    result = ver_texto_completo(DOC_URL, espera_segundos=1)
+
+    assert result["ok"] is False
+    assert result["error_code"] == "captcha_timeout"
+    assert "captcha_url" not in result
+
+
+def test_ver_texto_completo_rejected_after_max_attempts_returns_structured_failure(
+    monkeypatch,
+):
+    sent: list[httpx.Request] = []
+    SpyClient = _spy_client_class(_captcha_always_transport, sent)
+    monkeypatch.setattr("navaja.server.CendojClient", SpyClient)
+    monkeypatch.setattr(
+        "navaja.cendoj.serve_captcha", lambda *args, **kwargs: CaptchaAnswer("WRONG")
+    )
+
+    result = ver_texto_completo(DOC_URL, espera_segundos=1)
+
+    assert result["ok"] is False
+    assert result["error_code"] == "captcha_rejected"
+    assert "rejected" in result["error"].lower()
+    assert result["attempts"] == 3
+    assert result["requests"] == 4
+    assert result["content_type"] is not None
+    assert result["text"] is not None
+
+
+def test_ver_texto_completo_malformed_url_returns_structured_failure(monkeypatch):
+    sent: list[httpx.Request] = []
+    SpyClient = _spy_client_class(_fulltext_transport, sent)
+    monkeypatch.setattr("navaja.server.CendojClient", SpyClient)
+
+    result = ver_texto_completo("https://www.poderjudicial.es/not-a-document", espera_segundos=1)
+
+    assert result["ok"] is False
+    assert result["error_code"] == "invalid_url"
+    assert result["attempts"] is None
+    assert result["requests"] is None
+    assert result["content_type"] is None
+    assert result["text"] is None
+
+
+def test_ver_texto_completo_programming_error_propagates(monkeypatch):
+    sent: list[httpx.Request] = []
+    SpyClient = _spy_client_class(_fulltext_transport, sent)
+    monkeypatch.setattr("navaja.server.CendojClient", SpyClient)
+
+    def bad_serve_captcha(*args, **kwargs):
+        raise TypeError("unexpected stub failure")
+
+    monkeypatch.setattr("navaja.cendoj.serve_captcha", bad_serve_captcha)
+
+    with pytest.raises(TypeError, match="unexpected stub failure"):
+        ver_texto_completo(DOC_URL, espera_segundos=1)
+
+
+def test_ver_texto_completo_success_path_still_returns_ok_true(monkeypatch):
+    sent: list[httpx.Request] = []
+    SpyClient = _spy_client_class(_fulltext_transport, sent)
+    monkeypatch.setattr("navaja.server.CendojClient", SpyClient)
+    monkeypatch.setattr(
+        "navaja.cendoj.serve_captcha", lambda *args, **kwargs: CaptchaAnswer("ABCD")
+    )
+
+    result = ver_texto_completo(DOC_URL, espera_segundos=1)
+
+    assert result["ok"] is True
+    assert "error_code" not in result
+    assert result["attempts"] == 1
+    assert result["requests"] >= 2
+    assert result["content_type"] is not None
+    assert "text" in result

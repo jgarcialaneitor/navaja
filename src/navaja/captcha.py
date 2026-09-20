@@ -474,8 +474,10 @@ def serve_captcha(
         thread.join(timeout=5.0)
 
     if server.answer is None:
-        raise CaptchaTimeoutError(
+        exc = CaptchaTimeoutError(
             f"no captcha answer received within {timeout} seconds"
         )
+        exc.url = url
+        raise exc
 
     return CaptchaAnswer._create(server.answer, port=actual_port, url=url)

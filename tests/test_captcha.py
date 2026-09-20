@@ -97,6 +97,16 @@ def test_times_out_when_no_answer():
         serve_captcha(TINY_PNG, host="127.0.0.1", port=port, timeout=0.2)
 
 
+def test_timeout_error_carries_form_url():
+    port = _free_port()
+    token = "valid-token-12345"
+    with pytest.raises(CaptchaTimeoutError) as exc_info:
+        serve_captcha(TINY_PNG, host="127.0.0.1", port=port, timeout=0.2, token=token)
+
+    assert hasattr(exc_info.value, "url")
+    assert f"http://127.0.0.1:{port}/{token}/" == exc_info.value.url
+
+
 def test_serves_image_at_token_path_and_returns_answer():
     port = _free_port()
     result, thread, stderr = _run_server(TINY_PNG, port)

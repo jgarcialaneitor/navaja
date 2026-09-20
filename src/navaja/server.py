@@ -22,12 +22,14 @@ from typing import Any
 
 from mcp.server.mcpserver import MCPServer
 
-from navaja import CendojClient
+from navaja import CendojClient, FullTextError
 from navaja.captcha import (
+    CaptchaTimeoutError,
     default_captcha_token_path,
     resolve_captcha_host,
     resolve_captcha_token,
 )
+from navaja.documents import parse_document_url
 
 server = MCPServer("navaja", version="0.0.1")
 
@@ -121,8 +123,26 @@ def ver_texto_completo(
 
     Returns:
         A dict with ``ok``, ``attempts``, ``requests``, ``content_type`` and
-        ``text``. The captcha answer itself is never returned.
+        ``text``. On failure ``ok`` is ``False`` and the dict also carries
+        ``error`` and ``error_code`` (``captcha_timeout``,
+        ``captcha_rejected``, ``full_text_error`` or ``invalid_url``). When
+        a captcha timeout occurs, ``captcha_url`` contains the form URL so
+        the caller can retry at the same address. The captcha answer itself
+        is never returned.
     """
+    try:
+        parse_document_url(url)
+    except ValueError as exc:
+        return {
+            "ok": False,
+            "error": str(exc),
+            "error_code": "invalid_url",
+            "attempts": None,
+            "requests": None,
+            "content_type": None,
+            "text": None,
+        }
+
     host, host_reason = resolve_captcha_host()
     port = _captcha_port()
     token, _token_reason = resolve_captcha_token()
@@ -135,18 +155,42 @@ def ver_texto_completo(
 
     client = _get_client()
 
-    # The stdio transport owns stdout. Redirect any stray print from the
-    # underlying client (prompts and the captcha form URL) to stderr.
-    with contextlib.redirect_stdout(sys.stderr):
-        result = client.fetch_full_text(
-            url,
-            host=host,
-            port=port,
-            timeout=float(espera_segundos),
-            token=token,
-        )
+    try:
+        # The stdio transport owns stdout. Redirect any stray print from the
+        # underlying client (prompts and the captcha form URL) to stderr.
+        with contextlib.redirect_stdout(sys.stderr):
+            result = client.fetch_full_text(
+                url,
+                host=host,
+                port=port,
+                timeout=float(espera_segundos),
+                token=token,
+            )
+    except CaptchaTimeoutError as exc:
+        payload: dict[str, Any] = {
+            "ok": False,
+            "error": str(exc),
+            "error_code": "captcha_timeout",
+            "attempts": None,
+            "requests": None,
+            "content_type": None,
+            "text": None,
+        }
+        if hasattr(exc, "url"):
+            payload["captcha_url"] = exc.url
+        return payload
+    except FullTextError as exc:
+        return {
+            "ok": False,
+            "error": str(exc),
+            "error_code": "full_text_error",
+            "attempts": None,
+            "requests": None,
+            "content_type": None,
+            "text": None,
+        }
 
-    payload: dict[str, Any] = {
+    payload = {
         "ok": result.ok,
         "attempts": result.attempts,
         "requests": result.requests,
@@ -155,6 +199,7 @@ def ver_texto_completo(
     }
     if result.error is not None:
         payload["error"] = result.error
+        payload["error_code"] = "captcha_rejected"
     return payload
 
 
