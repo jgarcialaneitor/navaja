@@ -99,10 +99,11 @@ Pagination: `records_por_pagina` in `{10, 20, 30, 50}`; `pagina >= 1`;
       instead of returning an empty page. It turned out to be three shapes, not
       two: the invalid-search page, the mass-download control, and a legitimate
       zero-hit page. Work unit `5dc7800`.
-- [ ] 3. `models.py`: fix the page metadata. `records_per_page` must reflect
+- [x] 3. `models.py`: fix the page metadata. `records_per_page` must reflect
       the request rather than the hardcoded constant, `has_more` must follow
       the offset semantics, and a response larger than the requested page
-      (the clamped window) must not be reported as a normal page.
+      (the clamped window) must not be reported as a normal page. Work unit
+      `0dba1c8`.
 - [ ] 4. `server.py`: expose the filters on `buscar_sentencias` with typed
       parameters, ISO date strings in, enums for the closed vocabularies,
       `texto` optional under the at-least-one-criterion rule, and
@@ -149,6 +150,24 @@ maxresults=500 / 1000 -> rejected; the 200 cap cannot be lifted
 Caveat recorded for task 2: an earlier probe of `start=201` reported the first
 page because the payload carried `start` twice and the server honoured the
 first value. Do not repeat that; build the payload with a single `start`.
+
+### Task 3 verification (work unit `0dba1c8`)
+
+- Test counts: 157 passed + 1 skipped before the work unit, 177 passed + 1
+  skipped after.
+- The clamp was measured to be narrower than the window rule suggests: with a
+  small result set (`total=1`, `total=4`), requesting `start=11` through
+  `start=201` returns an empty page, not a clamp and not a reset. Only a set
+  that reaches the 200 ceiling clamps. The refusal in `search()` is therefore
+  defensive, and an empty page past the end of a short result set stays a
+  normal empty page.
+- Two regression gaps were found during verification and closed with tests
+  before the commit: no existing `has_more` case told the offset arithmetic
+  apart from the old `page * records_per_page < total`, and nothing drove
+  `CendojClient.search` into a clamped response, so deleting the refusal would
+  have left every test green.
+- `as_dict()` keys and the dataclass field order are unchanged, so the MCP tool
+  response shape does not move in this work unit.
 
 ### Task 2 verification (work unit `5dc7800`)
 
