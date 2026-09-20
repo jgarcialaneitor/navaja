@@ -244,9 +244,12 @@ Verified outcome:
 
 Checks that did not pass, or were skipped:
 
-- Native review: not run for this slice. See the next section; this facade
-  reviews the workspace projection in `ordinary` mode and its controller rejects
-  the explicit `baseRef` form, so committed work has no candidate.
+- Native review: not run for this slice, and explicitly left unreviewed by the
+  user on 2026-09-20. This facade reviews the workspace projection in `ordinary`
+  mode and its controller rejects the explicit `baseRef` form, so work that is
+  already committed has no candidate. The review switch stays enabled, and the
+  corrected order is recorded for the next feature: implement uncommitted,
+  inspect, start, then commit.
 - `ver_texto_completo` is untouched and still needs a human for the site's
   captcha.
 - Live tests stay opt-in (`NAVAJA_LIVE=1`).
