@@ -101,13 +101,14 @@ Each `KEY&LABEL` pair is pipe-separated; the label is the usable value.
       `navaja` still exporting it. Tests cover the label forms, both unclassified
       markers, a label-free summary, `total_capped` true / false / unknown, and
       that `resumen` did not change. Work unit `0cb9407`.
-- [ ] 2. `server.py`: the guidance. Put the answering recipe in the tool
+- [x] 2. `server.py`: the guidance. Put the answering recipe in the tool
       description: how to answer "the last N about X in Y" (place + a subject
       wording + a page of 10 to 50 + classify by `materia`), that no
       server-side subject filter exists and why `voces` is not a substitute, the
       200-record ceiling and what to do when `total_capped` is true, and the
       accepted page sizes. Tests assert the description carries those points and
-      that `materia` and `total_capped` reach the tool's response.
+      that `materia` and `total_capped` reach the tool's response. Work unit
+      `7e416e9`.
 - [ ] 3. The vocabulary tool. Add `CendojClient.localizaciones(...)` for the
       endpoint above, the `listar_localizaciones` MCP tool on top of it, and one
       saved fixture per level captured live. Tests cover the parsing (including
@@ -177,6 +178,20 @@ four wordings unioned      -> complete for the window (only 2026-01-28 was new)
   read-only verifier, so two of that verifier's pytest counts measured `HEAD`
   (34 and 195) instead of the worktree. Do not stash while a verifier is reading
   the tree; the parent's own counts are the authority.
+
+### Task 2 verification (work unit `7e416e9`)
+
+- Test counts: 211 passed + 1 skipped before the work unit, 213 passed + 1
+  skipped after, with no test removed.
+- The description was written to be read on every call, so it stays short: the
+  recipe, the classifier rule, the ceiling and its remedy, the absence of a
+  server-side subject filter, and the four accepted page sizes.
+- The first version of the recipe test asserted bare substrings (`"10" in
+  description`), which any stray digit satisfies. Caught before the commit and
+  replaced with the load-bearing phrases, whitespace-collapsed so line wrapping
+  does not break them: the page sizes as enumerated, the recipe naming
+  `localizacion` and `texto`, `materia` as the classifier, `total_capped` tied
+  to the 200-record ceiling, and the `voces` caveat.
 
 ## Notes
 
