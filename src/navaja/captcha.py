@@ -694,6 +694,45 @@ def stop_shared_captcha_server() -> None:
 atexit.register(stop_shared_captcha_server)
 
 
+def start_shared_captcha_server(host: str, port: int, token: str) -> str:
+    """Start the shared captcha listener for ``(host, port)``.
+
+    The listener is created if it does not already exist. If it already
+    exists, the existing listener is returned as long as ``token`` matches.
+
+    Args:
+        host: network interface to bind. ``0.0.0.0``, ``::`` and empty
+            values are rejected with ``ValueError``.
+        port: TCP port to bind.
+        token: URL-path token for the captcha form. Must be non-empty, at
+            least 16 characters long, and contain only ``A-Z``, ``a-z``,
+            ``0-9``, ``-`` and ``_``.
+
+    Returns:
+        The stable form URL for the listener.
+
+    Raises:
+        ValueError: if ``host`` or ``token`` fail validation, or if a
+            listener already exists for this address with a different token.
+        RuntimeError: if the address is held by a foreign process.
+    """
+    host = _validate_host(host)
+    _validate_token(token)
+    server = _get_or_create_captcha_server(host, port, token)
+    return server.url
+
+
+def is_shared_captcha_server_running(host: str, port: int) -> bool:
+    """Return whether a shared captcha listener is running on ``(host, port)``."""
+    key = (host, port)
+    with _captcha_server_lock:
+        server = _captcha_servers.get(key)
+        if server is None:
+            return False
+        thread = server._thread
+        return thread is not None and thread.is_alive()
+
+
 def serve_captcha(
     image_png: bytes,
     *,

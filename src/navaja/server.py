@@ -18,6 +18,7 @@ import contextlib
 import os
 import sys
 import threading
+from collections.abc import AsyncIterator
 from typing import Any
 
 from mcp.server.mcpserver import MCPServer
@@ -26,12 +27,14 @@ from navaja import CendojClient, FullTextError
 from navaja.captcha import (
     CaptchaTimeoutError,
     default_captcha_token_path,
+    is_shared_captcha_server_running,
     resolve_captcha_host,
     resolve_captcha_token,
+    start_shared_captcha_server,
+    stop_shared_captcha_server,
 )
 from navaja.documents import parse_document_url
 
-server = MCPServer("navaja", version="0.0.1")
 
 _client_lock = threading.Lock()
 _client: CendojClient | None = None
@@ -69,6 +72,61 @@ def _captcha_port() -> int:
     if not (1 <= port <= 65535):
         raise ValueError(f"NAVAJA_CAPTCHA_PORT must be 1-65535, got {port}")
     return port
+
+
+# Depth of nested `_captcha_lifespan` entries in this process. The listener is
+# started on the outermost entry and stopped on the outermost exit only, so an
+# inner exit can never tear down a listener an outer session still relies on.
+_captcha_lifespan_lock = threading.Lock()
+_captcha_lifespan_depth = 0
+
+
+@contextlib.asynccontextmanager
+async def _captcha_lifespan(app: MCPServer[Any]) -> AsyncIterator[None]:
+    """Start the captcha listener with the session and stop it on exit.
+
+    A failure to start (bad host, bad token, or an already-occupied port) is
+    reported as a warning on stderr and does **not** crash the session. The
+    tool path will raise the proper error when a captcha is actually needed.
+
+    The listener is started only on the outermost entry and stopped only on the
+    outermost exit, and the teardown runs from a ``finally`` so an exception
+    raised inside the session body still releases the port.
+    """
+    global _captcha_lifespan_depth
+    with _captcha_lifespan_lock:
+        _captcha_lifespan_depth += 1
+        outermost = _captcha_lifespan_depth == 1
+
+    if outermost:
+        try:
+            host, host_reason = resolve_captcha_host()
+            port = _captcha_port()
+            token, token_reason = resolve_captcha_token()
+            url = start_shared_captcha_server(host, port, token)
+            print(
+                f"Captcha form listening at {url} ({host_reason}, {token_reason})",
+                file=sys.stderr,
+                flush=True,
+            )
+        except (ValueError, RuntimeError) as exc:
+            print(
+                f"Captcha listener warning: could not start: {exc}",
+                file=sys.stderr,
+                flush=True,
+            )
+
+    try:
+        yield
+    finally:
+        with _captcha_lifespan_lock:
+            _captcha_lifespan_depth -= 1
+            last = _captcha_lifespan_depth == 0
+        if last:
+            stop_shared_captcha_server()
+
+
+server = MCPServer("navaja", version="0.0.1", lifespan=_captcha_lifespan)
 
 
 @server.tool()
@@ -207,11 +265,13 @@ def ver_texto_completo(
 def estado_servidor() -> dict:
     """Return runtime server configuration without leaking secrets.
 
-    Returns the configured captcha host and port, and whether a stable token
-    has been set. The token value itself is never exposed.
+    Returns the configured captcha host and port, whether a stable token has
+    been set, whether the captcha listener is currently bound, and a masked
+    version of the form URL. The token value itself is never exposed.
     """
     host, _host_reason = resolve_captcha_host()
     port = _captcha_port()
+    port_str = str(port)
 
     env_token_set = bool(os.environ.get("NAVAJA_CAPTCHA_TOKEN", "").strip())
     stable_token_set = env_token_set
@@ -219,10 +279,15 @@ def estado_servidor() -> dict:
         # A persisted token also gives a stable URL even without the env var.
         stable_token_set = default_captcha_token_path().exists()
 
+    captcha_listening = is_shared_captcha_server_running(host, port)
+    captcha_url_masked = f"http://{host}:{port}/<token>/"
+
     return {
         "host": host,
-        "port": str(port),
+        "port": port_str,
         "stable_token_set": stable_token_set,
+        "captcha_listening": captcha_listening,
+        "captcha_url_masked": captcha_url_masked,
     }
 
 

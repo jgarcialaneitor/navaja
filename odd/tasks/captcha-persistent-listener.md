@@ -95,7 +95,7 @@ leaves `serve_captcha` half-migrated would not close on a green commit.
       the idle page, the idle POST, PNG 404 while idle, two sequential
       challenges reusing the same port and URL, the concurrent-challenge error,
       and `stop()` releasing the port.
-- [ ] 2. Wire `server.py`: start the listener with the session via
+- [x] 2. Wire `server.py`: start the listener with the session via
       `MCPServer(lifespan=...)`, stop it on exit, expose the form URL from
       `estado_servidor`, and keep stdout clean and `secrets` out of the file.
 - [ ] 3. Wire `cli.py`: same shared-listener semantics for the one-shot path,
@@ -136,6 +136,41 @@ Task 1 — commit `feat: keep the captcha form listener alive for the whole sess
   previously sent the acknowledgement page regardless. The handler now uses
   `finish()`'s return value, so an answer that nobody received is reported as
   discarded instead of as received.
+
+Task 2 — commit `feat: start the captcha listener with the MCP session`.
+
+- `uv run pytest` → `117 passed, 1 skipped`.
+- Independent verification exercised the **real** entry point this time
+  (`navaja-mcp` over stdio with a full JSON-RPC handshake), because the
+  implementation had only been proven by calling the context manager directly,
+  which does not test the promise the human depends on. All 8 runtime claims
+  confirmed: the port is bound for the life of the session and owned by the
+  session process; the idle page answers 200 with its refresh directive while
+  the session is idle; `captcha.png` and a wrong token are 404; the port is
+  released on a clean stdin close and on SIGTERM; `estado_servidor` answers
+  truthfully through a real `tools/call`; stdout carries nothing but
+  well-formed JSON-RPC; and bad-host and occupied-port configurations warn on
+  stderr without killing the session.
+- The token-masking of `captcha_url_masked` was checked programmatically
+  against the real token rather than by eye: no substring of the token appears.
+- Two defects were found in the teardown path and fixed:
+  1. `stop_shared_captcha_server()` sat after `yield` outside any `finally`, so
+     an exception raised inside the session body left the listener bound.
+  2. The stop cleared the whole registry, so a nested entry's exit tore down
+     the listener an outer session was still using.
+  Both are fixed by a depth-counted lifespan: the listener starts only on the
+  outermost entry, stops only on the outermost exit, and the teardown runs from
+  a `finally`. A control run against the pre-fix shape confirmed the new tests
+  actually fail without the fix.
+
+## Known issues, deliberately not fixed here
+
+- `estado_servidor` raises `ValueError` when `NAVAJA_CAPTCHA_HOST=0.0.0.0`,
+  surfacing to the caller as `isError: true` instead of a structured answer.
+  This is pre-existing behaviour of `resolve_captcha_host()` at
+  `src/navaja/server.py:248`, unrelated to this feature, and left untouched on
+  purpose so this change stays scoped. Worth a separate fix: a status tool that
+  cannot report status under a bad configuration is exactly backwards.
 
 ## Notes
 

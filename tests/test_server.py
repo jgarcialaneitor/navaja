@@ -8,16 +8,26 @@ suite must never hit the live CENDOJ site.
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import io
 import os
+import socket
 from pathlib import Path
+from typing import Any
 
 import httpx
 import pytest
 
 from navaja import CendojClient
-from navaja.captcha import CaptchaAnswer, CaptchaTimeoutError
+from navaja.captcha import (
+    CaptchaAnswer,
+    CaptchaTimeoutError,
+    stop_shared_captcha_server,
+)
+from navaja import server as navaja_server
 from navaja.cendoj import INDEX_URL, SEARCH_URL
 from navaja.server import (
+    _captcha_lifespan,
     buscar_sentencias,
     close_shared_client,
     estado_servidor,
@@ -32,6 +42,22 @@ DOC_URL = (
     "https://www.poderjudicial.es/search/AN/openDocument/"
     "ab58557b5ca08f54a0a8778d75e36f0d/20260916"
 )
+
+
+def _free_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        return int(sock.getsockname()[1])
+
+
+def _port_is_free(host: str, port: int) -> bool:
+    """Return whether ``host:port`` can be bound without SO_REUSEADDR."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        try:
+            sock.bind((host, port))
+        except OSError:
+            return False
+    return True
 
 
 def _search_transport(sent: list[httpx.Request] | None = None) -> httpx.MockTransport:
@@ -188,6 +214,15 @@ def _clean_env(monkeypatch, tmp_path):
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "xdg-state"))
 
 
+@pytest.fixture(autouse=True)
+def _reset_shared_captcha_server(monkeypatch):
+    """Stop and clear the shared captcha listener registry around every test."""
+    monkeypatch.setattr(navaja_server, "_captcha_lifespan_depth", 0)
+    stop_shared_captcha_server()
+    yield
+    stop_shared_captcha_server()
+
+
 def test_tools_are_registered_with_expected_names():
     tools = asyncio.run(server.list_tools())
     names = {tool.name for tool in tools}
@@ -283,7 +318,10 @@ def test_estado_servidor_does_not_leak_token(monkeypatch):
     assert result["host"] == "100.64.0.1"
     assert result["port"] == "1234"
     assert result["stable_token_set"] is True
+    assert result["captcha_listening"] is False
+    assert result["captcha_url_masked"] == "http://100.64.0.1:1234/<token>/"
     assert "super-secret-token-value" not in str(result)
+    assert "<token>" in result["captcha_url_masked"]
 
 
 def test_stable_token_path_reaches_serve_captcha(monkeypatch):
@@ -434,3 +472,194 @@ def test_ver_texto_completo_success_path_still_returns_ok_true(monkeypatch):
     assert result["requests"] >= 2
     assert result["content_type"] is not None
     assert "text" in result
+
+
+# --- Captcha listener lifespan tests ----------------------------------------
+
+
+def test_lifespan_starts_and_stops_listener(monkeypatch, capsys):
+    port = _free_port()
+    monkeypatch.setenv("NAVAJA_CAPTCHA_HOST", "127.0.0.1")
+    monkeypatch.setenv("NAVAJA_CAPTCHA_PORT", str(port))
+    monkeypatch.setenv("NAVAJA_CAPTCHA_TOKEN", "valid-token-123456")
+
+    async def run() -> None:
+        async with _captcha_lifespan(server):
+            assert not _port_is_free("127.0.0.1", port)
+            result = estado_servidor()
+            assert result["captcha_listening"] is True
+            assert result["captcha_url_masked"] == f"http://127.0.0.1:{port}/<token>/"
+
+    asyncio.run(run())
+
+    assert _port_is_free("127.0.0.1", port)
+    result = estado_servidor()
+    assert result["captcha_listening"] is False
+    assert capsys.readouterr().out == ""
+
+
+def test_lifespan_survives_bad_host_and_tool_still_raises(monkeypatch, capsys):
+    """The lifespan must swallow the bad-host rejection, not propagate it.
+
+    The body must actually run (so the session would keep serving) and the
+    context must exit normally; the tool path keeps raising the proper error.
+    """
+    port = _free_port()
+    monkeypatch.setenv("NAVAJA_CAPTCHA_HOST", "0.0.0.0")
+    monkeypatch.setenv("NAVAJA_CAPTCHA_PORT", str(port))
+    monkeypatch.setenv("NAVAJA_CAPTCHA_TOKEN", "valid-token-123456")
+
+    stderr_capture = io.StringIO()
+    body_ran: list[str] = []
+
+    async def run() -> None:
+        with contextlib.redirect_stderr(stderr_capture):
+            async with _captcha_lifespan(server):
+                # Reached only if the lifespan did not propagate the
+                # ValueError raised by resolve_captcha_host().
+                body_ran.append("session-alive")
+        body_ran.append("exited-cleanly")
+
+    asyncio.run(run())
+
+    assert body_ran == ["session-alive", "exited-cleanly"]
+    stderr = stderr_capture.getvalue()
+    assert "Captcha listener warning" in stderr
+    assert "0.0.0.0" in stderr
+    assert capsys.readouterr().out == ""
+
+    with pytest.raises(ValueError, match=r"0\.0\.0\.0"):
+        ver_texto_completo(DOC_URL, espera_segundos=1)
+
+
+def test_lifespan_does_not_crash_on_occupied_port(monkeypatch, capsys):
+    port = _free_port()
+    monkeypatch.setenv("NAVAJA_CAPTCHA_HOST", "127.0.0.1")
+    monkeypatch.setenv("NAVAJA_CAPTCHA_PORT", str(port))
+    monkeypatch.setenv("NAVAJA_CAPTCHA_TOKEN", "valid-token-123456")
+
+    stderr_capture = io.StringIO()
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", port))
+        sock.listen(1)
+
+        async def run() -> None:
+            with contextlib.redirect_stderr(stderr_capture):
+                async with _captcha_lifespan(server):
+                    result = estado_servidor()
+                    assert result["captcha_listening"] is False
+
+        asyncio.run(run())
+
+    stderr = stderr_capture.getvalue()
+    assert "Captcha listener warning" in stderr
+    assert "address already in use" in stderr
+    assert capsys.readouterr().out == ""
+
+
+def test_lifespan_url_masked_contains_no_token_part(monkeypatch, capsys):
+    port = _free_port()
+    token = "my-session-token-12345"
+    monkeypatch.setenv("NAVAJA_CAPTCHA_HOST", "127.0.0.1")
+    monkeypatch.setenv("NAVAJA_CAPTCHA_PORT", str(port))
+    monkeypatch.setenv("NAVAJA_CAPTCHA_TOKEN", token)
+
+    async def run() -> None:
+        async with _captcha_lifespan(server):
+            result = estado_servidor()
+            assert result["captcha_listening"] is True
+            masked = result["captcha_url_masked"]
+            assert token not in masked
+            assert "<token>" in masked
+            assert masked == f"http://127.0.0.1:{port}/<token>/"
+
+    asyncio.run(run())
+    assert capsys.readouterr().out == ""
+
+
+def test_entering_lifespan_context_manager_writes_nothing_to_stdout(
+    capsys, monkeypatch
+):
+    """Entering and exiting the context manager must not touch stdout.
+
+    This asserts the in-process behaviour only; the stdio transport itself is
+    not exercised here, so it cannot observe transport-level output.
+    """
+    port = _free_port()
+    monkeypatch.setenv("NAVAJA_CAPTCHA_HOST", "127.0.0.1")
+    monkeypatch.setenv("NAVAJA_CAPTCHA_PORT", str(port))
+    monkeypatch.setenv("NAVAJA_CAPTCHA_TOKEN", "valid-token-123456")
+
+    async def run() -> None:
+        async with _captcha_lifespan(server):
+            pass
+
+    asyncio.run(run())
+    assert capsys.readouterr().out == ""
+
+
+def test_lifespan_releases_listener_when_body_raises(monkeypatch, capsys):
+    port = _free_port()
+    monkeypatch.setenv("NAVAJA_CAPTCHA_HOST", "127.0.0.1")
+    monkeypatch.setenv("NAVAJA_CAPTCHA_PORT", str(port))
+    monkeypatch.setenv("NAVAJA_CAPTCHA_TOKEN", "valid-token-123456")
+
+    async def run() -> None:
+        async with _captcha_lifespan(server):
+            assert not _port_is_free("127.0.0.1", port)
+            raise RuntimeError("boom")
+
+    with pytest.raises(RuntimeError, match="boom"):
+        asyncio.run(run())
+
+    assert _port_is_free("127.0.0.1", port), (
+        "an exception inside the session body must still release the listener"
+    )
+    assert estado_servidor()["captcha_listening"] is False
+    assert capsys.readouterr().out == ""
+
+
+def test_nested_lifespan_inner_exit_keeps_listener_for_outer_session(
+    monkeypatch, capsys
+):
+    port = _free_port()
+    monkeypatch.setenv("NAVAJA_CAPTCHA_HOST", "127.0.0.1")
+    monkeypatch.setenv("NAVAJA_CAPTCHA_PORT", str(port))
+    monkeypatch.setenv("NAVAJA_CAPTCHA_TOKEN", "valid-token-123456")
+
+    async def run() -> None:
+        async with _captcha_lifespan(server):
+            assert not _port_is_free("127.0.0.1", port)
+            async with _captcha_lifespan(server):
+                assert not _port_is_free("127.0.0.1", port)
+            # The inner exit must not tear down the outer session's listener.
+            assert not _port_is_free("127.0.0.1", port)
+            assert estado_servidor()["captcha_listening"] is True
+
+    asyncio.run(run())
+
+    assert _port_is_free("127.0.0.1", port)
+    assert estado_servidor()["captcha_listening"] is False
+    assert capsys.readouterr().out == ""
+
+
+def test_nested_lifespan_announces_startup_only_once(monkeypatch, capsys):
+    port = _free_port()
+    monkeypatch.setenv("NAVAJA_CAPTCHA_HOST", "127.0.0.1")
+    monkeypatch.setenv("NAVAJA_CAPTCHA_PORT", str(port))
+    monkeypatch.setenv("NAVAJA_CAPTCHA_TOKEN", "valid-token-123456")
+
+    stderr_capture = io.StringIO()
+
+    async def run() -> None:
+        with contextlib.redirect_stderr(stderr_capture):
+            async with _captcha_lifespan(server):
+                async with _captcha_lifespan(server):
+                    pass
+
+    asyncio.run(run())
+
+    stderr = stderr_capture.getvalue()
+    assert stderr.count("Captcha form listening at") == 1
+    assert capsys.readouterr().out == ""
