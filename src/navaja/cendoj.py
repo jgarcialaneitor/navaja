@@ -17,7 +17,9 @@ Endpoint map (established by read-only reconnaissance):
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from datetime import date
+from enum import StrEnum
 from typing import Any, Mapping
 
 import httpx
@@ -42,8 +44,19 @@ INDEX_URL = f"{BASE_URL}/search/indexAN.jsp"
 SEARCH_URL = f"{BASE_URL}/search/search.action"
 
 DEFAULT_TIMEOUT = 30.0
-DEFAULT_SORT = "IN_FECHARESOLUCION:decreasing"
 DEFAULT_RECORDS_PER_PAGE = 10
+
+# Page sizes the site accepts. Any other value comes back as its generic
+# bad-request page, which parses as an empty result set.
+ALLOWED_RECORDS_PER_PAGE = (10, 20, 30, 50)
+
+# The site never offers more than 200 records for one query and no parameter
+# lifts that: ``maxresults`` above 200 is rejected. Past this window the site
+# clamps ``start`` to ``201 - recordsPerPage`` and returns all 200 records in a
+# single page, so a client that pages on gets duplicates that look legitimate.
+MAX_RESULTS = 200
+
+_DATE_FORMAT = "%d/%m/%Y"
 
 USER_AGENT = (
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
@@ -217,6 +230,275 @@ def parse_search_page(html: str, *, page: int = 1, base_url: str = BASE_URL) -> 
     )
 
 
+class Jurisdiccion(StrEnum):
+    """Tokens accepted by the site's ``JURISDICCION`` field.
+
+    The site matches these exactly, in uppercase: ``"Penal"`` is answered with
+    its generic bad-request page rather than being normalised.
+    """
+
+    CIVIL = "CIVIL"
+    PENAL = "PENAL"
+    CONTENCIOSO = "CONTENCIOSO"
+    SOCIAL = "SOCIAL"
+    MILITAR = "MILITAR"
+
+
+class TipoResolucion(StrEnum):
+    """Tokens accepted by the site's ``TIPORESOLUCION`` field."""
+
+    SENTENCIA = "SENTENCIA"
+    AUTO = "AUTO"
+
+
+class Coleccion(StrEnum):
+    """Which collection the site's ``databasematch`` field searches."""
+
+    AN = "AN"
+    """Every jurisdiction. The site's own default and navaja's."""
+
+    TS = "TS"
+    """Tribunal Supremo only."""
+
+
+class Orden(StrEnum):
+    """Sort tokens accepted by the site's ``sort`` field."""
+
+    RECIENTE = "IN_FECHARESOLUCION:decreasing"
+    ANTIGUO = "IN_FECHARESOLUCION:increasing"
+
+
+class NivelLocalizacion(StrEnum):
+    """Levels of the site's location selector, as its own suffixes."""
+
+    COMUNIDAD = "C"
+    PROVINCIA = "P"
+    SEDE = "S"
+
+
+_ENUMS: dict[str, type[StrEnum]] = {
+    "jurisdiccion": Jurisdiccion,
+    "tipo_resolucion": TipoResolucion,
+    "coleccion": Coleccion,
+    "orden": Orden,
+}
+
+_LOCALIZACION_TOKEN = re.compile(r"^(?P<nombre>.+?)\s*\((?P<nivel>[CPS])\)$")
+
+
+def _coerce_enum(value: Any, enum_type: type[StrEnum], field_name: str) -> Any:
+    """Coerce a token to ``enum_type``, refusing anything the site rejects."""
+    if value is None or isinstance(value, enum_type):
+        return value
+    for candidate in (value, str(value).strip().upper()):
+        try:
+            return enum_type(candidate)
+        except ValueError:
+            continue
+    accepted = ", ".join(member.value for member in enum_type)
+    raise ValueError(
+        f"{field_name} {value!r} is not accepted by the site; use one of {accepted}"
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class Localizacion:
+    """One entry of the site's ``Localización`` filter.
+
+    The site's wire format is its own display text -- ``MELILLA(C)`` for a
+    comunidad autónoma, ``BARCELONA(P)`` for a provincia, ``MELILLA(S)`` for a
+    sede -- and the names are its uppercase vocabulary. Names are uppercased
+    here because the site matches them exactly.
+    """
+
+    nombre: str
+    nivel: NivelLocalizacion = NivelLocalizacion.COMUNIDAD
+
+    def __post_init__(self) -> None:
+        nombre = re.sub(r"\s+", " ", str(self.nombre)).strip().upper()
+        if not nombre:
+            raise ValueError("localizacion name must not be empty")
+        if any(char in nombre for char in "()|"):
+            raise ValueError(
+                f"localizacion name must be a bare place name, got {self.nombre!r}; "
+                "use Localizacion(nombre, nivel) or the 'MELILLA(C)' string form"
+            )
+        object.__setattr__(self, "nombre", nombre)
+        object.__setattr__(self, "nivel", _coerce_enum(self.nivel, NivelLocalizacion, "nivel"))
+
+    @classmethod
+    def parse(cls, token: str) -> "Localizacion":
+        """Parse the site's own ``"MELILLA(C)"`` form."""
+        match = _LOCALIZACION_TOKEN.match(str(token).strip())
+        if match is None:
+            raise ValueError(
+                f"localizacion {token!r} must look like 'MELILLA(C)', 'BARCELONA(P)' "
+                "or 'MELILLA(S)'"
+            )
+        return cls(match.group("nombre"), NivelLocalizacion(match.group("nivel")))
+
+    def as_wire(self) -> str:
+        """Return the site's display-text token, e.g. ``"MELILLA(C)"``."""
+        return f"{self.nombre}({self.nivel.value})"
+
+
+def _coerce_localizacion(value: Any) -> Localizacion:
+    """Accept a :class:`Localizacion`, a ``"MELILLA(C)"`` string or a pair."""
+    if isinstance(value, Localizacion):
+        return value
+    if isinstance(value, str):
+        return Localizacion.parse(value)
+    if isinstance(value, tuple) and len(value) == 2:
+        return Localizacion(value[0], value[1])
+    raise ValueError(
+        "each localizacion must be a Localizacion, a 'MELILLA(C)' string or a "
+        f"(name, level) pair, got {value!r}"
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class SearchFilters:
+    """The CENDOJ advanced-search filters modelled by navaja.
+
+    Each field maps to one form field verified against the live endpoint. The
+    fields deliberately left out (``ID_NORMA``, ``SUBTIPORESOLUCION``,
+    ``TIPOORGANOPUB``, ...) stay reachable through
+    :meth:`CendojClient.search`'s ``extra_fields``.
+    """
+
+    texto: str | None = None
+    """Free text (``TEXT``). Optional when another criterion is present."""
+
+    fecha_desde: date | None = None
+    """Inclusive lower bound of ``FECHARESOLUCIONDESDE``."""
+
+    fecha_hasta: date | None = None
+    """Inclusive upper bound of ``FECHARESOLUCIONHASTA``."""
+
+    jurisdiccion: Jurisdiccion | None = None
+    tipo_resolucion: TipoResolucion | None = None
+    roj: str | None = None
+    ecli: str | None = None
+    num_resolucion: str | None = None
+    num_recurso: str | None = None
+
+    ponente: str | None = None
+    """Magistrate's name. Uppercased: the site's list is uppercase."""
+
+    voces: str | None = None
+    """Subject vocabulary (``VOCES``), e.g. ``"TRÁFICO DE DROGAS"``."""
+
+    localizacion: tuple[Localizacion, ...] = ()
+    """Comunidades autónomas, provincias or sedes. OR within this filter."""
+
+    coleccion: Coleccion = Coleccion.AN
+    """Which collection to search (``databasematch``)."""
+
+    orden: Orden = Orden.RECIENTE
+    """Result order (``sort``)."""
+
+    def __post_init__(self) -> None:
+        for name, enum_type in _ENUMS.items():
+            object.__setattr__(self, name, _coerce_enum(getattr(self, name), enum_type, name))
+        if self.texto is not None:
+            object.__setattr__(self, "texto", re.sub(r"\s+", " ", str(self.texto)).strip() or None)
+        for name in ("roj", "ecli", "num_resolucion", "num_recurso"):
+            value = getattr(self, name)
+            if value is not None:
+                object.__setattr__(self, name, str(value).strip() or None)
+        for name in ("ponente", "voces"):
+            value = getattr(self, name)
+            if value is not None:
+                object.__setattr__(self, name, re.sub(r"\s+", " ", str(value)).strip().upper() or None)
+        object.__setattr__(
+            self,
+            "localizacion",
+            tuple(_coerce_localizacion(item) for item in (self.localizacion or ())),
+        )
+        if self.fecha_desde and self.fecha_hasta and self.fecha_desde > self.fecha_hasta:
+            raise ValueError("fecha_desde must not be later than fecha_hasta")
+
+    @property
+    def has_criteria(self) -> bool:
+        """Whether any criterion is set. The site needs at least one."""
+        return any(
+            (
+                self.texto,
+                self.fecha_desde,
+                self.fecha_hasta,
+                self.jurisdiccion,
+                self.tipo_resolucion,
+                self.roj,
+                self.ecli,
+                self.num_resolucion,
+                self.num_recurso,
+                self.ponente,
+                self.voces,
+                self.localizacion,
+            )
+        )
+
+    def as_form_fields(self) -> dict[str, str]:
+        """Map the filters to the site's own form field names and values."""
+        fields: dict[str, str] = {
+            "databasematch": self.coleccion.value,
+            "sort": self.orden.value,
+        }
+        if self.texto:
+            fields["TEXT"] = self.texto
+        if self.fecha_desde:
+            fields["FECHARESOLUCIONDESDE"] = self.fecha_desde.strftime(_DATE_FORMAT)
+        if self.fecha_hasta:
+            fields["FECHARESOLUCIONHASTA"] = self.fecha_hasta.strftime(_DATE_FORMAT)
+        if self.jurisdiccion:
+            fields["JURISDICCION"] = self.jurisdiccion.value
+        if self.tipo_resolucion:
+            fields["TIPORESOLUCION"] = self.tipo_resolucion.value
+        if self.roj:
+            fields["ROJ"] = self.roj
+        if self.ecli:
+            fields["ECLI"] = self.ecli
+        if self.num_resolucion:
+            fields["NUMERORESOLUCION"] = self.num_resolucion
+        if self.num_recurso:
+            fields["NUMERORECURSO"] = self.num_recurso
+        if self.ponente:
+            fields["PONENTE"] = self.ponente
+        if self.voces:
+            fields["VOCES"] = self.voces
+        if self.localizacion:
+            fields["VALUESCOMUNIDAD"] = "".join(
+                f"{item.as_wire()} | " for item in self.localizacion
+            )
+        return fields
+
+
+def _pagination_form_fields(page: int, records_per_page: int) -> dict[str, str]:
+    """Validate pagination and map the page number to the site's record offset.
+
+    The site's ``start`` is a 1-based record index, not a page number, so it
+    must be derived rather than forwarded.
+    """
+    if page < 1:
+        raise ValueError("page must be >= 1")
+    if records_per_page not in ALLOWED_RECORDS_PER_PAGE:
+        accepted = ", ".join(str(value) for value in ALLOWED_RECORDS_PER_PAGE)
+        raise ValueError(
+            f"records_per_page must be one of {accepted}; the site answers any other "
+            "value with its generic bad-request page, which looks like an empty "
+            "result set"
+        )
+    start = (page - 1) * records_per_page + 1
+    last = start + records_per_page - 1
+    if last > MAX_RESULTS:
+        raise ValueError(
+            f"page {page} at {records_per_page} per page reaches record {last}, past "
+            f"the site's {MAX_RESULTS}-record ceiling; the site would silently return "
+            f"all {MAX_RESULTS} records again instead of this page"
+        )
+    return {"recordsPerPage": str(records_per_page), "start": str(start)}
+
+
 class CendojClient:
     """Synchronous client for the CENDOJ search endpoint.
 
@@ -264,43 +546,51 @@ class CendojClient:
 
     def search(
         self,
-        texto: str,
+        filters: SearchFilters | str | None = None,
         *,
         page: int = 1,
         records_per_page: int = DEFAULT_RECORDS_PER_PAGE,
-        sort: str = DEFAULT_SORT,
         extra_fields: Mapping[str, str] | None = None,
     ) -> SearchPage:
-        """Run a free-text query against the CENDOJ jurisprudence database.
+        """Run a query against the CENDOJ jurisprudence database.
 
         Args:
-            texto: free-text query, e.g. ``"clausulas abusivas"``.
-            page: 1-based page number.
-            records_per_page: hits per page.
-            sort: the site's sort token.
-            extra_fields: additional form fields, for filters that are not
-                modelled yet (jurisdiction, resolution type, date range).
+            filters: a :class:`SearchFilters`, or a plain string as shorthand
+                for ``SearchFilters(texto=...)``.
+            page: 1-based page number. It is mapped to the site's record offset
+                rather than forwarded, because the site's ``start`` counts
+                records.
+            records_per_page: hits per page; one of
+                :data:`ALLOWED_RECORDS_PER_PAGE`.
+            extra_fields: additional form fields, for anything not modelled in
+                :class:`SearchFilters` (``ID_NORMA``, ``SUBTIPORESOLUCION``,
+                ...). Applied last, so they win over a modelled field with the
+                same name.
 
         Returns:
             The parsed page of results.
+
+        Raises:
+            ValueError: when no criterion is given, or when the pagination
+                cannot be expressed on the site.
         """
-        if not texto or not texto.strip():
-            raise ValueError("texto must be a non-empty search string")
-        if page < 1:
-            raise ValueError("page must be >= 1")
+        if isinstance(filters, str):
+            filters = SearchFilters(texto=filters)
+        elif filters is None:
+            filters = SearchFilters()
 
-        self._ensure_session()
+        if not filters.has_criteria:
+            raise ValueError(
+                "at least one search criterion is required: pass texto, a filter, or both"
+            )
 
-        data: dict[str, str] = {
-            "action": "query",
-            "sort": sort,
-            "recordsPerPage": str(records_per_page),
-            "databasematch": "AN",
-            "TEXT": texto,
-            "start": str(page),
-        }
+        data: dict[str, str] = {"action": "query"}
+        data.update(_pagination_form_fields(page, records_per_page))
+        data.update(filters.as_form_fields())
         if extra_fields:
             data.update(extra_fields)
+
+        self._ensure_session()
 
         response = self._client.post(SEARCH_URL, data=data, headers={"Referer": INDEX_URL})
         response.raise_for_status()

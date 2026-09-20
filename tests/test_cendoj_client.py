@@ -8,13 +8,25 @@ suite stays polite to a public service.
 from __future__ import annotations
 
 import os
+from datetime import date
 from pathlib import Path
+from urllib.parse import parse_qs
 
 import httpx
 import pytest
 
 from navaja import CendojClient
-from navaja.cendoj import INDEX_URL, SEARCH_URL
+from navaja.cendoj import (
+    Coleccion,
+    INDEX_URL,
+    Jurisdiccion,
+    Localizacion,
+    NivelLocalizacion,
+    Orden,
+    SEARCH_URL,
+    SearchFilters,
+    TipoResolucion,
+)
 
 FIXTURE = Path(__file__).parent / "fixtures" / "search_clausulas_abusivas.html"
 HTML = FIXTURE.read_text(encoding="utf-8")
@@ -28,6 +40,11 @@ def _client_capturing(sent: list[httpx.Request]) -> CendojClient:
         return httpx.Response(200, text=HTML)
 
     return CendojClient(transport=httpx.MockTransport(handler))
+
+
+def _decoded_form(request: httpx.Request) -> dict[str, str]:
+    parsed = parse_qs(request.content.decode())
+    return {key: values[0] for key, values in parsed.items()}
 
 
 def test_bootstraps_session_before_searching():
@@ -49,6 +66,7 @@ def test_sends_the_expected_form_fields():
     body = sent[1].content.decode()
     assert "action=query" in body
     assert "databasematch=AN" in body
+    assert "sort=IN_FECHARESOLUCION%3Adecreasing" in body
     assert "TEXT=clausulas+abusivas" in body
 
 
@@ -74,15 +92,210 @@ def test_extra_fields_are_forwarded():
 
 @pytest.mark.parametrize("texto", ["", "   "])
 def test_rejects_empty_query(texto):
-    with _client_capturing([]) as client:
+    sent: list[httpx.Request] = []
+    with _client_capturing(sent) as client:
         with pytest.raises(ValueError):
             client.search(texto)
+    assert sent == []
 
 
 def test_rejects_non_positive_page():
-    with _client_capturing([]) as client:
+    sent: list[httpx.Request] = []
+    with _client_capturing(sent) as client:
         with pytest.raises(ValueError):
             client.search("x", page=0)
+    assert sent == []
+
+
+def test_sends_all_modelled_filters():
+    sent: list[httpx.Request] = []
+    with _client_capturing(sent) as client:
+        client.search(
+            SearchFilters(
+                texto="cláusulas abusivas",
+                fecha_desde=date(2024, 1, 1),
+                fecha_hasta=date(2024, 12, 31),
+                jurisdiccion=Jurisdiccion.CIVIL,
+                tipo_resolucion=TipoResolucion.SENTENCIA,
+                roj="ROJ: STS 123/2024",
+                ecli="ECLI:ES:TS:2024:123",
+                num_resolucion="123/2024",
+                num_recurso="1234/2024",
+                ponente="Pérez",
+                voces="tráfico",
+                localizacion=(Localizacion("MELILLA"), Localizacion("Murcia")),
+                coleccion=Coleccion.TS,
+                orden=Orden.ANTIGUO,
+            )
+        )
+
+    body = _decoded_form(sent[1])
+    assert body == {
+        "action": "query",
+        "recordsPerPage": "10",
+        "start": "1",
+        "databasematch": "TS",
+        "sort": "IN_FECHARESOLUCION:increasing",
+        "TEXT": "cláusulas abusivas",
+        "FECHARESOLUCIONDESDE": "01/01/2024",
+        "FECHARESOLUCIONHASTA": "31/12/2024",
+        "JURISDICCION": "CIVIL",
+        "TIPORESOLUCION": "SENTENCIA",
+        "ROJ": "ROJ: STS 123/2024",
+        "ECLI": "ECLI:ES:TS:2024:123",
+        "NUMERORESOLUCION": "123/2024",
+        "NUMERORECURSO": "1234/2024",
+        "PONENTE": "PÉREZ",
+        "VOCES": "TRÁFICO",
+        "VALUESCOMUNIDAD": "MELILLA(C) | MURCIA(C) | ",
+    }
+
+
+def test_filter_only_search_sends_no_text():
+    sent: list[httpx.Request] = []
+    with _client_capturing(sent) as client:
+        client.search(SearchFilters(localizacion=(Localizacion("MELILLA"),)))
+
+    body = _decoded_form(sent[1])
+    assert "TEXT" not in body
+    assert body["VALUESCOMUNIDAD"] == "MELILLA(C) | "
+
+
+def test_page_three_maps_to_start_twenty_one():
+    sent: list[httpx.Request] = []
+    with _client_capturing(sent) as client:
+        client.search("x", page=3, records_per_page=10)
+
+    assert _decoded_form(sent[1])["start"] == "21"
+
+
+def test_page_twenty_maps_to_start_one_ninety_one():
+    sent: list[httpx.Request] = []
+    with _client_capturing(sent) as client:
+        client.search("x", page=20, records_per_page=10)
+
+    assert _decoded_form(sent[1])["start"] == "191"
+
+
+@pytest.mark.parametrize("records_per_page", [0, 5, 25, 100])
+def test_rejects_unsupported_records_per_page(records_per_page):
+    sent: list[httpx.Request] = []
+    with _client_capturing(sent) as client:
+        with pytest.raises(ValueError, match="records_per_page"):
+            client.search("x", records_per_page=records_per_page)
+    assert sent == []
+
+
+def test_rejects_page_past_two_hundred_record_ceiling():
+    sent: list[httpx.Request] = []
+    with _client_capturing(sent) as client:
+        with pytest.raises(ValueError, match="ceiling"):
+            client.search("x", page=21, records_per_page=10)
+    assert sent == []
+
+
+def test_rejects_search_with_no_arguments():
+    sent: list[httpx.Request] = []
+    with _client_capturing(sent) as client:
+        with pytest.raises(ValueError, match="criterion"):
+            client.search()
+    assert sent == []
+
+
+def test_rejects_unknown_jurisdiccion_token():
+    sent: list[httpx.Request] = []
+    with _client_capturing(sent) as client:
+        with pytest.raises(ValueError) as exc_info:
+            client.search(SearchFilters(jurisdiccion="CONTENCIOSO-ADMINISTRATIVO"))
+    assert "jurisdiccion" in str(exc_info.value)
+    assert "CIVIL, PENAL, CONTENCIOSO, SOCIAL, MILITAR" in str(exc_info.value)
+    assert sent == []
+
+
+def test_mixed_case_tipo_resolucion_is_normalised():
+    sent: list[httpx.Request] = []
+    with _client_capturing(sent) as client:
+        client.search(SearchFilters(tipo_resolucion="sentencia"))
+
+    assert _decoded_form(sent[1])["TIPORESOLUCION"] == "SENTENCIA"
+
+
+def test_rejects_reversed_date_range():
+    sent: list[httpx.Request] = []
+    with _client_capturing(sent) as client:
+        with pytest.raises(ValueError, match="fecha_desde"):
+            client.search(
+                SearchFilters(
+                    fecha_desde=date(2024, 12, 31),
+                    fecha_hasta=date(2024, 1, 1),
+                )
+            )
+    assert sent == []
+
+
+@pytest.mark.parametrize(
+    "value, expected",
+    [
+        (Localizacion("Melilla"), "MELILLA(C)"),
+        (Localizacion("melilla", NivelLocalizacion.SEDE), "MELILLA(S)"),
+        ("Barcelona(P)", "BARCELONA(P)"),
+        (("país vasco", "C"), "PAÍS VASCO(C)"),
+    ],
+)
+def test_localizacion_grammar(value, expected):
+    filters = SearchFilters(localizacion=(value,))
+    assert filters.localizacion[0].as_wire() == expected
+
+
+def test_multiple_localizaciones_are_joined_with_separator():
+    sent: list[httpx.Request] = []
+    with _client_capturing(sent) as client:
+        client.search(
+            SearchFilters(
+                localizacion=(
+                    Localizacion.parse("MELILLA(C)"),
+                    Localizacion.parse("MURCIA(C)"),
+                )
+            )
+        )
+
+    assert _decoded_form(sent[1])["VALUESCOMUNIDAD"] == "MELILLA(C) | MURCIA(C) | "
+
+
+@pytest.mark.parametrize(
+    "token",
+    [
+        "MELILLA",
+        "MELILLA(X)",
+        "MELILLA(C) | MURCIA(C)",
+    ],
+)
+def test_rejects_malformed_localizacion_tokens(token):
+    with pytest.raises(ValueError):
+        SearchFilters(localizacion=(token,))
+
+
+def test_localizacion_with_wire_token_is_rejected_as_bare_name():
+    with pytest.raises(ValueError, match="bare place name"):
+        Localizacion("MELILLA(C)")
+
+
+def test_extra_fields_win_over_modelled_defaults():
+    sent: list[httpx.Request] = []
+    with _client_capturing(sent) as client:
+        client.search(SearchFilters(texto="x"), extra_fields={"databasematch": "TS"})
+
+    assert _decoded_form(sent[1])["databasematch"] == "TS"
+
+
+def test_non_default_records_per_page_reaches_wire():
+    sent: list[httpx.Request] = []
+    with _client_capturing(sent) as client:
+        client.search("x", records_per_page=20)
+
+    body = _decoded_form(sent[1])
+    assert body["recordsPerPage"] == "20"
+    assert body["start"] == "1"
 
 
 @pytest.mark.live
