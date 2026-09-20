@@ -17,8 +17,14 @@ from typing import Any
 
 import httpx
 import pytest
+from urllib.parse import parse_qs
 
-from navaja import CendojClient
+from navaja import (
+    CendojClient,
+    SearchError,
+    SearchGatedError,
+    SearchRequestError,
+)
 from navaja.captcha import (
     CaptchaAnswer,
     CaptchaTimeoutError,
@@ -35,7 +41,8 @@ from navaja.server import (
     ver_texto_completo,
 )
 
-FIXTURE = Path(__file__).parent / "fixtures" / "search_clausulas_abusivas.html"
+FIXTURES = Path(__file__).parent / "fixtures"
+FIXTURE = FIXTURES / "search_clausulas_abusivas.html"
 HTML = FIXTURE.read_text(encoding="utf-8")
 
 DOC_URL = (
@@ -247,9 +254,21 @@ def test_buscar_sentencias_returns_documented_shape(monkeypatch):
     assert result["results"][0]["url_documento"]
 
 
+def test_buscar_sentencias_blank_texto_with_filter_reaches_wire(monkeypatch):
+    sent: list[httpx.Request] = []
+    SpyClient = _spy_client_class(_search_transport, sent)
+    monkeypatch.setattr("navaja.server.CendojClient", SpyClient)
+
+    buscar_sentencias(texto="", jurisdiccion="PENAL")
+
+    body = _search_body(sent)
+    assert body["JURISDICCION"] == ["PENAL"]
+    assert "TEXT" not in body
+
+
 @pytest.mark.parametrize("texto", ["", "   "])
-def test_buscar_sentencias_rejects_empty_query(texto):
-    with pytest.raises(ValueError, match="non-empty"):
+def test_buscar_sentencias_blank_texto_alone_raises(texto):
+    with pytest.raises(ValueError, match="criterion"):
         buscar_sentencias(texto)
 
 
@@ -663,3 +682,217 @@ def test_nested_lifespan_announces_startup_only_once(monkeypatch, capsys):
     stderr = stderr_capture.getvalue()
     assert stderr.count("Captcha form listening at") == 1
     assert capsys.readouterr().out == ""
+
+
+# --- Search-filter wiring tests -------------------------------------------------
+
+
+def _last_search_request(sent: list[httpx.Request]) -> httpx.Request:
+    return next(
+        r for r in reversed(sent) if r.method == "POST" and str(r.url) == SEARCH_URL
+    )
+
+
+def _search_body(sent: list[httpx.Request]) -> dict[str, list[str]]:
+    request = _last_search_request(sent)
+    return parse_qs(request.content.decode(), keep_blank_values=True)
+
+
+def test_buscar_sentencias_filter_only_reaches_wire(monkeypatch):
+    sent: list[httpx.Request] = []
+    SpyClient = _spy_client_class(_search_transport, sent)
+    monkeypatch.setattr("navaja.server.CendojClient", SpyClient)
+
+    buscar_sentencias(jurisdiccion="PENAL", localizacion=["MELILLA(C)"])
+
+    body = _search_body(sent)
+    assert body["JURISDICCION"] == ["PENAL"]
+    assert body["VALUESCOMUNIDAD"] == ["MELILLA(C) | "]
+    assert "TEXT" not in body
+
+
+def test_buscar_sentencias_all_modelled_filters_reach_wire(monkeypatch):
+    sent: list[httpx.Request] = []
+    SpyClient = _spy_client_class(_search_transport, sent)
+    monkeypatch.setattr("navaja.server.CendojClient", SpyClient)
+
+    buscar_sentencias(
+        texto="clausulas abusivas",
+        fecha_desde="2024-01-01",
+        fecha_hasta="31/12/2024",
+        jurisdiccion="CIVIL",
+        tipo_resolucion="SENTENCIA",
+        roj="SAP NA 123/2024",
+        ecli="ECLI:ES:APNA:2024:123",
+        num_resolucion="123/2024",
+        num_recurso="456/2024",
+        ponente="García",
+        voces="tráfico de drogas",
+        localizacion=["NAVARRA(C)"],
+        coleccion="TS",
+        orden="antiguo",
+    )
+
+    body = _search_body(sent)
+    assert body["TEXT"] == ["clausulas abusivas"]
+    assert body["FECHARESOLUCIONDESDE"] == ["01/01/2024"]
+    assert body["FECHARESOLUCIONHASTA"] == ["31/12/2024"]
+    assert body["JURISDICCION"] == ["CIVIL"]
+    assert body["TIPORESOLUCION"] == ["SENTENCIA"]
+    assert body["ROJ"] == ["SAP NA 123/2024"]
+    assert body["ECLI"] == ["ECLI:ES:APNA:2024:123"]
+    assert body["NUMERORESOLUCION"] == ["123/2024"]
+    assert body["NUMERORECURSO"] == ["456/2024"]
+    assert body["PONENTE"] == ["GARCÍA"]
+    assert body["VOCES"] == ["TRÁFICO DE DROGAS"]
+    assert body["VALUESCOMUNIDAD"] == ["NAVARRA(C) | "]
+    assert body["databasematch"] == ["TS"]
+    assert body["sort"] == ["IN_FECHARESOLUCION:increasing"]
+
+
+def test_buscar_sentencias_orden_raw_wire_token_reaches_wire(monkeypatch):
+    sent: list[httpx.Request] = []
+    SpyClient = _spy_client_class(_search_transport, sent)
+    monkeypatch.setattr("navaja.server.CendojClient", SpyClient)
+
+    buscar_sentencias(
+        texto="clausulas abusivas",
+        orden="IN_FECHARESOLUCION:increasing",
+    )
+
+    body = _search_body(sent)
+    assert body["sort"] == ["IN_FECHARESOLUCION:increasing"]
+
+
+def test_buscar_sentencias_pagination_reaches_wire(monkeypatch):
+    sent: list[httpx.Request] = []
+    SpyClient = _spy_client_class(_search_transport, sent)
+    monkeypatch.setattr("navaja.server.CendojClient", SpyClient)
+
+    buscar_sentencias(
+        texto="clausulas abusivas",
+        pagina=2,
+        records_por_pagina=20,
+    )
+
+    body = _search_body(sent)
+    assert body["start"] == ["21"]
+    assert body["recordsPerPage"] == ["20"]
+
+
+def test_buscar_sentencias_localizacion_bare_name_and_suffix(monkeypatch):
+    sent: list[httpx.Request] = []
+    SpyClient = _spy_client_class(_search_transport, sent)
+    monkeypatch.setattr("navaja.server.CendojClient", SpyClient)
+
+    buscar_sentencias(
+        jurisdiccion="PENAL",
+        localizacion=["Melilla", "Barcelona(P)"],
+    )
+
+    body = _search_body(sent)
+    assert body["VALUESCOMUNIDAD"] == ["MELILLA(C) | BARCELONA(P) | "]
+
+
+@pytest.mark.parametrize("fecha", ["2024-01-01", "01/01/2024"])
+def test_buscar_sentencias_accepts_both_date_formats(fecha, monkeypatch):
+    sent: list[httpx.Request] = []
+    SpyClient = _spy_client_class(_search_transport, sent)
+    monkeypatch.setattr("navaja.server.CendojClient", SpyClient)
+
+    buscar_sentencias(jurisdiccion="PENAL", fecha_desde=fecha)
+
+    body = _search_body(sent)
+    assert body["FECHARESOLUCIONDESDE"] == ["01/01/2024"]
+
+
+def test_buscar_sentencias_rejects_nonsense_date(monkeypatch):
+    sent: list[httpx.Request] = []
+    SpyClient = _spy_client_class(_search_transport, sent)
+    monkeypatch.setattr("navaja.server.CendojClient", SpyClient)
+
+    with pytest.raises(ValueError, match="fecha_desde"):
+        buscar_sentencias(jurisdiccion="PENAL", fecha_desde="not-a-date")
+
+
+def test_buscar_sentencias_forwards_campos_extra(monkeypatch):
+    sent: list[httpx.Request] = []
+    SpyClient = _spy_client_class(_search_transport, sent)
+    monkeypatch.setattr("navaja.server.CendojClient", SpyClient)
+
+    buscar_sentencias(
+        texto="clausulas abusivas",
+        campos_extra={"ID_NORMA": "1"},
+    )
+
+    body = _search_body(sent)
+    assert body["ID_NORMA"] == ["1"]
+
+
+def test_buscar_sentencias_rejects_unsupported_page_size(monkeypatch):
+    sent: list[httpx.Request] = []
+    SpyClient = _spy_client_class(_search_transport, sent)
+    monkeypatch.setattr("navaja.server.CendojClient", SpyClient)
+
+    with pytest.raises(ValueError, match="records_per_page"):
+        buscar_sentencias(texto="clausulas abusivas", records_por_pagina=99)
+
+
+def test_buscar_sentencias_rejects_no_criterion(monkeypatch):
+    sent: list[httpx.Request] = []
+    SpyClient = _spy_client_class(_search_transport, sent)
+    monkeypatch.setattr("navaja.server.CendojClient", SpyClient)
+
+    with pytest.raises(ValueError, match="criterion"):
+        buscar_sentencias()
+
+
+def _refusing_search_transport(fixture_name: str, sent: list[httpx.Request] | None = None):
+    if sent is None:
+        sent = []
+    html = (FIXTURES / fixture_name).read_text(encoding="utf-8")
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        sent.append(request)
+        if str(request.url) == INDEX_URL:
+            return httpx.Response(200, text="<html><body>form</body></html>")
+        if str(request.url) == SEARCH_URL:
+            return httpx.Response(200, text=html)
+        return httpx.Response(404)
+
+    return httpx.MockTransport(handler)
+
+
+@pytest.mark.parametrize(
+    "fixture, exception_type",
+    [
+        ("search_invalid_request.html", SearchRequestError),
+        ("search_mass_download_gate.html", SearchGatedError),
+    ],
+)
+def test_buscar_sentencias_propagates_search_error(
+    fixture, exception_type, monkeypatch
+):
+    sent: list[httpx.Request] = []
+    SpyClient = _spy_client_class(
+        lambda sent=sent: _refusing_search_transport(fixture, sent), sent
+    )
+    monkeypatch.setattr("navaja.server.CendojClient", SpyClient)
+
+    with pytest.raises(exception_type):
+        buscar_sentencias(texto="clausulas abusivas")
+
+
+def test_buscar_sentencias_schema_lists_new_parameters():
+    tools = asyncio.run(server.list_tools())
+    tool = next(t for t in tools if t.name == "buscar_sentencias")
+    properties = tool.input_schema.get("properties", {})
+    for name in (
+        "jurisdiccion",
+        "tipo_resolucion",
+        "fecha_desde",
+        "fecha_hasta",
+        "localizacion",
+        "campos_extra",
+    ):
+        assert name in properties, f"{name} missing from schema"

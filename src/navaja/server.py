@@ -2,7 +2,7 @@
 
 The server exposes three tools:
 
-* ``buscar_sentencias`` — free-text search, no captcha.
+* ``buscar_sentencias`` — advanced search with filters, no captcha.
 * ``ver_texto_completo`` — human-in-the-loop full-text fetch.
 * ``estado_servidor`` — runtime configuration snapshot.
 
@@ -19,11 +19,12 @@ import os
 import sys
 import threading
 from collections.abc import AsyncIterator
+from datetime import date, datetime
 from typing import Any
 
 from mcp.server.mcpserver import MCPServer
 
-from navaja import CendojClient, FullTextError
+from navaja import CendojClient, FullTextError, Localizacion, SearchError, SearchFilters
 from navaja.captcha import (
     CaptchaTimeoutError,
     default_captcha_token_path,
@@ -129,13 +130,70 @@ async def _captcha_lifespan(app: MCPServer[Any]) -> AsyncIterator[None]:
 server = MCPServer("navaja", version="0.0.1", lifespan=_captcha_lifespan)
 
 
+_DATE_FORMATS = ("%Y-%m-%d", "%d/%m/%Y")
+
+
+def _parse_date_arg(value: str | None, name: str) -> date | None:
+    """Convert ``YYYY-MM-DD`` or ``DD/MM/AAAA`` to a :class:`date`."""
+    if value is None:
+        return None
+    for fmt in _DATE_FORMATS:
+        try:
+            return datetime.strptime(value.strip(), fmt).date()
+        except ValueError:
+            continue
+    raise ValueError(
+        f"{name} {value!r} is not a recognised date; use YYYY-MM-DD or DD/MM/AAAA"
+    )
+
+
+def _parse_localizaciones(items: list[str] | None) -> tuple[Localizacion, ...]:
+    """Convert location strings to :class:`Localizacion` objects.
+
+    Suffix forms such as ``"MELILLA(C)"`` are parsed exactly as the site
+    uses them; bare names such as ``"Melilla"`` are treated as comunidades
+    autónomas. Blank entries are ignored.
+    """
+    if not items:
+        return ()
+    result: list[Localizacion] = []
+    for raw in items:
+        text = raw.strip()
+        if not text:
+            continue
+        try:
+            loc = Localizacion.parse(text)
+        except ValueError:
+            loc = Localizacion(text)
+        result.append(loc)
+    return tuple(result)
+
+
 @server.tool()
 def buscar_sentencias(
-    texto: str,
+    texto: str | None = None,
+    fecha_desde: str | None = None,
+    fecha_hasta: str | None = None,
+    jurisdiccion: str | None = None,
+    tipo_resolucion: str | None = None,
+    roj: str | None = None,
+    ecli: str | None = None,
+    num_resolucion: str | None = None,
+    num_recurso: str | None = None,
+    ponente: str | None = None,
+    voces: str | None = None,
+    localizacion: list[str] | None = None,
+    coleccion: str | None = None,
+    orden: str | None = None,
+    campos_extra: dict[str, str] | None = None,
     pagina: int = 1,
     records_por_pagina: int = 10,
 ) -> dict:
-    """Search the CENDOJ case-law database by free text.
+    """Search the CENDOJ case-law database using filters.
+
+    ``texto`` is optional, but at least one criterion is required. Filters
+    combine with AND. Different ``localizacion`` entries are OR-ed with each
+    other.
 
     Returns structured metadata for each resolution: ROJ, ECLI, date, organ,
     seat, resolution and appeal numbers, municipality, ponente, the site's
@@ -146,17 +204,74 @@ def buscar_sentencias(
 
     Args:
         texto: free-text query, e.g. ``"clausulas abusivas"``.
-        pagina: 1-based page number.
-        records_por_pagina: hits per page.
+        fecha_desde: inclusive lower bound, as ``YYYY-MM-DD`` or
+            ``DD/MM/AAAA``.
+        fecha_hasta: inclusive upper bound, as ``YYYY-MM-DD`` or
+            ``DD/MM/AAAA``.
+        jurisdiccion: one of ``CIVIL``, ``PENAL``, ``CONTENCIOSO``,
+            ``SOCIAL``, ``MILITAR``.
+        tipo_resolucion: ``SENTENCIA`` or ``AUTO``.
+        roj: official citation token.
+        ecli: European Case Law Identifier.
+        num_resolucion: resolution number.
+        num_recurso: appeal number.
+        ponente: magistrate's name.
+        voces: subject vocabulary, e.g. ``"TRÁFICO DE DROGAS"``.
+        localizacion: list of location tokens. Each entry may be the site's
+            suffix form (``"MELILLA(C)"``, ``"BARCELONA(P)"``,
+            ``"MELILLA(S)"``) or a bare place name (``"Melilla"``), which
+            means a comunidad autónoma.
+        coleccion: ``AN`` for all jurisdictions or ``TS`` for the Tribunal
+            Supremo only.
+        orden: ``reciente`` (newest first) or ``antiguo`` (oldest first).
+        campos_extra: escape hatch for site fields navaja does not model
+            (``ID_NORMA``, ``SUBTIPORESOLUCION``, ...). Applied last, so it
+            wins over a modelled field with the same name.
+        pagina: real 1-based page number.
+        records_por_pagina: one of 10, 20, 30 or 50. The site never returns
+            more than 200 records for one query, so the requested window must
+            not pass that ceiling.
+
+    Raises:
+        ValueError: when a date, the pagination, or the overall request is
+            unusable (no criterion, unsupported page size, window past the
+            200-record ceiling, or an enum token the site does not accept).
+        SearchError: when the site refuses or does not honour the requested
+            window. Subclasses :class:`SearchRequestError` (invalid search)
+            and :class:`SearchGatedError` (mass-download control) may be
+            raised instead.
     """
-    if not texto or not texto.strip():
-        raise ValueError("texto must be a non-empty search string")
+    filter_kwargs: dict[str, Any] = {
+        "texto": texto,
+        "fecha_desde": _parse_date_arg(fecha_desde, "fecha_desde"),
+        "fecha_hasta": _parse_date_arg(fecha_hasta, "fecha_hasta"),
+        "jurisdiccion": jurisdiccion,
+        "tipo_resolucion": tipo_resolucion,
+        "roj": roj,
+        "ecli": ecli,
+        "num_resolucion": num_resolucion,
+        "num_recurso": num_recurso,
+        "ponente": ponente,
+        "voces": voces,
+    }
+
+    locations = _parse_localizaciones(localizacion)
+    if locations:
+        filter_kwargs["localizacion"] = locations
+
+    if coleccion is not None:
+        filter_kwargs["coleccion"] = coleccion
+    if orden is not None:
+        filter_kwargs["orden"] = orden
+
+    filters = SearchFilters(**filter_kwargs)
 
     client = _get_client()
     page = client.search(
-        texto,
+        filters,
         page=pagina,
         records_per_page=records_por_pagina,
+        extra_fields=campos_extra,
     )
     return page.as_dict()
 

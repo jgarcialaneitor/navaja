@@ -293,17 +293,33 @@ _LOCALIZACION_TOKEN = re.compile(r"^(?P<nombre>.+?)\s*\((?P<nivel>[CPS])\)$")
 
 
 def _coerce_enum(value: Any, enum_type: type[StrEnum], field_name: str) -> Any:
-    """Coerce a token to ``enum_type``, refusing anything the site rejects."""
+    """Coerce a token to ``enum_type``, refusing anything the site rejects.
+
+    Both the member value (the token the site expects, such as
+    ``"IN_FECHARESOLUCION:increasing"``) and the member name (``"antiguo"``)
+    are accepted, case-insensitively. Names matter because several members are
+    named for the caller's vocabulary while their value is the site's own
+    token, and the tool exposes the friendly name.
+    """
     if value is None or isinstance(value, enum_type):
         return value
-    for candidate in (value, str(value).strip().upper()):
+    candidates = (value, str(value).strip().upper())
+    for candidate in candidates:
         try:
             return enum_type(candidate)
         except ValueError:
             continue
+    for candidate in candidates:
+        member = enum_type.__members__.get(str(candidate).strip().upper())
+        if member is not None:
+            return member
     accepted = ", ".join(member.value for member in enum_type)
+    names = ", ".join(
+        member.name for member in enum_type if member.name != member.value
+    )
+    detail = f"{accepted} (or their names: {names})" if names else accepted
     raise ValueError(
-        f"{field_name} {value!r} is not accepted by the site; use one of {accepted}"
+        f"{field_name} {value!r} is not accepted by the site; use one of {detail}"
     )
 
 
