@@ -40,8 +40,19 @@ local form runs as a tiny HTTP server, and the human reaches it from any device
 that can connect to that interface.
 
 This is deliberately designed for a VPS or other headless host. You can run
-`navaja-mcp` on a server with no display and open the form URL on your laptop,
-phone, or Tailscale-connected device.
+`navaja-mcp` on a server with no display and solve the captcha through an
+SSH tunnel. For example, if the form is served on `127.0.0.1:8765` on the
+remote host, forward it with:
+
+```bash
+ssh -L 8765:127.0.0.1:8765 <your-vps>
+```
+
+Then open `http://127.0.0.1:8765/<token>/` locally. This has been verified
+end to end: a real CENDOJ captcha was solved through an SSH tunnel and the
+server returned the PDF on the first attempt. Because the tunnel runs over
+port 22, already allowed by typical host firewalls, no `ufw` change was
+needed.
 
 ## Configuration
 
@@ -131,10 +142,44 @@ Current suite: `59 passed, 1 skipped`.
 
 Tests never touch the live site unless `NAVAJA_LIVE=1` is set.
 
-## Unverified
+## Verified
 
-The live CENDOJ captcha round-trip — a real `stickyImg` image served by the
-site, answered by a human through the local form, followed by an actual PDF or
-HTML response — has not been exercised end to end. That step requires a human
-with a browser and a real document URL. Everything else is covered by offline
-tests.
+The live CENDOJ captcha round-trip has been verified end to end:
+
+```bash
+uv run navaja-doc "https://www.poderjudicial.es/search/AN/openDocument/3fb62a5395c8aaa1a0a8778d75e36f0d/20260917"
+```
+
+Output:
+
+```
+Fetching full text for https://www.poderjudicial.es/search/AN/openDocument/3fb62a5395c8aaa1a0a8778d75e36f0d/20260917
+Captcha form ready at http://127.0.0.1:8765/<token>/
+Result: success
+Attempts: 1
+Content-Type: application/pdf; name="STS_3679_2026.pdf"
+Text preview: JURISPRUDENCIA Roj: STS 3679/2026 - ECLI:ES:TS:2026:3679 Id Cendoj: 28079110012026101379
+Órgano: Tribunal Supremo. Sala de lo Civil Sede: Madrid Sección: 1 Fecha: 10/09/2026
+Nº de Recurso: 288/2022 Nº de Resolución: 1413/2026 Procedimiento: Recurso de casación
+Ponente: PEDRO JOSE VELA TORRES Tipo de Resolución: Sentencia
+```
+
+What this proves:
+
+- A correct human answer to the site's `stickyImg` captcha returns the real
+  PDF. The full round-trip works.
+- It succeeded on the first attempt, using only the existing captcha POST
+  body. No extra cookies, Referer header, or retry dance were needed.
+- The local-form-plus-SSH-tunnel flow works on a headless VPS. The tunnel
+  runs over port 22, already allowed on `tailscale0`, so the host firewall
+  (`ufw`) did not need to be changed.
+- `pypdf` extracts clean text from the returned PDF.
+- The PDF metadata is richer than the search-result parser currently
+  produces. The document carries `Órgano`, `Sede`, `Sección`, `Fecha`,
+  `Nº de Recurso`, `Nº de Resolución`, `Procedimiento`, `Ponente`,
+  `Tipo de Resolución` and `Id Cendoj`. Notably, it includes
+  `Sede: Madrid`, which the current search parser leaves empty for
+  Tribunal Supremo rulings.
+
+This verification was performed with `navaja-doc` directly, not through an
+MCP client.

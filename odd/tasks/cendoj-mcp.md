@@ -55,6 +55,12 @@ Out of scope, deliberately:
       short-lived local form when required, let the user solve it, and extract
       the text.
 - [x] 8. Wiring docs: how to register the MCP server and run it locally.
+- [ ] 9. Fix the search-result parser gap for Tribunal Supremo rulings:
+      `Sentencia.sede` is `None` for STS/ATS rulings because `_parse_title`
+      expects the `"<TIPO> <SEDE>, a <fecha>"` shape used by SAP titles. The
+      Supreme Court title does not include the seat in that position, but the
+      full-text PDF already carries `Sede`, so the gap is fillable from the
+      document as well as from the title.
 
 ## Evidence
 
@@ -113,9 +119,16 @@ Out of scope, deliberately:
   `serve_captcha(..., token=...)`; there is no monkey-patching of
   `secrets.token_urlsafe`. Supplied tokens are validated as URL-path-safe
   (`A-Z`, `a-z`, `0-9`, `-`, `_`, minimum 16 characters).
-- UNVERIFIED: the live CENDOJ captcha round-trip (real `stickyImg` image ->
-  human answer -> actual PDF or HTML response) has not been exercised against
-  the live site. It requires a human with a browser and a real document URL.
+- Verified: the live CENDOJ captcha round-trip was exercised with
+  `uv run navaja-doc "https://www.poderjudicial.es/search/AN/openDocument/3fb62a5395c8aaa1a0a8778d75e36f0d/20260917"`.
+  The site returned `Content-Type: application/pdf; name="STS_3679_2026.pdf"`,
+  the flow succeeded on the first attempt, and `pypdf` extracted clean text
+  including `JURISPRUDENCIA Roj: STS 3679/2026`, `Id Cendoj:
+  28079110012026101379`, and the richer metadata fields (`Órgano`, `Sede`,
+  `Sección`, `Fecha`, `Nº de Recurso`, `Nº de Resolución`, `Procedimiento`,
+  `Ponente`, `Tipo de Resolución`). The human reached the local form through
+  an SSH tunnel, which runs over port 22 and therefore needed no `ufw`
+  change.
 - Commit: `4899472e7f94592bd800fba24f7bd1450569b908` — "feat: add navaja, an
   MCP server for personal CENDOJ research" (18 files, 4093 insertions).
 
