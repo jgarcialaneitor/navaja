@@ -109,15 +109,16 @@ Each `KEY&LABEL` pair is pipe-separated; the label is the usable value.
       accepted page sizes. Tests assert the description carries those points and
       that `materia` and `total_capped` reach the tool's response. Work unit
       `7e416e9`.
-- [ ] 3. The vocabulary tool. Add `CendojClient.localizaciones(...)` for the
+- [x] 3. The vocabulary tool. Add `CendojClient.localizaciones(...)` for the
       endpoint above, the `listar_localizaciones` MCP tool on top of it, and one
       saved fixture per level captured live. Tests cover the parsing (including
       the empty-key entry and the `&` escape), the parent requirements, the
-      level aliases, and the tool's response shape.
-- [ ] 4. Documentation: README section for `materia`, `total_capped` and
+      level aliases, and the tool's response shape. Work unit `a46c368`.
+- [x] 4. Documentation: README section for `materia`, `total_capped` and
       `listar_localizaciones`, with the recipe and the measured reasons the
       server-side alternatives do not work. Close this file with the
-      verification record.
+      verification record. Work unit: the closing commit that carries this
+      section.
 
 ## Evidence
 
@@ -192,6 +193,76 @@ four wordings unioned      -> complete for the window (only 2026-01-28 was new)
   does not break them: the page sizes as enumerated, the recipe naming
   `localizacion` and `texto`, `materia` as the classifier, `total_capped` tied
   to the 200-record ceiling, and the `voces` caveat.
+
+### Task 3 verification (work unit `a46c368`)
+
+- Test counts: 213 passed + 1 skipped before the work unit, 240 passed + 1
+  skipped after, with no test removed from either touched file.
+- Live acceptance through the tool function: `COMUNIDAD` returns 19 tokens
+  starting `ANDALUCÍA(C)`; `PROVINCIA` with `comunidad=MELILLA` returns
+  `("MELILLA(P)",)`; `SEDE` with both parents returns `("MELILLA(S)",)`; the
+  alias `nivel="C"` resolves to the comunidad level; and a missing parent
+  raises `ValueError`.
+- Independent verification exercised the error paths directly (non-success
+  payload, non-JSON body, missing `result`, empty `result`), confirmed the wire
+  body carries the level WORD rather than the short code and that lowercase
+  parents are uppercased, and found no gaps in the five adversarial cases it
+  probed. It reported one latent oddity: `result: null` returned an empty tuple
+  instead of raising, because `str(None)` has no `&` to split on.
+- That oddity was fixed before the commit, and the comunidad parsing test was
+  strengthened from a membership check to the full 19-token tuple: a parser that
+  dropped or duplicated entries would have passed the loose version.
+
+## Close
+
+Closed on 2026-09-20 on branch `feat/cendoj-search`. Work units `0cb9407`
+(the data), `7e416e9` (the guidance) and `a46c368` (the vocabulary tool), with
+their evidence commits `42cdb22` and `64e2e8d` and the closing update.
+
+Verified outcome:
+
+- The subject the site assigns is now a field, not a string to parse:
+  `materia` carries the label, `null` for the two unclassified markers. Verified
+  live through the tool on the query that started this: the drink-driving
+  resolution the free text drags in now arrives labelled
+  `'LESIONES POR IMPRUDENCIA'`, next to the drug-trafficking ones, so the caller
+  can tell them apart without re-reading the query.
+- The 200-record ceiling is visible: `total_capped` reports when the total is a
+  ceiling rather than a count.
+- The recipe lives in the tool description, so the caller no longer has to
+  discover by probing that free text is fuzzy, that the subject axis is not
+  filterable, or that only four page sizes exist.
+- Place tokens are no longer guessed: `listar_localizaciones` returns the site's
+  own vocabulary as ready-to-use tokens (19 comunidades, `MELILLA(P)`,
+  `MELILLA(S)`), and a missing parent raises.
+- Final suite: 240 passed, 1 skipped. No test was removed in any work unit.
+- Measured effect on the question that motivated the feature: it used to take
+  about eight calls and could still be wrong, because the filter that looks
+  right (`voces`) misses two of the five answers. Now one call returns the
+  subject-classified results and says whether the set was truncated, so a second
+  call is only needed when `total_capped` is true.
+
+Checks that did not pass, or were skipped:
+
+- Native review: not run for this slice. See the next section; this facade
+  reviews the workspace projection in `ordinary` mode and its controller rejects
+  the explicit `baseRef` form, so committed work has no candidate.
+- `ver_texto_completo` is untouched and still needs a human for the site's
+  captcha.
+- Live tests stay opt-in (`NAVAJA_LIVE=1`).
+- `navaja-mcp` does not hot reload: every source change needs a restart after
+  the commit that carries it. Three of the four changes here touch `src/`, so a
+  restart is required before they can be observed through the MCP.
+- Process error recorded during task 1: the parent ran `git stash` in parallel
+  with a read-only verifier, invalidating two of that verifier's pytest counts.
+  The parent's own counts were used instead. Do not stash while a verifier is
+  reading the tree.
+
+Next step:
+
+- Nothing pending for this feature. Open items, all out of scope and measured as
+  not working: any server-side subject filter, an internal wording-union tool,
+  and the 6481-entry `materiasleg` vocabulary.
 
 ## Notes
 

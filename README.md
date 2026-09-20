@@ -8,10 +8,12 @@ summaries, and read the full text of the resolutions you pick.
 
 ## What navaja is
 
-`navaja-mcp` exposes three tools for an MCP client:
+`navaja-mcp` exposes four tools for an MCP client:
 
 - `buscar_sentencias` — search by free text and the site's advanced filters.
   No captcha is needed.
+- `listar_localizaciones` — the site's own location vocabulary, ready to pass
+  back into a search. No captcha is needed.
 - `ver_texto_completo` — fetch the full text of a resolution.
 - `estado_servidor` — runtime configuration snapshot.
 
@@ -45,6 +47,30 @@ relevance ranking, so results come back ordered by resolution date, and recall
 within one query depends on how you word it. The site caps a query at 200
 records, which is why a broad query returns the same ceiling for every wording.
 
+### Subject matter
+
+The site classifies every resolution, and the classification travels in the
+summary as `RESUMEN: <label>`. `materia` exposes it as its own field. It is
+`null` when the site did not classify the resolution: both
+`DELITO SIN ESPECIFICAR` and `MATERIAS NO ESPECIFICADAS` mean that.
+
+There is **no server-side subject filter**, and that is measured rather than
+assumed:
+
+- `MATERIAS` is a field in the site's own form, but the endpoint ignores it.
+  Three values, including a valid one, returned the baseline unchanged.
+- Free-text operators do nothing useful: `"tráfico de drogas"` in quotes equals
+  the unquoted query, `+tráfico +drogas` is worse, and `AND` / `Y` change
+  nothing.
+- `voces` is honoured but is a different thesaurus. It does not include every
+  resolution whose label says `TRÁFICO DE DROGAS`, so it misses relevant ones.
+
+So to answer "the last N about X in Y": put the place in `localizacion`, put a
+subject wording in `texto`, ask for a page of 10 to 50, and **classify the
+results by `materia`**. A query for `"tráfico de drogas"` also returns
+resolutions about drink-driving or extranjería that merely mention the phrase,
+and the label is what tells them apart.
+
 ### Location
 
 `localizacion` takes a list. Each entry is either the site's own form, with the
@@ -68,6 +94,19 @@ POST /search/jurisprudencia.action
 which returns pipe-separated `KEY&LABEL` pairs (`MELILLA&MELILLA`,
 `PAÍS VASCO&PAÍS VASCO`).
 
+`listar_localizaciones` exposes that vocabulary as a tool, already formatted as
+tokens you can pass straight back:
+
+```python
+listar_localizaciones(nivel="COMUNIDAD")                        # "MELILLA(C)", ...
+listar_localizaciones(nivel="PROVINCIA", comunidad="MELILLA")   # "MELILLA(P)"
+listar_localizaciones(nivel="SEDE", comunidad="MELILLA", provincia="MELILLA")
+```
+
+The tokens always carry their level suffix, so a provincia token cannot be
+mistaken for a comunidad. A missing parent raises rather than returning an empty
+list.
+
 The value is the label the site displays, not an internal id: a search with
 Melilla selected sends `MELILLA(C) | `. The codes the front-end keeps in its own
 checkbox values (`ALL@ALL@MELILLA`) are ignored by the server, so a client that
@@ -83,6 +122,11 @@ returns the whole result set again — 200 records that look like a normal page.
 
 Getting this wrong is not hypothetical. The previous release forwarded the page
 number as the offset, so page 2 repeated nine of page 1's ten results.
+
+`total_capped` reports when `total` sits on that ceiling, so the count is a
+ceiling rather than a count. When it is true, union several subject wordings or
+narrow with a date range instead of paging: past the ceiling the site clamps the
+offset and returns the same records again, so there is nothing further to reach.
 
 ### When the site does not answer
 
@@ -271,7 +315,7 @@ uv run pytest          # deterministic, runs against saved fixtures
 NAVAJA_LIVE=1 uv run pytest -m live   # opt-in: hits the real site
 ```
 
-Current suite: `195 passed, 1 skipped`.
+Current suite: `240 passed, 1 skipped`.
 
 Tests never touch the live site unless `NAVAJA_LIVE=1` is set.
 
