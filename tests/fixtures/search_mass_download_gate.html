@@ -1,0 +1,61 @@
+
+
+
+
+
+
+
+
+	<div id="captchacontent" class="inner">		
+		<div id="cabecera">
+			<span class="area">Control de </span> <span class="restring">
+			
+					grandes paginaciones
+				
+			</span>
+		</div>
+		<div id="principal">
+			
+			
+			<h2>Por favor, introduzca el texto que muestra la siguiente imagen:</h2>
+			<div class="captchaform">
+				<form action="search.action" name="frmauthenticatecaptcha" id="frmauthenticatecaptcha" method="POST"
+				onsubmit="sendCaptcha('frmauthenticatecaptcha', 'jurisprudencia'); return false;">
+				<input type="hidden" id="action" name="action" value="captcha"/>
+				
+			                 <input type="hidden" id="prevaction" name="prevaction" value="query"/>
+			            
+			                 <input type="hidden" id="sort" name="sort" value="IN_FECHARESOLUCION:decreasing"/>
+			            
+			                 <input type="hidden" id="databasematch" name="databasematch" value="AN"/>
+			            
+			                 <input type="hidden" id="start" name="start" value="1"/>
+			            
+			                 <input type="hidden" id="recordsPerPage" name="recordsPerPage" value="10"/>
+			            
+			                 <input type="hidden" id="TEXT" name="TEXT" value="Melilla"/>
+			            
+			                 <input type="hidden" id="maxresults" name="maxresults" value="500"/>
+			            
+					<div class="form-row row captchaimg">
+						
+							<img src="/search/stickyImg?t=1789934043716" />
+						
+					</div>
+						
+					<div class="form-row row frm">
+						
+						<div class="col-xs-1"></div>
+						<div class="col-xs-5">
+							<input type="text" id="captcha" name="captcha" class="pull-right form-control input-sm"/> 
+						</div>
+						<div class="col-xs-5">
+							<input type="submit" value="Confirmar" class="btn btn-primary btn-sm"/>
+						</div>
+					</div>
+				</form>	
+			</div>
+			
+
+	</div>
+</div>

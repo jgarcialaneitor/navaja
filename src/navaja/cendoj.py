@@ -499,6 +499,61 @@ def _pagination_form_fields(page: int, records_per_page: int) -> dict[str, str]:
     return {"recordsPerPage": str(records_per_page), "start": str(start)}
 
 
+class SearchError(Exception):
+    """Base class for a search the site refused to answer.
+
+    A search that legitimately matches nothing is *not* an error: it returns a
+    result page with no results, which parses into an empty
+    :class:`~navaja.models.SearchPage`. These exceptions mean the site did not
+    answer the query at all, which must never look like "no matches".
+    """
+
+
+class SearchRequestError(SearchError):
+    """The site rejected the search as invalid.
+
+    Reachable with a field value the site validates strictly, such as an
+    unaccepted page size or a jurisdiction token it does not know.
+    """
+
+
+class SearchGatedError(SearchError):
+    """The site answered with its mass-download control instead of results.
+
+    Its ``Control de grandes paginaciones`` challenge, the same control the
+    full-text flow meets. navaja has no automatic solver; the request has to be
+    made smaller or the challenge solved by a human elsewhere.
+    """
+
+
+# Matched case-insensitively against the response body. The mass-download gate
+# is checked first: its page also carries the word "control".
+_GATE_MARKERS = ("grandes paginaciones", "introduzca el texto que muestra")
+_INVALID_SEARCH_MARKERS = ("no se ha podido atender", "la búsqueda no es válida")
+
+
+def _error_message(html: str) -> str:
+    """Return the site's own error text, when its error page is present."""
+    soup = BeautifulSoup(html, "lxml")
+    element = soup.select_one("span.errorMessage") or soup.select_one(".error")
+    return _clean(element.get_text(" ")) if element is not None else ""
+
+
+def detect_refusal(html: str) -> str | None:
+    """Say why the site did not answer with results, when it did not.
+
+    Returns ``"gated"`` for the mass-download control, ``"invalid"`` for the
+    invalid-search page, and ``None`` for a result page -- including one with
+    no results, which is an answer, not a refusal.
+    """
+    lowered = html.lower()
+    if all(marker in lowered for marker in _GATE_MARKERS):
+        return "gated"
+    if any(marker in lowered for marker in _INVALID_SEARCH_MARKERS):
+        return "invalid"
+    return None
+
+
 class CendojClient:
     """Synchronous client for the CENDOJ search endpoint.
 
@@ -573,6 +628,9 @@ class CendojClient:
         Raises:
             ValueError: when no criterion is given, or when the pagination
                 cannot be expressed on the site.
+            SearchRequestError: when the site rejects the search as invalid.
+            SearchGatedError: when the site answers with its mass-download
+                control instead of results.
         """
         if isinstance(filters, str):
             filters = SearchFilters(texto=filters)
@@ -594,6 +652,21 @@ class CendojClient:
 
         response = self._client.post(SEARCH_URL, data=data, headers={"Referer": INDEX_URL})
         response.raise_for_status()
+
+        refusal = detect_refusal(response.text)
+        if refusal == "gated":
+            raise SearchGatedError(
+                "the site answered with its mass-download control instead of results; "
+                "navaja cannot solve that challenge automatically, so narrow the "
+                "request"
+            )
+        if refusal == "invalid":
+            message = _error_message(response.text)
+            raise SearchRequestError(
+                "the site rejected the search as invalid"
+                + (f": {message}" if message else "")
+            )
+
         return parse_search_page(response.text, page=page)
 
     def fetch_full_text(

@@ -24,12 +24,23 @@ from navaja.cendoj import (
     NivelLocalizacion,
     Orden,
     SEARCH_URL,
+    SearchError,
     SearchFilters,
+    SearchGatedError,
+    SearchRequestError,
     TipoResolucion,
+    detect_refusal,
 )
 
 FIXTURE = Path(__file__).parent / "fixtures" / "search_clausulas_abusivas.html"
 HTML = FIXTURE.read_text(encoding="utf-8")
+
+INVALID_FIXTURE = Path(__file__).parent / "fixtures" / "search_invalid_request.html"
+GATE_FIXTURE = Path(__file__).parent / "fixtures" / "search_mass_download_gate.html"
+NO_RESULTS_FIXTURE = Path(__file__).parent / "fixtures" / "search_no_results.html"
+INVALID_HTML = INVALID_FIXTURE.read_text(encoding="utf-8")
+GATE_HTML = GATE_FIXTURE.read_text(encoding="utf-8")
+NO_RESULTS_HTML = NO_RESULTS_FIXTURE.read_text(encoding="utf-8")
 
 
 def _client_capturing(sent: list[httpx.Request]) -> CendojClient:
@@ -38,6 +49,15 @@ def _client_capturing(sent: list[httpx.Request]) -> CendojClient:
         if str(request.url) == INDEX_URL:
             return httpx.Response(200, text="<html><body>form</body></html>")
         return httpx.Response(200, text=HTML)
+
+    return CendojClient(transport=httpx.MockTransport(handler))
+
+
+def _client_with_body(html: str) -> CendojClient:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if str(request.url) == INDEX_URL:
+            return httpx.Response(200, text="<html><body>form</body></html>")
+        return httpx.Response(200, text=html)
 
     return CendojClient(transport=httpx.MockTransport(handler))
 
@@ -296,6 +316,46 @@ def test_non_default_records_per_page_reaches_wire():
     body = _decoded_form(sent[1])
     assert body["recordsPerPage"] == "20"
     assert body["start"] == "1"
+
+
+@pytest.mark.parametrize(
+    "html, expected",
+    [
+        (INVALID_HTML, "invalid"),
+        (GATE_HTML, "gated"),
+        (NO_RESULTS_HTML, None),
+        (HTML, None),
+    ],
+)
+def test_detect_refusal_classifies_response(html, expected):
+    assert detect_refusal(html) == expected
+
+
+def test_search_raises_search_request_error_with_invalid_fixture():
+    with _client_with_body(INVALID_HTML) as client:
+        with pytest.raises(SearchRequestError, match="La búsqueda no es válida") as exc_info:
+            client.search("x")
+
+    assert "invalid" in str(exc_info.value).lower()
+
+
+def test_search_raises_search_gated_error_with_gate_fixture():
+    with _client_with_body(GATE_HTML) as client:
+        with pytest.raises(SearchGatedError):
+            client.search("x")
+
+
+def test_search_returns_empty_page_for_no_results_fixture():
+    with _client_with_body(NO_RESULTS_HTML) as client:
+        page = client.search("x")
+
+    assert page.sentencias == ()
+    assert page.total is None
+
+
+def test_search_errors_are_search_error_subclasses():
+    assert issubclass(SearchRequestError, SearchError)
+    assert issubclass(SearchGatedError, SearchError)
 
 
 @pytest.mark.live
