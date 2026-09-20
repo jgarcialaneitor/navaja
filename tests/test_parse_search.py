@@ -107,17 +107,26 @@ def test_search_page_offset(page, records_per_page, expected):
 @pytest.mark.parametrize(
     "total, sentencias_count, records_per_page, page, expected",
     [
+        # Full first page of a larger set: records 1..10 of 200.
         (200, 10, 10, 1, True),
+        # Last page exactly fills the set: records 191..200 of 200.
         (200, 10, 10, 20, False),
+        # Larger page size, last page exactly fills the set: records 151..200 of 200.
         (200, 50, 50, 4, False),
+        # Small set fits entirely on the first page: records 1..4 of 4.
         (4, 4, 10, 1, False),
-        # Old arithmetic `page * records_per_page < total` would return True,
-        # but the page already ends at record 200 of a 201-record set.
-        (201, 10, 10, 20, False),
-        # Old arithmetic would return False, but records 11..15 of 17 leave more.
+        # Set size exactly matches the first page: records 1..10 of 10.
+        (10, 10, 10, 1, False),
+        # Live defect case: first page shows records 1..10 of 11, one remains.
+        (11, 10, 10, 1, True),
+        # Final page with a single remaining record: record 11 of 11.
+        (11, 1, 10, 2, False),
+        # Final page leaves one record beyond it: records 191..200 of 201.
+        (201, 10, 10, 20, True),
+        # Short page: records 11..15 of 17, more remain.
         (17, 5, 10, 2, True),
-        # Short page: fewer records than requested, yet the set continues.
-        # Using the requested size instead of received records would wrongly say False.
+        # Short page: records 11..15 of 18, more remain.
+        # Using the requested page size instead of received records would wrongly say False.
         (18, 5, 10, 2, True),
     ],
 )

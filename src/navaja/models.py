@@ -92,14 +92,20 @@ class SearchPage:
     def has_more(self) -> bool:
         """Whether the site reports more hits beyond this page.
 
-        When the site does not report a total, the conservative fallback is
-        to assume there is more as long as this page is full. When a total is
-        present, the decision uses the number of records actually received,
-        not the requested size, because the last page is normally short.
+        The site counts records, not pages, so the decision is made from this
+        page's first-record offset plus the records actually received: the last
+        record held here is ``offset + len(sentencias) - 1``, and anything past
+        it is more.
+
+        Two traps, both measured live. Using the requested size instead of the
+        records received is wrong for a short last page. And dropping the
+        ``- 1`` hides a single remaining record: with a total of 11 hits and 10
+        of them shown, this must say there is more, because the eleventh is
+        reachable.
         """
         if self.total is None:
             return len(self.sentencias) >= self.records_per_page
-        return self.offset + len(self.sentencias) < self.total
+        return self.offset + len(self.sentencias) - 1 < self.total
 
     def as_dict(self) -> dict[str, Any]:
         return {
