@@ -109,7 +109,7 @@ leaves `serve_captcha` half-migrated would not close on a green commit.
       only after the CENDOJ round-trip has already started. Detect that case
       and say what is happening and what to do instead of surfacing the raw
       bind error.
-- [ ] 4. Documentation: README flow, the idle page, the "nothing answers"
+- [x] 4. Documentation: README flow, the idle page, the "nothing answers"
       meaning, and the accepted always-open-during-session surface. Record the
       verification evidence in this file.
 
@@ -196,6 +196,32 @@ Task 3 — commit `fix: tell the CLI user who is holding the captcha port`.
   substituted client records every use and the conflict tests assert it was
   never touched. A control run with the pre-flight disabled fails exactly
   those four tests, so they are not vacuous.
+
+Task 4 — documentation update (no source changes; do not commit).
+
+- `uv run pytest` → `125 passed, 1 skipped`.
+- `README.md`:
+  - Rewrote the captcha section to describe the three URL states: captcha
+    form while a challenge is pending, idle page with a 5-second refresh
+    while none is pending, and nothing answering when no navaja process is
+    running.
+  - Documented the accepted trade-off explicitly: the listener stays bound
+    for the whole navaja process, binds only the validated private interface,
+    refuses `0.0.0.0`/`::`/empty hosts, requires the token on every path, and
+    returns 404 for a wrong token in both form and idle states.
+  - Documented that `estado_servidor` reports `captcha_listening` and
+    `captcha_url_masked` and never returns the token.
+  - Documented the `navaja-doc` fast-fail when the captcha port is held and
+    the `--port 0` escape hatch.
+  - Fixed stale claims found against the source:
+    - Test suite total: `59 passed, 1 skipped` → `125 passed, 1 skipped`.
+    - CLI startup output: the old quote `Captcha form ready at
+      http://127.0.0.1:8765/<token>/` was replaced with the current wording
+      (`Captcha form will bind to ... because ...` and `Captcha form binding
+      to ...; ready at ...`).
+- `.gitignore`: added `.codegraph/` so local indexer state no longer shows up
+  as untracked.
+- `git status` after the changes no longer lists `.codegraph/` as untracked.
 
 ## Known issues, deliberately not fixed here
 

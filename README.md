@@ -21,9 +21,28 @@ results page. Only the full-text step can trigger the site's
 ## How full-text retrieval works
 
 When you ask for the full text of a resolution, navaja requests the document
-from CENDOJ. If the site responds with its captcha page, navaja starts a
-**short-lived local HTTP form** on a private network interface, serves the
-captcha image, and waits for a human to type the answer.
+from CENDOJ. If the site responds with its captcha page, navaja shows the
+captcha image through a **long-lived local HTTP form** bound to a private
+network interface and waits for a human to type the answer.
+
+The form URL has three states:
+
+- While a challenge is pending, it serves the captcha form.
+- While no challenge is pending, it serves an idle page that says so and
+  refreshes itself every 5 seconds; a tab left open picks up the next
+  challenge without the human reloading.
+- If the URL answers nothing at all, no navaja process is running.
+
+The listener stays bound for the whole navaja process rather than only during
+a challenge. That is a deliberate trade-off: a slightly longer-lived local
+listener in exchange for a URL that always answers something useful. It still
+binds only the validated private interface (`0.0.0.0`, `::` and empty hosts
+are refused), and the token is required on every path. A wrong token returns
+a 404 in both the form and idle states.
+
+The `estado_servidor` tool reports whether the listener is bound
+(`captcha_listening`) and a masked form URL (`captcha_url_masked`). It
+deliberately never returns the token.
 
 There is **no automatic captcha solver** in navaja. The captcha image is never
 sent to a vision model, an OCR service, or any third party. A human reads the
@@ -127,6 +146,11 @@ Fetch a single document from the command line with the `navaja-doc` script:
 navaja-doc "https://www.poderjudicial.es/search/AN/openDocument/<16-or-32-hex-hash>/<YYYYMMDD>"
 ```
 
+If the default port is already held by a running `navaja-mcp` session,
+`navaja-doc` fails fast with an actionable message instead of making a
+CENDOJ round-trip first. Use `--port 0` to let the OS pick a free port; the
+actual form URL is announced on stderr.
+
 To get a real document URL right now, run:
 
 ```bash
@@ -159,7 +183,7 @@ uv run pytest          # deterministic, runs against saved fixtures
 NAVAJA_LIVE=1 uv run pytest -m live   # opt-in: hits the real site
 ```
 
-Current suite: `59 passed, 1 skipped`.
+Current suite: `125 passed, 1 skipped`.
 
 Tests never touch the live site unless `NAVAJA_LIVE=1` is set.
 
@@ -175,7 +199,8 @@ Output:
 
 ```
 Fetching full text for https://www.poderjudicial.es/search/AN/openDocument/3fb62a5395c8aaa1a0a8778d75e36f0d/20260917
-Captcha form ready at http://127.0.0.1:8765/<token>/
+Captcha form will bind to 127.0.0.1 because no tailscale0 interface found
+Captcha form binding to 127.0.0.1; ready at http://127.0.0.1:8765/<token>/
 Result: success
 Attempts: 1
 Content-Type: application/pdf; name="STS_3679_2026.pdf"

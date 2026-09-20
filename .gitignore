@@ -1,6 +1,7 @@
 # Local Pi runtime state
 .atl/
 .engram/
+.codegraph/
 
 # Secrets and credentials — never track
 *.pw
