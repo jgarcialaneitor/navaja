@@ -195,9 +195,34 @@ def buscar_sentencias(
     combine with AND. Different ``localizacion`` entries are OR-ed with each
     other.
 
+    How to answer a research question: to find the last N resolutions about a
+    subject in a place, pass the place in ``localizacion`` and a subject wording
+    in ``texto`` (for example ``"tráfico de drogas"``), add ``tipo_resolucion``
+    when the question specifies sentences or orders, ask for a page of 10 to 50,
+    and read the first N results.
+
+    Classify results by ``materia``, not by the query wording. ``materia`` is
+    the site's own subject label; free text is fuzzy, so a query for
+    ``"tráfico de drogas"`` can also return drink-driving or extranjería
+    resolutions that merely mention the phrase. The label is the reliable way
+    to tell which results actually belong to the subject.
+
+    ``total_capped`` is ``True`` when the reported total sits at the site's
+    200-record ceiling, so the count is a ceiling rather than an exact count.
+    Remedy: union several subject wordings, or narrow the search with a date
+    range. There is no server-side subject filter; ``voces`` is honoured but
+    does not include every resolution whose label says ``TRÁFICO DE DROGAS``,
+    so it will miss relevant results.
+
+    ``records_por_pagina`` accepts only 10, 20, 30 or 50, so asking for "the
+    last 5" means requesting 10 and taking the first five. Any other value
+    raises ``ValueError``.
+
     Returns structured metadata for each resolution: ROJ, ECLI, date, organ,
     seat, resolution and appeal numbers, municipality, ponente, the site's
-    own automatic summary, and the document URL.
+    own automatic summary, document URL, and ``materia`` (the site's own
+    subject label). The page itself carries ``total``, ``total_capped``,
+    ``has_more``, ``page`` and ``records_per_page``.
 
     This tool does not solve any captcha; the search endpoint does not require
     one.

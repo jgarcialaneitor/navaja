@@ -254,6 +254,45 @@ def test_buscar_sentencias_returns_documented_shape(monkeypatch):
     assert result["results"][0]["url_documento"]
 
 
+def test_buscar_sentencias_description_carries_recipe():
+    tools = asyncio.run(server.list_tools())
+    tool = next(t for t in tools if t.name == "buscar_sentencias")
+    # Collapse whitespace so line breaks inside phrases do not break assertions.
+    description = " ".join(tool.description.split())
+    # Load-bearing guidance: page sizes are enumerated, not any stray digit.
+    assert "10, 20, 30 or 50" in description
+    # The recipe tells the caller to combine place and subject.
+    assert (
+        "pass the place in ``localizacion`` and a subject wording in ``texto``"
+        in description
+    )
+    # ``materia`` is the reliable classifier.
+    assert "Classify results by ``materia``" in description
+    # ``total_capped`` is tied to the 200-record ceiling.
+    assert (
+        "``total_capped`` is ``True`` when the reported total sits at the site's 200-record ceiling"
+        in description
+    )
+    # ``voces`` is explicitly not a substitute for the subject label.
+    assert (
+        "``voces`` is honoured but does not include every resolution whose label says"
+        in description
+    )
+    # There is no server-side subject filter.
+    assert "There is no server-side subject filter" in description
+
+
+def test_buscar_sentencias_response_carries_materia_and_total_capped(monkeypatch):
+    sent: list[httpx.Request] = []
+    SpyClient = _spy_client_class(_search_transport, sent)
+    monkeypatch.setattr("navaja.server.CendojClient", SpyClient)
+
+    result = buscar_sentencias("clausulas abusivas")
+
+    assert "total_capped" in result
+    assert "materia" in result["results"][0]
+
+
 def test_buscar_sentencias_blank_texto_with_filter_reaches_wire(monkeypatch):
     sent: list[httpx.Request] = []
     SpyClient = _spy_client_class(_search_transport, sent)
