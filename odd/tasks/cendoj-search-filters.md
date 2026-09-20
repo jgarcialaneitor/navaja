@@ -34,8 +34,9 @@ In scope:
 
 Out of scope, deliberately:
 
-- `ID_NORMA`, which needs a server-side norm identifier whose format is still
-  unknown (`6311`, `BOE-A-1995-25444` and `Código Penal` are all rejected).
+- `ID_NORMA`. Measured: a non-matching id returns a legitimate zero-hit
+  page, so the field accepts an id space navaja does not know how to address.
+  Out of scope until that id space is discoverable.
 - `SUBTIPORESOLUCION`, `INSTITUCION`, `SECCION`, `SECCIONAUTO`,
   `SECCIONSOLOPLENO`, `TIPOORGANOPUB`, `TIPOINTERES_*`: present in the form,
   not verified, and not needed for the current research workflow.
@@ -92,11 +93,12 @@ Pagination: `records_por_pagina` in `{10, 20, 30, 50}`; `pagina >= 1`;
       at least one criterion, format dates as `DD/MM/AAAA` and validate the
       enum tokens. Tests assert the exact POST body per filter and every
       rejection path. Work unit `67c4885`.
-- [ ] 2. `cendoj.py` / `models.py`: separate "malformed request" from "no
-      results". Characterise the two response shapes first (the generic
-      bad-request page for an unaccepted page size or enum, versus a legitimate
-      zero-hit page), record the discriminating signal in Evidence, and raise a
-      typed error for the first instead of returning an empty page.
+- [x] 2. `cendoj.py` / `models.py`: separate "malformed request" from "no
+      results". Characterise the response shapes first, record the
+      discriminating signal in Evidence, and raise a typed error for a refusal
+      instead of returning an empty page. It turned out to be three shapes, not
+      two: the invalid-search page, the mass-download control, and a legitimate
+      zero-hit page. Work unit `5dc7800`.
 - [ ] 3. `models.py`: fix the page metadata. `records_per_page` must reflect
       the request rather than the hardcoded constant, `has_more` must follow
       the offset semantics, and a response larger than the requested page
@@ -147,6 +149,34 @@ maxresults=500 / 1000 -> rejected; the 200 cap cannot be lifted
 Caveat recorded for task 2: an earlier probe of `start=201` reported the first
 page because the payload carried `start` twice and the server honoured the
 first value. Do not repeat that; build the payload with a single `start`.
+
+### Task 2 verification (work unit `5dc7800`)
+
+Three shapes, told apart by content and not by size:
+
+| case | body text | outcome |
+| --- | --- | --- |
+| invalid search | `No se ha podido atender su petición.` / `La búsqueda no es válida!` | `SearchRequestError` |
+| mass-download gate | `Control de grandes paginaciones` | `SearchGatedError` |
+| no results | `No se ha encontrado ningún resultado.` | empty `SearchPage` |
+
+Size is not a signal: a legitimate zero-hit page and an invalid-search page can
+be the same size, and the shapes measured at 275, 398, 554, 744, 954, 1922 and
+1999 bytes inside the same family. An earlier draft of this task read "empty
+275-byte page = bad request", which was wrong twice over: the size is not
+guaranteed, and `ID_NORMA=6311` -- assumed rejected -- is in fact a legitimate
+zero-hit page.
+
+New finding: `maxresults` above the 200 cap does not merely fail. It makes the
+site answer with its `Control de grandes paginaciones` challenge, the same
+captcha the full-text flow meets. The modelled filters never send `maxresults`,
+but `extra_fields` can, which is why the gate is surfaced as its own error.
+
+Test counts: 149 passed + 1 skipped before the work unit, 157 passed + 1 skipped
+after, with no test removed (five test functions added; the extra cases come
+from a parametrised one). The delegated writer reported 119 passing for the
+full suite, which was simply wrong; the parent re-measured at HEAD and in the
+worktree rather than trusting it.
 
 ### Task 1 verification (work unit `67c4885`)
 
