@@ -141,10 +141,12 @@ def _reset_shared_client():
 
 
 @pytest.fixture(autouse=True)
-def _clean_env(monkeypatch):
+def _clean_env(monkeypatch, tmp_path):
     """Clear server-specific environment variables so tests are deterministic."""
     for name in ("NAVAJA_CAPTCHA_HOST", "NAVAJA_CAPTCHA_PORT", "NAVAJA_CAPTCHA_TOKEN"):
         monkeypatch.delenv(name, raising=False)
+    # Keep token persistence out of the real home directory.
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "xdg-state"))
 
 
 def test_tools_are_registered_with_expected_names():

@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import sys
 
+from navaja.captcha import resolve_captcha_host
 from navaja.cendoj import CendojClient
 from navaja.documents import FullTextResult
 
@@ -42,8 +43,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("url", help="CENDOJ document URL")
     parser.add_argument(
         "--host",
-        default="127.0.0.1",
-        help="interface for the local captcha form (default: 127.0.0.1)",
+        default=None,
+        help=(
+            "interface for the local captcha form "
+            "(default: auto-detect: NAVAJA_CAPTCHA_HOST, then tailscale0 IPv4, then 127.0.0.1)"
+        ),
     )
     parser.add_argument(
         "--port",
@@ -63,11 +67,20 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
+    if args.host is None:
+        host, host_reason = resolve_captcha_host()
+        print(
+            f"Captcha form will bind to {host} because {host_reason}",
+            file=sys.stderr,
+        )
+    else:
+        host = args.host
+
     try:
         with CendojClient() as client:
             result = client.fetch_full_text(
                 args.url,
-                host=args.host,
+                host=host,
                 port=args.port,
                 timeout=args.timeout,
             )

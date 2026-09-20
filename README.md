@@ -33,6 +33,27 @@ The challenge is session-sticky: once the session has solved it, subsequent
 full-text requests in the same session usually do not ask again. In practice
 this means roughly **one solve per research session**, not one per resolution.
 
+### Zero-configuration defaults
+
+By default navaja tries to make the captcha form reachable without manual
+configuration:
+
+* **Host:** `navaja-doc` and `navaja-mcp` auto-detect the bind interface in
+  this order:
+  1. `NAVAJA_CAPTCHA_HOST`, if set.
+  2. The IPv4 address of the `tailscale0` interface, if it exists.
+  3. `127.0.0.1`.
+* **Token:** the captcha URL-path token is stable across runs. It is read from
+  `NAVAJA_CAPTCHA_TOKEN` when set, otherwise from
+  `$XDG_STATE_HOME/navaja/captcha-token` (default
+  `~/.local/state/navaja/captcha-token`). If none exists, a new token is
+  generated with `secrets.token_urlsafe(32)` and persisted. The state directory
+  is created with mode `0700` and the token file with mode `0600`; the file is
+  written atomically so concurrent runs cannot leave it torn.
+
+The chosen host is announced on stderr together with the form URL, so it is
+never a silent exposure.
+
 ## It runs headless
 
 navaja does **not** open a browser on the machine that runs the server. The
@@ -60,9 +81,9 @@ Set these environment variables before starting the server:
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `NAVAJA_CAPTCHA_HOST` | `127.0.0.1` | Interface the local form binds to. Use a Tailscale IP such as `100.x.y.z` when the human is on another machine. |
+| `NAVAJA_CAPTCHA_HOST` | auto-detect | Interface the local form binds to. When unset, navaja picks the `tailscale0` IPv4 address, falling back to `127.0.0.1`. |
 | `NAVAJA_CAPTCHA_PORT` | `8765` | Port the local form listens on. |
-| `NAVAJA_CAPTCHA_TOKEN` | random per run | Optional stable URL-path token. Must be at least 16 characters and only contain `A-Z`, `a-z`, `0-9`, `-`, `_`. |
+| `NAVAJA_CAPTCHA_TOKEN` | persisted | Stable URL-path token. When unset, navaja reads or creates `$XDG_STATE_HOME/navaja/captcha-token` (default `~/.local/state/navaja/captcha-token`). Must be at least 16 characters and only contain `A-Z`, `a-z`, `0-9`, `-`, `_`. |
 
 If `NAVAJA_CAPTCHA_HOST` is `0.0.0.0`, `::`, or empty, the server refuses to
 start. Bind a specific interface.

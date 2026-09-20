@@ -1,6 +1,13 @@
 """navaja: MCP server for personal CENDOJ case-law research."""
 
-from .captcha import CaptchaAnswer, CaptchaTimeoutError, serve_captcha
+from .captcha import (
+    CaptchaAnswer,
+    CaptchaTimeoutError,
+    default_captcha_token_path,
+    resolve_captcha_host,
+    resolve_captcha_token,
+    serve_captcha,
+)
 from .cendoj import CendojClient, parse_search_page
 from .documents import (
     DocumentRef,
@@ -14,6 +21,9 @@ __all__ = [
     "CaptchaAnswer",
     "CaptchaTimeoutError",
     "CendojClient",
+    "default_captcha_token_path",
+    "resolve_captcha_host",
+    "resolve_captcha_token",
     "DocumentRef",
     "FullTextError",
     "FullTextResult",

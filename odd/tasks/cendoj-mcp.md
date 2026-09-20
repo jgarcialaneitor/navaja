@@ -55,7 +55,24 @@ Out of scope, deliberately:
       short-lived local form when required, let the user solve it, and extract
       the text.
 - [x] 8. Wiring docs: how to register the MCP server and run it locally.
-- [ ] 9. Fix the search-result parser gap for Tribunal Supremo rulings:
+- [x] 9. Zero-configuration captcha form:
+      - Auto-detect the captcha bind interface: `NAVAJA_CAPTCHA_HOST`, then
+        `tailscale0` IPv4, then `127.0.0.1`. Reject `0.0.0.0`, `::` and empty
+        hosts. The detection is unit-testable via an injectable interface list
+        and uses the standard library (`socket`/`fcntl`), not a new dependency
+        and not the `tailscale` binary.
+      - Stable, persisted captcha token: `NAVAJA_CAPTCHA_TOKEN`, then
+        `$XDG_STATE_HOME/navaja/captcha-token` (default
+        `~/.local/state/navaja/captcha-token`), then generate with
+        `secrets.token_urlsafe(32)` and persist. Directory mode `0700`, file
+        mode `0600`, atomic write (temp file + `os.replace`). Malformed files
+        are regenerated; the token value is never logged in isolation.
+      - Apply both defaults in `server.py` and `cli.py`; announce the chosen
+        host on stderr together with the form URL.
+      - Add offline tests for host resolution, token persistence, file modes,
+        malformed-file recovery and concurrent-safe writes.
+      - Verified: `78 passed, 1 skipped` (`uv run pytest`).
+- [ ] 10. Fix the search-result parser gap for Tribunal Supremo rulings:
       `Sentencia.sede` is `None` for STS/ATS rulings because `_parse_title`
       expects the `"<TIPO> <SEDE>, a <fecha>"` shape used by SAP titles. The
       Supreme Court title does not include the seat in that position, but the

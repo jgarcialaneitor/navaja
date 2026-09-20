@@ -23,6 +23,11 @@ from typing import Any
 from mcp.server.mcpserver import MCPServer
 
 from navaja import CendojClient
+from navaja.captcha import (
+    default_captcha_token_path,
+    resolve_captcha_host,
+    resolve_captcha_token,
+)
 
 server = MCPServer("navaja", version="0.0.1")
 
@@ -51,16 +56,6 @@ def close_shared_client() -> None:
 atexit.register(close_shared_client)
 
 
-def _captcha_host() -> str:
-    host = os.environ.get("NAVAJA_CAPTCHA_HOST", "127.0.0.1").strip()
-    if not host or host in {"0.0.0.0", "::"}:
-        raise ValueError(
-            f"NAVAJA_CAPTCHA_HOST={host!r} is not allowed: "
-            "bind only a specific interface such as 127.0.0.1 or a Tailnet IP"
-        )
-    return host
-
-
 def _captcha_port() -> int:
     raw = os.environ.get("NAVAJA_CAPTCHA_PORT", "8765").strip()
     try:
@@ -72,11 +67,6 @@ def _captcha_port() -> int:
     if not (1 <= port <= 65535):
         raise ValueError(f"NAVAJA_CAPTCHA_PORT must be 1-65535, got {port}")
     return port
-
-
-def _captcha_token() -> str | None:
-    token = os.environ.get("NAVAJA_CAPTCHA_TOKEN", "").strip()
-    return token if token else None
 
 
 @server.tool()
@@ -133,9 +123,15 @@ def ver_texto_completo(
         A dict with ``ok``, ``attempts``, ``requests``, ``content_type`` and
         ``text``. The captcha answer itself is never returned.
     """
-    host = _captcha_host()
+    host, host_reason = resolve_captcha_host()
     port = _captcha_port()
-    token = _captcha_token()
+    token, _token_reason = resolve_captcha_token()
+
+    print(
+        f"Captcha form will bind to {host} because {host_reason}",
+        file=sys.stderr,
+        flush=True,
+    )
 
     client = _get_client()
 
@@ -169,10 +165,19 @@ def estado_servidor() -> dict:
     Returns the configured captcha host and port, and whether a stable token
     has been set. The token value itself is never exposed.
     """
+    host, _host_reason = resolve_captcha_host()
+    port = _captcha_port()
+
+    env_token_set = bool(os.environ.get("NAVAJA_CAPTCHA_TOKEN", "").strip())
+    stable_token_set = env_token_set
+    if not stable_token_set:
+        # A persisted token also gives a stable URL even without the env var.
+        stable_token_set = default_captcha_token_path().exists()
+
     return {
-        "host": os.environ.get("NAVAJA_CAPTCHA_HOST", "127.0.0.1").strip() or "127.0.0.1",
-        "port": os.environ.get("NAVAJA_CAPTCHA_PORT", "8765").strip() or "8765",
-        "stable_token_set": bool(os.environ.get("NAVAJA_CAPTCHA_TOKEN", "").strip()),
+        "host": host,
+        "port": str(port),
+        "stable_token_set": stable_token_set,
     }
 
 
