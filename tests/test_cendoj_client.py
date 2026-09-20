@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 from datetime import date
 from pathlib import Path
+from typing import Any
 from urllib.parse import parse_qs
 
 import httpx
@@ -20,6 +21,7 @@ from navaja.cendoj import (
     Coleccion,
     INDEX_URL,
     Jurisdiccion,
+    LOCALIZACIONES_URL,
     Localizacion,
     NivelLocalizacion,
     Orden,
@@ -381,3 +383,191 @@ def test_live_search_smoke():
     assert page.sentencias, "the live search returned no results"
     assert page.sentencias[0].roj
     assert page.sentencias[0].url_documento
+
+
+# --- Location vocabulary tests ------------------------------------------------
+
+COMUNIDAD_FIXTURE = Path(__file__).parent / "fixtures" / "localizaciones_comunidad.json"
+PROVINCIA_MELILLA_FIXTURE = (
+    Path(__file__).parent / "fixtures" / "localizaciones_provincia_melilla.json"
+)
+SEDE_MELILLA_FIXTURE = Path(__file__).parent / "fixtures" / "localizaciones_sede_melilla.json"
+
+COMUNIDAD_JSON = COMUNIDAD_FIXTURE.read_text(encoding="utf-8")
+PROVINCIA_MELILLA_JSON = PROVINCIA_MELILLA_FIXTURE.read_text(encoding="utf-8")
+SEDE_MELILLA_JSON = SEDE_MELILLA_FIXTURE.read_text(encoding="utf-8")
+
+
+def _client_for_localizaciones(json_body: str) -> CendojClient:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if str(request.url) == INDEX_URL:
+            return httpx.Response(200, text="<html><body>form</body></html>")
+        if str(request.url) == LOCALIZACIONES_URL:
+            return httpx.Response(200, text=json_body)
+        return httpx.Response(404)
+
+    return CendojClient(transport=httpx.MockTransport(handler))
+
+
+def test_localizaciones_comunidad_parses_fixture():
+    with _client_for_localizaciones(COMUNIDAD_JSON) as client:
+        tokens = client.localizaciones()
+
+    assert tokens == (
+        "ANDALUCÍA(C)",
+        "ARAGÓN(C)",
+        "ASTURIAS(C)",
+        "BALEARES(C)",
+        "CANARIAS(C)",
+        "CANTABRIA(C)",
+        "CASTILLA LA MANCHA(C)",
+        "CASTILLA Y LEÓN(C)",
+        "CATALUÑA(C)",
+        "CEUTA(C)",
+        "COMUNIDAD VALENCIANA(C)",
+        "EXTREMADURA(C)",
+        "GALICIA(C)",
+        "LA RIOJA(C)",
+        "MADRID(C)",
+        "MELILLA(C)",
+        "MURCIA(C)",
+        "NAVARRA(C)",
+        "PAÍS VASCO(C)",
+    )
+    assert "TODAS" not in tokens
+
+
+def test_localizaciones_provincia_melilla_parses_fixture():
+    with _client_for_localizaciones(PROVINCIA_MELILLA_JSON) as client:
+        tokens = client.localizaciones(NivelLocalizacion.PROVINCIA, comunidad="MELILLA")
+
+    assert tokens == ("MELILLA(P)",)
+
+
+def test_localizaciones_sede_melilla_parses_fixture():
+    with _client_for_localizaciones(SEDE_MELILLA_JSON) as client:
+        tokens = client.localizaciones(
+            NivelLocalizacion.SEDE, comunidad="MELILLA", provincia="MELILLA"
+        )
+
+    assert tokens == ("MELILLA(S)",)
+
+
+@pytest.mark.parametrize(
+    "nivel, expected_field",
+    [
+        ("C", "COMUNIDAD"),
+        ("comunidad", "COMUNIDAD"),
+        (NivelLocalizacion.COMUNIDAD, "COMUNIDAD"),
+        ("P", "PROVINCIA"),
+        ("p", "PROVINCIA"),
+        ("PROVINCIA", "PROVINCIA"),
+        ("S", "SEDE"),
+        ("sede", "SEDE"),
+    ],
+)
+def test_localizaciones_level_aliases(nivel, expected_field):
+    sent: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        sent.append(request)
+        if str(request.url) == INDEX_URL:
+            return httpx.Response(200, text="<html><body>form</body></html>")
+        return httpx.Response(200, text=SEDE_MELILLA_JSON)
+
+    with CendojClient(transport=httpx.MockTransport(handler)) as client:
+        kwargs: dict[str, Any] = {"comunidad": "MELILLA", "provincia": "MELILLA"}
+        if expected_field == "COMUNIDAD":
+            kwargs = {}
+        elif expected_field == "PROVINCIA":
+            kwargs = {"comunidad": "MELILLA"}
+        client.localizaciones(nivel, **kwargs)
+
+    body = _decoded_form(sent[1])
+    assert body["field"] == expected_field
+
+
+def test_localizaciones_missing_comunidad_for_provincia_raises():
+    with _client_for_localizaciones(PROVINCIA_MELILLA_JSON) as client:
+        with pytest.raises(ValueError, match="comunidad"):
+            client.localizaciones(NivelLocalizacion.PROVINCIA)
+
+
+def test_localizaciones_missing_comunidad_for_sede_raises():
+    with _client_for_localizaciones(SEDE_MELILLA_JSON) as client:
+        with pytest.raises(ValueError, match="comunidad"):
+            client.localizaciones(NivelLocalizacion.SEDE, provincia="MELILLA")
+
+
+def test_localizaciones_missing_provincia_for_sede_raises():
+    with _client_for_localizaciones(SEDE_MELILLA_JSON) as client:
+        with pytest.raises(ValueError, match="provincia"):
+            client.localizaciones(NivelLocalizacion.SEDE, comunidad="MELILLA")
+
+
+def test_localizaciones_non_success_payload_raises_search_error():
+    with _client_for_localizaciones('{"success":false,"errorCode":1,"result":""}') as client:
+        with pytest.raises(SearchError, match="vocabulary"):
+            client.localizaciones()
+
+
+def test_localizaciones_non_json_body_raises_search_error():
+    with _client_for_localizaciones("not json") as client:
+        with pytest.raises(SearchError, match="vocabulary"):
+            client.localizaciones()
+
+
+def test_localizaciones_missing_result_raises_search_error():
+    with _client_for_localizaciones('{"success":true,"errorCode":-1}') as client:
+        with pytest.raises(SearchError, match="vocabulary"):
+            client.localizaciones()
+
+
+def test_localizaciones_empty_result_returns_empty_tuple():
+    with _client_for_localizaciones('{"success":true,"errorCode":-1,"result":""}') as client:
+        tokens = client.localizaciones()
+
+    assert tokens == ()
+
+
+@pytest.mark.parametrize(
+    "result_value, kind",
+    [
+        ("null", "null"),
+        ("123", "int"),
+        ('["a"]', "list"),
+    ],
+)
+def test_localizaciones_non_string_result_raises_search_error(result_value, kind):
+    body = f'{{"success":true,"errorCode":-1,"result":{result_value}}}'
+    with _client_for_localizaciones(body) as client:
+        with pytest.raises(SearchError, match="vocabulary"):
+            client.localizaciones()
+
+
+def test_localizaciones_post_body_carries_expected_fields():
+    sent: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        sent.append(request)
+        if str(request.url) == INDEX_URL:
+            return httpx.Response(200, text="<html><body>form</body></html>")
+        return httpx.Response(200, text=SEDE_MELILLA_JSON)
+
+    with CendojClient(transport=httpx.MockTransport(handler)) as client:
+        client.localizaciones(
+            NivelLocalizacion.SEDE, comunidad="melilla", provincia="melilla"
+        )
+
+    assert sent[0].method == "GET"
+    assert str(sent[0].url) == INDEX_URL
+    assert sent[1].method == "POST"
+    assert str(sent[1].url) == LOCALIZACIONES_URL
+    body = _decoded_form(sent[1])
+    assert body == {
+        "action": "getComunidades",
+        "field": "SEDE",
+        "comunidad": "MELILLA",
+        "provincia": "MELILLA",
+        "publicinterface": "true",
+    }

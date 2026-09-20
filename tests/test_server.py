@@ -21,6 +21,7 @@ from urllib.parse import parse_qs
 
 from navaja import (
     CendojClient,
+    NivelLocalizacion,
     SearchError,
     SearchGatedError,
     SearchRequestError,
@@ -31,12 +32,13 @@ from navaja.captcha import (
     stop_shared_captcha_server,
 )
 from navaja import server as navaja_server
-from navaja.cendoj import INDEX_URL, SEARCH_URL
+from navaja.cendoj import INDEX_URL, LOCALIZACIONES_URL, SEARCH_URL
 from navaja.server import (
     _captcha_lifespan,
     buscar_sentencias,
     close_shared_client,
     estado_servidor,
+    listar_localizaciones,
     server,
     ver_texto_completo,
 )
@@ -154,6 +156,31 @@ def _combined_transport(sent: list[httpx.Request] | None = None) -> httpx.MockTr
     return httpx.MockTransport(handler)
 
 
+def _localizaciones_transport(
+    result: str = "&TODAS|MELILLA&MELILLA",
+    sent: list[httpx.Request] | None = None,
+) -> httpx.MockTransport:
+    if sent is None:
+        sent = []
+
+    body = (
+        '{"success":true,"errorCode":-1,"errorMessage":"","result":"'
+        + result.replace("&", "\\u0026")
+        + '"}'
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        sent.append(request)
+        url = str(request.url)
+        if url == INDEX_URL:
+            return httpx.Response(200, text="<html><body>form</body></html>")
+        if url == LOCALIZACIONES_URL:
+            return httpx.Response(200, text=body)
+        return httpx.Response(404)
+
+    return httpx.MockTransport(handler)
+
+
 def _captcha_always_transport(sent: list[httpx.Request] | None = None) -> httpx.MockTransport:
     """Always return the captcha challenge page, so every attempt fails."""
     if sent is None:
@@ -234,6 +261,7 @@ def test_tools_are_registered_with_expected_names():
     tools = asyncio.run(server.list_tools())
     names = {tool.name for tool in tools}
     assert "buscar_sentencias" in names
+    assert "listar_localizaciones" in names
     assert "ver_texto_completo" in names
     assert "estado_servidor" in names
 
@@ -309,6 +337,75 @@ def test_buscar_sentencias_blank_texto_with_filter_reaches_wire(monkeypatch):
 def test_buscar_sentencias_blank_texto_alone_raises(texto):
     with pytest.raises(ValueError, match="criterion"):
         buscar_sentencias(texto)
+
+
+# --- listar_localizaciones tests ---------------------------------------------
+
+
+def test_listar_localizaciones_returns_canonical_nivel_and_tokens(monkeypatch):
+    sent: list[httpx.Request] = []
+
+    def transport_factory(s: list[httpx.Request]) -> httpx.MockTransport:
+        return _localizaciones_transport("&TODAS|ANDALUCÍA&ANDALUCÍA|MELILLA&MELILLA", s)
+
+    SpyClient = _spy_client_class(transport_factory, sent)
+    monkeypatch.setattr("navaja.server.CendojClient", SpyClient)
+
+    result = listar_localizaciones()
+
+    assert result["nivel"] == "COMUNIDAD"
+    assert result["localizaciones"] == ["ANDALUCÍA(C)", "MELILLA(C)"]
+
+
+def test_listar_localizaciones_forwards_level_and_parents(monkeypatch):
+    sent: list[httpx.Request] = []
+
+    def transport_factory(s: list[httpx.Request]) -> httpx.MockTransport:
+        return _localizaciones_transport("MELILLA&MELILLA", s)
+
+    SpyClient = _spy_client_class(transport_factory, sent)
+    monkeypatch.setattr("navaja.server.CendojClient", SpyClient)
+
+    result = listar_localizaciones(
+        nivel="SEDE", comunidad="MELILLA", provincia="MELILLA"
+    )
+
+    assert result["nivel"] == "SEDE"
+    assert result["localizaciones"] == ["MELILLA(S)"]
+    body = _localizaciones_body(sent)
+    assert body["field"] == ["SEDE"]
+    assert body["comunidad"] == ["MELILLA"]
+    assert body["provincia"] == ["MELILLA"]
+
+
+def test_listar_localizaciones_description_carries_vocabulary_and_parents():
+    tools = asyncio.run(server.list_tools())
+    tool = next(t for t in tools if t.name == "listar_localizaciones")
+    description = " ".join(tool.description.split())
+    assert "site's own location vocabulary" in description.lower()
+    assert "buscar_sentencias(localizacion=" in description
+    assert "``PROVINCIA`` requires ``comunidad``" in description
+    assert "``SEDE`` requires both ``comunidad`` and ``provincia``" in description
+
+
+def test_listar_localizaciones_value_error_propagates(monkeypatch):
+    sent: list[httpx.Request] = []
+
+    def transport_factory(s: list[httpx.Request]) -> httpx.MockTransport:
+        return _localizaciones_transport("&TODAS|MELILLA&MELILLA", s)
+
+    SpyClient = _spy_client_class(transport_factory, sent)
+    monkeypatch.setattr("navaja.server.CendojClient", SpyClient)
+
+    with pytest.raises(ValueError, match="comunidad"):
+        listar_localizaciones(nivel="PROVINCIA")
+
+
+def test_buscar_sentencias_description_points_to_listar_localizaciones():
+    tools = asyncio.run(server.list_tools())
+    tool = next(t for t in tools if t.name == "buscar_sentencias")
+    description = " ".join(tool.description.split())
+    assert "listar_localizaciones" in description
 
 
 def test_ver_texto_completo_returns_documented_shape(monkeypatch):
@@ -734,6 +831,13 @@ def _last_search_request(sent: list[httpx.Request]) -> httpx.Request:
 
 def _search_body(sent: list[httpx.Request]) -> dict[str, list[str]]:
     request = _last_search_request(sent)
+    return parse_qs(request.content.decode(), keep_blank_values=True)
+
+
+def _localizaciones_body(sent: list[httpx.Request]) -> dict[str, list[str]]:
+    request = next(
+        r for r in sent if r.method == "POST" and str(r.url) == LOCALIZACIONES_URL
+    )
     return parse_qs(request.content.decode(), keep_blank_values=True)
 
 

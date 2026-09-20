@@ -9,6 +9,7 @@ Endpoint map (established by read-only reconnaissance):
 
 * ``GET  /search/indexAN.jsp``     bootstraps the ``JSESSIONID`` cookie.
 * ``POST /search/search.action``   runs a query. No captcha.
+* ``POST /search/jurisprudencia.action`` serves the site's location vocabulary.
 * ``GET  /search/stickyImg``       the session-sticky captcha image.
 * ``GET  /search/contenidos.action?action=accessToPDF`` requests a resolution.
 * ``POST /search/contenidos.action?action=captcha`` submits the captcha answer.
@@ -42,6 +43,7 @@ from .models import MAX_RESULTS, SearchPage, Sentencia
 BASE_URL = "https://www.poderjudicial.es"
 INDEX_URL = f"{BASE_URL}/search/indexAN.jsp"
 SEARCH_URL = f"{BASE_URL}/search/search.action"
+LOCALIZACIONES_URL = f"{BASE_URL}/search/jurisprudencia.action"
 
 DEFAULT_TIMEOUT = 30.0
 DEFAULT_RECORDS_PER_PAGE = 10
@@ -698,6 +700,101 @@ class CendojClient:
                 f"{records_per_page}-record window)"
             )
         return page_result
+
+    def localizaciones(
+        self,
+        nivel: NivelLocalizacion | str = NivelLocalizacion.COMUNIDAD,
+        *,
+        comunidad: str | None = None,
+        provincia: str | None = None,
+    ) -> tuple[str, ...]:
+        """Return the site's own location vocabulary as ready-to-use tokens.
+
+        The tokens include the level suffix, e.g. ``"MELILLA(C)"``, so they
+        can be passed directly to :class:`SearchFilters` or
+        ``buscar_sentencias``.
+
+        Args:
+            nivel: ``COMUNIDAD``, ``PROVINCIA`` or ``SEDE`` (or ``C``/``P``/``S``),
+                case-insensitive.
+            comunidad: required parent when ``nivel`` is ``PROVINCIA`` or
+                ``SEDE``.
+            provincia: required parent when ``nivel`` is ``SEDE``.
+
+        Returns:
+            A tuple of location tokens in the order the site sent them. The
+            empty-key ``TODAS`` entry is dropped.
+
+        Raises:
+            ValueError: when a required parent is missing.
+            SearchError: when the site's vocabulary payload cannot be read.
+        """
+        nivel_member = _coerce_enum(nivel, NivelLocalizacion, "nivel")
+        if nivel_member is NivelLocalizacion.PROVINCIA and not comunidad:
+            raise ValueError("comunidad is required for nivel=PROVINCIA")
+        if nivel_member is NivelLocalizacion.SEDE:
+            if not comunidad:
+                raise ValueError("comunidad is required for nivel=SEDE")
+            if not provincia:
+                raise ValueError("provincia is required for nivel=SEDE")
+
+        self._ensure_session()
+
+        data = {
+            "action": "getComunidades",
+            "field": nivel_member.name,
+            "comunidad": (comunidad or "").strip().upper(),
+            "provincia": (provincia or "").strip().upper(),
+            "publicinterface": "true",
+        }
+        response = self._client.post(
+            LOCALIZACIONES_URL, data=data, headers={"Referer": INDEX_URL}
+        )
+        response.raise_for_status()
+
+        try:
+            payload = response.json()
+        except Exception as exc:
+            raise SearchError(
+                "could not read the location vocabulary from the site: "
+                "response was not valid JSON"
+            ) from exc
+
+        if not payload.get("success"):
+            raise SearchError(
+                "could not read the location vocabulary from the site: "
+                "the site reported failure"
+            )
+        if "result" not in payload:
+            raise SearchError(
+                "could not read the location vocabulary from the site: "
+                "missing result field"
+            )
+
+        result = payload["result"]
+        if result is None:
+            raise SearchError(
+                "could not read the location vocabulary from the site: "
+                "result field was null"
+            )
+        if not isinstance(result, str):
+            raise SearchError(
+                "could not read the location vocabulary from the site: "
+                f"result field was {type(result).__name__!r}, expected a string"
+            )
+        if not result:
+            return ()
+
+        tokens: list[str] = []
+        for entry in result.split("|"):
+            if "&" not in entry:
+                continue
+            key, _, label = entry.partition("&")
+            if not key:
+                # Drop the site's empty-key "TODAS" option.
+                continue
+            tokens.append(f"{label}({nivel_member.value})")
+        return tuple(tokens)
 
     def fetch_full_text(
         self,

@@ -1,8 +1,9 @@
 """MCP server for personal CENDOJ case-law research.
 
-The server exposes three tools:
+The server exposes four tools:
 
 * ``buscar_sentencias`` — advanced search with filters, no captcha.
+* ``listar_localizaciones`` — the site's own location vocabulary.
 * ``ver_texto_completo`` — human-in-the-loop full-text fetch.
 * ``estado_servidor`` — runtime configuration snapshot.
 
@@ -24,7 +25,15 @@ from typing import Any
 
 from mcp.server.mcpserver import MCPServer
 
-from navaja import CendojClient, FullTextError, Localizacion, SearchError, SearchFilters
+from navaja import (
+    CendojClient,
+    FullTextError,
+    Localizacion,
+    NivelLocalizacion,
+    SearchError,
+    SearchFilters,
+)
+from navaja.cendoj import _coerce_enum
 from navaja.captcha import (
     CaptchaTimeoutError,
     default_captcha_token_path,
@@ -245,7 +254,8 @@ def buscar_sentencias(
         localizacion: list of location tokens. Each entry may be the site's
             suffix form (``"MELILLA(C)"``, ``"BARCELONA(P)"``,
             ``"MELILLA(S)"``) or a bare place name (``"Melilla"``), which
-            means a comunidad autónoma.
+            means a comunidad autónoma. Use ``listar_localizaciones`` to get
+            the valid names the site actually accepts.
         coleccion: ``AN`` for all jurisdictions or ``TS`` for the Tribunal
             Supremo only.
         orden: ``reciente`` (newest first) or ``antiguo`` (oldest first).
@@ -299,6 +309,41 @@ def buscar_sentencias(
         extra_fields=campos_extra,
     )
     return page.as_dict()
+
+
+@server.tool()
+def listar_localizaciones(
+    nivel: str = "COMUNIDAD",
+    comunidad: str | None = None,
+    provincia: str | None = None,
+) -> dict:
+    """Return the site's own location vocabulary.
+
+    The tokens are ready to pass into ``buscar_sentencias(localizacion=[...])``.
+    A bare place name is also accepted by that parameter and means a comunidad
+    autónoma; to use a provincia or sede, pass the suffix form returned here.
+
+    ``nivel`` accepts ``COMUNIDAD`` (or ``C``), ``PROVINCIA`` (or ``P``) and
+    ``SEDE`` (or ``S``), case-insensitively. ``PROVINCIA`` requires
+    ``comunidad``; ``SEDE`` requires both ``comunidad`` and ``provincia``.
+
+    Args:
+        nivel: which level of the location hierarchy to list.
+        comunidad: parent comunidad, required for ``PROVINCIA`` and ``SEDE``.
+        provincia: parent provincia, required for ``SEDE``.
+
+    Returns:
+        A dict with ``nivel`` (the canonical level word) and
+        ``localizaciones`` (the list of ready-to-use tokens).
+    """
+    member = _coerce_enum(nivel, NivelLocalizacion, "nivel")
+    client = _get_client()
+    tokens = client.localizaciones(
+        nivel=member,
+        comunidad=comunidad,
+        provincia=provincia,
+    )
+    return {"nivel": member.name, "localizaciones": list(tokens)}
 
 
 @server.tool()
