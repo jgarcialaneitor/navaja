@@ -98,8 +98,17 @@ leaves `serve_captcha` half-migrated would not close on a green commit.
 - [x] 2. Wire `server.py`: start the listener with the session via
       `MCPServer(lifespan=...)`, stop it on exit, expose the form URL from
       `estado_servidor`, and keep stdout clean and `secrets` out of the file.
-- [ ] 3. Wire `cli.py`: same shared-listener semantics for the one-shot path,
-      releasing the port when the process ends.
+- [x] 3. `cli.py`: make the port collision with a running MCP session
+      actionable. Wiring the CLI to the shared listener turned out to need no
+      code: it is a one-shot process, `serve_captcha` already attaches to the
+      shared registry, and the `atexit` hook already releases the port. But
+      holding the port for the whole session introduced a regression on this
+      path: the MCP session used to own port 8765 only during a challenge, so
+      `navaja-doc` almost always got it; now the CLI fails with
+      `address already in use` whenever an MCP session is alive, and it fails
+      only after the CENDOJ round-trip has already started. Detect that case
+      and say what is happening and what to do instead of surfacing the raw
+      bind error.
 - [ ] 4. Documentation: README flow, the idle page, the "nothing answers"
       meaning, and the accepted always-open-during-session surface. Record the
       verification evidence in this file.
@@ -162,6 +171,31 @@ Task 2 — commit `feat: start the captcha listener with the MCP session`.
   outermost entry, stops only on the outermost exit, and the teardown runs from
   a `finally`. A control run against the pre-fix shape confirmed the new tests
   actually fail without the fix.
+
+Task 3 — commit `fix: tell the CLI user who is holding the captcha port`.
+
+- `uv run pytest` \u2192 `125 passed, 1 skipped`. New `tests/test_cli.py`: 8 tests;
+  the CLI had no test module before.
+- The task as originally written was dropped: wiring the CLI to the shared
+  listener needed no code at all, because the CLI is a one-shot process,
+  `serve_captcha` already attaches to the shared registry, and the `atexit`
+  hook already releases the port. Writing code there would have been
+  make-work. The task was replaced by the regression that inspection actually
+  found.
+- Regression fixed: holding the port for the whole session means `navaja-doc`
+  now collides reliably with a live MCP session instead of almost never. The
+  CLI probes the address with a TCP connect (not a trial bind, which would
+  race and trip over `TIME_WAIT`) before any CENDOJ traffic, and confirms
+  whether the occupant really is a navaja listener rather than guessing.
+- Observed output, holding the port with a real `CaptchaServer`:
+  `Error: a navaja session is already holding 127.0.0.1 port 43547; its
+  captcha form is the one answering there.` With a plain foreign socket it
+  falls back to `port ... is in use by another process.` Both then give the
+  way forward (`--port 0`, or stop the holder). The token appears in neither.
+- The no-CENDOJ-request guarantee is proven structurally, not by log text: the
+  substituted client records every use and the conflict tests assert it was
+  never touched. A control run with the pre-flight disabled fails exactly
+  those four tests, so they are not vacuous.
 
 ## Known issues, deliberately not fixed here
 
