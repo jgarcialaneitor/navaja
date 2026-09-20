@@ -180,7 +180,13 @@ def _parse_total(soup: BeautifulSoup) -> int | None:
     return None
 
 
-def parse_search_page(html: str, *, page: int = 1, base_url: str = BASE_URL) -> SearchPage:
+def parse_search_page(
+    html: str,
+    *,
+    page: int = 1,
+    records_per_page: int = DEFAULT_RECORDS_PER_PAGE,
+    base_url: str = BASE_URL,
+) -> SearchPage:
     """Parse a CENDOJ results page into a :class:`SearchPage`."""
     soup = BeautifulSoup(html, "lxml")
     sentencias: list[Sentencia] = []
@@ -225,7 +231,7 @@ def parse_search_page(html: str, *, page: int = 1, base_url: str = BASE_URL) -> 
     return SearchPage(
         sentencias=tuple(sentencias),
         page=page,
-        records_per_page=DEFAULT_RECORDS_PER_PAGE,
+        records_per_page=records_per_page,
         total=_parse_total(soup),
     )
 
@@ -500,12 +506,17 @@ def _pagination_form_fields(page: int, records_per_page: int) -> dict[str, str]:
 
 
 class SearchError(Exception):
-    """Base class for a search the site refused to answer.
+    """Base class for a search the site answered without honouring the request.
+
+    Covers three cases: the site refused the search as invalid, it served its
+    mass-download control instead of results, and it answered the query but
+    returned the whole result set rather than the requested page window.
 
     A search that legitimately matches nothing is *not* an error: it returns a
     result page with no results, which parses into an empty
-    :class:`~navaja.models.SearchPage`. These exceptions mean the site did not
-    answer the query at all, which must never look like "no matches".
+    :class:`~navaja.models.SearchPage`. These exceptions mean the caller cannot
+    trust the returned page as the requested slice, which must never look like
+    "no matches".
     """
 
 
@@ -667,7 +678,16 @@ class CendojClient:
                 + (f": {message}" if message else "")
             )
 
-        return parse_search_page(response.text, page=page)
+        page_result = parse_search_page(
+            response.text, page=page, records_per_page=records_per_page
+        )
+        if page_result.clamped:
+            raise SearchError(
+                "the site returned the whole result set instead of the requested "
+                f"page (got {len(page_result.sentencias)} records for a "
+                f"{records_per_page}-record window)"
+            )
+        return page_result
 
     def fetch_full_text(
         self,

@@ -14,8 +14,11 @@ import pytest
 
 from navaja import parse_search_page
 from navaja.cendoj import parse_spanish_date
+from navaja.models import SearchPage, Sentencia
 
 FIXTURE = Path(__file__).parent / "fixtures" / "search_clausulas_abusivas.html"
+CLAMPED_FIXTURE = Path(__file__).parent / "fixtures" / "search_clamped_page.html"
+NO_RESULTS_FIXTURE = Path(__file__).parent / "fixtures" / "search_no_results.html"
 
 
 @pytest.fixture(scope="module")
@@ -77,6 +80,92 @@ def test_as_dict_is_json_safe(page):
     assert isinstance(payload["results"], list)
     assert payload["results"][0]["fecha_resolucion"] == "2026-09-11"
     assert isinstance(payload["results"][0]["resumen"], str)
+
+
+def test_parse_search_page_records_per_page_is_propagated():
+    page = parse_search_page(FIXTURE.read_text(encoding="utf-8"), records_per_page=50)
+    assert page.records_per_page == 50
+
+
+@pytest.mark.parametrize(
+    "page, records_per_page, expected",
+    [
+        (1, 10, 1),
+        (2, 10, 11),
+        (1, 50, 1),
+        (3, 50, 101),
+    ],
+)
+def test_search_page_offset(page, records_per_page, expected):
+    sentencia = Sentencia()
+    search_page = SearchPage(
+        sentencias=(sentencia,), page=page, records_per_page=records_per_page
+    )
+    assert search_page.offset == expected
+
+
+@pytest.mark.parametrize(
+    "total, sentencias_count, records_per_page, page, expected",
+    [
+        (200, 10, 10, 1, True),
+        (200, 10, 10, 20, False),
+        (200, 50, 50, 4, False),
+        (4, 4, 10, 1, False),
+        # Old arithmetic `page * records_per_page < total` would return True,
+        # but the page already ends at record 200 of a 201-record set.
+        (201, 10, 10, 20, False),
+        # Old arithmetic would return False, but records 11..15 of 17 leave more.
+        (17, 5, 10, 2, True),
+        # Short page: fewer records than requested, yet the set continues.
+        # Using the requested size instead of received records would wrongly say False.
+        (18, 5, 10, 2, True),
+    ],
+)
+def test_has_more_with_total(total, sentencias_count, records_per_page, page, expected):
+    sentencias = tuple(Sentencia() for _ in range(sentencias_count))
+    search_page = SearchPage(
+        sentencias=sentencias,
+        page=page,
+        records_per_page=records_per_page,
+        total=total,
+    )
+    assert search_page.has_more is expected
+
+
+@pytest.mark.parametrize(
+    "sentencias_count, records_per_page, expected",
+    [
+        (10, 10, True),
+        (9, 10, False),
+        (0, 10, False),
+        (50, 50, True),
+    ],
+)
+def test_has_more_without_total(sentencias_count, records_per_page, expected):
+    sentencias = tuple(Sentencia() for _ in range(sentencias_count))
+    search_page = SearchPage(
+        sentencias=sentencias, records_per_page=records_per_page, total=None
+    )
+    assert search_page.has_more is expected
+
+
+def test_clamped_fixture_is_detected_as_clamped():
+    page = parse_search_page(
+        CLAMPED_FIXTURE.read_text(encoding="utf-8"), records_per_page=10
+    )
+    assert len(page.sentencias) == 12
+    assert page.clamped is True
+
+
+def test_normal_fixture_is_not_clamped(page):
+    assert len(page.sentencias) == 10
+    assert page.clamped is False
+
+
+def test_empty_page_is_not_clamped():
+    page = parse_search_page(NO_RESULTS_FIXTURE.read_text(encoding="utf-8"))
+    assert page.sentencias == ()
+    assert page.clamped is False
 
 
 class TestParseSpanishDate:

@@ -38,9 +38,11 @@ HTML = FIXTURE.read_text(encoding="utf-8")
 INVALID_FIXTURE = Path(__file__).parent / "fixtures" / "search_invalid_request.html"
 GATE_FIXTURE = Path(__file__).parent / "fixtures" / "search_mass_download_gate.html"
 NO_RESULTS_FIXTURE = Path(__file__).parent / "fixtures" / "search_no_results.html"
+CLAMPED_FIXTURE = Path(__file__).parent / "fixtures" / "search_clamped_page.html"
 INVALID_HTML = INVALID_FIXTURE.read_text(encoding="utf-8")
 GATE_HTML = GATE_FIXTURE.read_text(encoding="utf-8")
 NO_RESULTS_HTML = NO_RESULTS_FIXTURE.read_text(encoding="utf-8")
+CLAMPED_HTML = CLAMPED_FIXTURE.read_text(encoding="utf-8")
 
 
 def _client_capturing(sent: list[httpx.Request]) -> CendojClient:
@@ -351,6 +353,15 @@ def test_search_returns_empty_page_for_no_results_fixture():
 
     assert page.sentencias == ()
     assert page.total is None
+
+
+def test_search_raises_search_error_when_site_returns_clamped_page():
+    """The clamped fixture has 12 results; with the default 10-per-page window
+    the parsed page is clamped and must raise SearchError.
+    """
+    with _client_with_body(CLAMPED_HTML) as client:
+        with pytest.raises(SearchError, match="whole result set"):
+            client.search("x", records_per_page=10)
 
 
 def test_search_errors_are_search_error_subclasses():

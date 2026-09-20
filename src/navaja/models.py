@@ -69,11 +69,37 @@ class SearchPage:
     """Total hits reported by the site, when present."""
 
     @property
+    def offset(self) -> int:
+        """1-based index of this page's first record, as the site counts.
+
+        The site's ``start`` parameter counts records, not pages, so page 2
+        at 10 records per page begins at record 11.
+        """
+        return (self.page - 1) * self.records_per_page + 1
+
+    @property
+    def clamped(self) -> bool:
+        """True when the site returned more records than this page asked for.
+
+        Past its 200-record ceiling the site ignores ``recordsPerPage``,
+        clamps ``start`` to ``201 - recordsPerPage``, and returns the whole
+        result set in one page. That page looks legitimate but contains
+        duplicates of the real window.
+        """
+        return len(self.sentencias) > self.records_per_page
+
+    @property
     def has_more(self) -> bool:
-        """Whether the site reports more hits beyond this page."""
+        """Whether the site reports more hits beyond this page.
+
+        When the site does not report a total, the conservative fallback is
+        to assume there is more as long as this page is full. When a total is
+        present, the decision uses the number of records actually received,
+        not the requested size, because the last page is normally short.
+        """
         if self.total is None:
             return len(self.sentencias) >= self.records_per_page
-        return self.page * self.records_per_page < self.total
+        return self.offset + len(self.sentencias) < self.total
 
     def as_dict(self) -> dict[str, Any]:
         return {

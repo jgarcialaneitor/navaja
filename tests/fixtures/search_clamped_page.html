@@ -1,0 +1,189 @@
+<!-- Synthetic fixture for the CENDOJ clamped-window case.
+
+This fixture reproduces the shape parse_search_page reads, with exactly 12
+search-result blocks. It stands in for a page where the site returned 12 records
+to a 10-per-page request: past the 200-record ceiling the site ignores
+recordsPerPage, clamps start to 201 - recordsPerPage, and returns all 200
+records in one page.
+
+A real captured page is not used because it would be ~900 KB.
+-->
+<!DOCTYPE html>
+<html>
+<head><title>Clamped results</title></head>
+<body>
+<div class="resultswrapper">
+<div id="jurisprudenciaresults_searchresults" class="row searchresults">
+<input type="hidden" name="total" id="frmFilterjurisprudencia_total" value="200">
+<div class="row searchresult doc" id="result-1" data-ref="REF01" data-db="AN" data-fechares="20260901">
+<div class="col-xs-12 col-sm-12 content">
+<div class="title">
+<a href="https://www.poderjudicial.es/search/AN/openDocument/doc01/20260901" id="ref-1" data-roj="SAP  NA 1/2026">SAP Navarra, a 1 de septiembre de 2026 - ROJ: SAP  NA 1/2026</a>
+</div>
+<div class="metadatos">
+<ul>
+<li><b>ECLI:ES:APNA:2026:0001</b></li>
+<li>N&ordm; de Resoluci&oacute;n: <b>1/2026</b></li>
+</ul>
+</div>
+<div class="summary">Resumen Autom&aacute;tico: summary 1</div>
+</div>
+</div>
+<div class="row searchresult doc" id="result-2" data-ref="REF02" data-db="AN" data-fechares="20260902">
+<div class="col-xs-12 col-sm-12 content">
+<div class="title">
+<a href="https://www.poderjudicial.es/search/AN/openDocument/doc02/20260902" id="ref-2" data-roj="SAP  NA 2/2026">SAP Navarra, a 2 de septiembre de 2026 - ROJ: SAP  NA 2/2026</a>
+</div>
+<div class="metadatos">
+<ul>
+<li><b>ECLI:ES:APNA:2026:0002</b></li>
+<li>N&ordm; de Resoluci&oacute;n: <b>2/2026</b></li>
+</ul>
+</div>
+<div class="summary">Resumen Autom&aacute;tico: summary 2</div>
+</div>
+</div>
+<div class="row searchresult doc" id="result-3" data-ref="REF03" data-db="AN" data-fechares="20260903">
+<div class="col-xs-12 col-sm-12 content">
+<div class="title">
+<a href="https://www.poderjudicial.es/search/AN/openDocument/doc03/20260903" id="ref-3" data-roj="SAP  NA 3/2026">SAP Navarra, a 3 de septiembre de 2026 - ROJ: SAP  NA 3/2026</a>
+</div>
+<div class="metadatos">
+<ul>
+<li><b>ECLI:ES:APNA:2026:0003</b></li>
+<li>N&ordm; de Resoluci&oacute;n: <b>3/2026</b></li>
+</ul>
+</div>
+<div class="summary">Resumen Autom&aacute;tico: summary 3</div>
+</div>
+</div>
+<div class="row searchresult doc" id="result-4" data-ref="REF04" data-db="AN" data-fechares="20260904">
+<div class="col-xs-12 col-sm-12 content">
+<div class="title">
+<a href="https://www.poderjudicial.es/search/AN/openDocument/doc04/20260904" id="ref-4" data-roj="SAP  NA 4/2026">SAP Navarra, a 4 de septiembre de 2026 - ROJ: SAP  NA 4/2026</a>
+</div>
+<div class="metadatos">
+<ul>
+<li><b>ECLI:ES:APNA:2026:0004</b></li>
+<li>N&ordm; de Resoluci&oacute;n: <b>4/2026</b></li>
+</ul>
+</div>
+<div class="summary">Resumen Autom&aacute;tico: summary 4</div>
+</div>
+</div>
+<div class="row searchresult doc" id="result-5" data-ref="REF05" data-db="AN" data-fechares="20260905">
+<div class="col-xs-12 col-sm-12 content">
+<div class="title">
+<a href="https://www.poderjudicial.es/search/AN/openDocument/doc05/20260905" id="ref-5" data-roj="SAP  NA 5/2026">SAP Navarra, a 5 de septiembre de 2026 - ROJ: SAP  NA 5/2026</a>
+</div>
+<div class="metadatos">
+<ul>
+<li><b>ECLI:ES:APNA:2026:0005</b></li>
+<li>N&ordm; de Resoluci&oacute;n: <b>5/2026</b></li>
+</ul>
+</div>
+<div class="summary">Resumen Autom&aacute;tico: summary 5</div>
+</div>
+</div>
+<div class="row searchresult doc" id="result-6" data-ref="REF06" data-db="AN" data-fechares="20260906">
+<div class="col-xs-12 col-sm-12 content">
+<div class="title">
+<a href="https://www.poderjudicial.es/search/AN/openDocument/doc06/20260906" id="ref-6" data-roj="SAP  NA 6/2026">SAP Navarra, a 6 de septiembre de 2026 - ROJ: SAP  NA 6/2026</a>
+</div>
+<div class="metadatos">
+<ul>
+<li><b>ECLI:ES:APNA:2026:0006</b></li>
+<li>N&ordm; de Resoluci&oacute;n: <b>6/2026</b></li>
+</ul>
+</div>
+<div class="summary">Resumen Autom&aacute;tico: summary 6</div>
+</div>
+</div>
+<div class="row searchresult doc" id="result-7" data-ref="REF07" data-db="AN" data-fechares="20260907">
+<div class="col-xs-12 col-sm-12 content">
+<div class="title">
+<a href="https://www.poderjudicial.es/search/AN/openDocument/doc07/20260907" id="ref-7" data-roj="SAP  NA 7/2026">SAP Navarra, a 7 de septiembre de 2026 - ROJ: SAP  NA 7/2026</a>
+</div>
+<div class="metadatos">
+<ul>
+<li><b>ECLI:ES:APNA:2026:0007</b></li>
+<li>N&ordm; de Resoluci&oacute;n: <b>7/2026</b></li>
+</ul>
+</div>
+<div class="summary">Resumen Autom&aacute;tico: summary 7</div>
+</div>
+</div>
+<div class="row searchresult doc" id="result-8" data-ref="REF08" data-db="AN" data-fechares="20260908">
+<div class="col-xs-12 col-sm-12 content">
+<div class="title">
+<a href="https://www.poderjudicial.es/search/AN/openDocument/doc08/20260908" id="ref-8" data-roj="SAP  NA 8/2026">SAP Navarra, a 8 de septiembre de 2026 - ROJ: SAP  NA 8/2026</a>
+</div>
+<div class="metadatos">
+<ul>
+<li><b>ECLI:ES:APNA:2026:0008</b></li>
+<li>N&ordm; de Resoluci&oacute;n: <b>8/2026</b></li>
+</ul>
+</div>
+<div class="summary">Resumen Autom&aacute;tico: summary 8</div>
+</div>
+</div>
+<div class="row searchresult doc" id="result-9" data-ref="REF09" data-db="AN" data-fechares="20260909">
+<div class="col-xs-12 col-sm-12 content">
+<div class="title">
+<a href="https://www.poderjudicial.es/search/AN/openDocument/doc09/20260909" id="ref-9" data-roj="SAP  NA 9/2026">SAP Navarra, a 9 de septiembre de 2026 - ROJ: SAP  NA 9/2026</a>
+</div>
+<div class="metadatos">
+<ul>
+<li><b>ECLI:ES:APNA:2026:0009</b></li>
+<li>N&ordm; de Resoluci&oacute;n: <b>9/2026</b></li>
+</ul>
+</div>
+<div class="summary">Resumen Autom&aacute;tico: summary 9</div>
+</div>
+</div>
+<div class="row searchresult doc" id="result-10" data-ref="REF10" data-db="AN" data-fechares="20260910">
+<div class="col-xs-12 col-sm-12 content">
+<div class="title">
+<a href="https://www.poderjudicial.es/search/AN/openDocument/doc10/20260910" id="ref-10" data-roj="SAP  NA 10/2026">SAP Navarra, a 10 de septiembre de 2026 - ROJ: SAP  NA 10/2026</a>
+</div>
+<div class="metadatos">
+<ul>
+<li><b>ECLI:ES:APNA:2026:0010</b></li>
+<li>N&ordm; de Resoluci&oacute;n: <b>10/2026</b></li>
+</ul>
+</div>
+<div class="summary">Resumen Autom&aacute;tico: summary 10</div>
+</div>
+</div>
+<div class="row searchresult doc" id="result-11" data-ref="REF11" data-db="AN" data-fechares="20260911">
+<div class="col-xs-12 col-sm-12 content">
+<div class="title">
+<a href="https://www.poderjudicial.es/search/AN/openDocument/doc11/20260911" id="ref-11" data-roj="SAP  NA 11/2026">SAP Navarra, a 11 de septiembre de 2026 - ROJ: SAP  NA 11/2026</a>
+</div>
+<div class="metadatos">
+<ul>
+<li><b>ECLI:ES:APNA:2026:0011</b></li>
+<li>N&ordm; de Resoluci&oacute;n: <b>11/2026</b></li>
+</ul>
+</div>
+<div class="summary">Resumen Autom&aacute;tico: summary 11</div>
+</div>
+</div>
+<div class="row searchresult doc" id="result-12" data-ref="REF12" data-db="AN" data-fechares="20260912">
+<div class="col-xs-12 col-sm-12 content">
+<div class="title">
+<a href="https://www.poderjudicial.es/search/AN/openDocument/doc12/20260912" id="ref-12" data-roj="SAP  NA 12/2026">SAP Navarra, a 12 de septiembre de 2026 - ROJ: SAP  NA 12/2026</a>
+</div>
+<div class="metadatos">
+<ul>
+<li><b>ECLI:ES:APNA:2026:0012</b></li>
+<li>N&ordm; de Resoluci&oacute;n: <b>12/2026</b></li>
+</ul>
+</div>
+<div class="summary">Resumen Autom&aacute;tico: summary 12</div>
+</div>
+</div>
+</div>
+</div>
+</body>
+</html>
