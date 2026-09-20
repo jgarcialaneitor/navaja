@@ -258,3 +258,58 @@ worktree rather than trusting it.
   `Orden`'s members are named for the caller while their values are the site's
   tokens, and removing that coercion from the tool broke the tool's own test
   until the coercion was added to the client.
+
+## Close
+
+Closed on 2026-09-20 on branch `feat/cendoj-search`: 11 commits, working tree
+clean, nothing pushed (the repository is local and has no remote configured).
+
+Verified outcome:
+
+- `buscar_sentencias` exposes the filters verified against the live endpoint, so
+  the site's region and subject scoping no longer has to be smuggled into the
+  free text. The question that started the work is one call:
+  `texto="droga"`, `jurisdiccion="PENAL"`, `localizacion=["MELILLA(C)"]`,
+  `fecha_desde="2026-01-01"` returns 11 resolutions, all of Melilla.
+- The three defects that motivated the feature are dead, and each has a test that
+  fails if it comes back: the page number forwarded as a record offset, a refused
+  search reported as an empty result set, and page metadata that contradicted the
+  request.
+- Final suite: `195 passed, 1 skipped`. The skip is the opt-in live smoke test.
+- Four defects were found and fixed during the work rather than by it: the
+  refusal/empty conflation, the page metadata, the clamp, and the `has_more`
+  off-by-one. The off-by-one was found by an acceptance check through the MCP
+  after a restart, not by the suite, because the test meant to cover it pinned
+  the wrong expectation.
+- The last acceptance check ran through the real MCP transport rather than a
+  script: the process started 21:32:15, after the last source change (`33ec950`,
+  21:28:57) and after `HEAD` (`306251b`, 21:29:33). Page 1 of a `total=11` query
+  reported `has_more: true` and page 2 reported `false`; `pagina=2` had zero
+  overlap with page 1; an exact `ecli` returned `total=1, has_more=false`; and a
+  rejected page size returned the list of accepted values instead of an empty
+  result set.
+- Commits after the per-task records: `21f0b32`, `33ec950`, `306251b`, and the
+  closing commit that carries this section.
+
+Checks that did not pass, or were skipped:
+
+- The first acceptance check through the MCP failed: `has_more` reported `false`
+  with one record still reachable. Fixed in `33ec950` and re-verified after a
+  server restart.
+- Native review: not run for this slice. It was explicitly left unreviewed by the
+  user after the candidate could not be started from the facade -- a committed
+  slice has no workspace candidate, and this controller rejects the explicit
+  `baseRef` form. The review switch stays enabled, and the lesson is recorded:
+  freeze the candidate before committing.
+- `ver_texto_completo` is untouched and still needs a human for the site's
+  captcha.
+- Live tests stay opt-in (`NAVAJA_LIVE=1`) and are not part of the closed suite.
+- `navaja-mcp` does not hot reload, so every source change needs a restart that
+  happens after the commit carrying it. This bit twice during the work.
+
+Next step:
+
+- Nothing pending for this feature. If it is picked up again, the open items are
+  the out-of-scope ones: `ID_NORMA`'s id space, the unverified
+  `SUBTIPORESOLUCION`, `TIPOORGANOPUB`, `SECCION` and `TIPOINTERES_*` fields, and
+  validating location names against the vocabulary endpoint.
