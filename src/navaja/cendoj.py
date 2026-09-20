@@ -37,7 +37,7 @@ from .documents import (
     _is_captcha_page,
     _is_pdf,
 )
-from .models import SearchPage, Sentencia
+from .models import MAX_RESULTS, SearchPage, Sentencia
 
 BASE_URL = "https://www.poderjudicial.es"
 INDEX_URL = f"{BASE_URL}/search/indexAN.jsp"
@@ -49,12 +49,6 @@ DEFAULT_RECORDS_PER_PAGE = 10
 # Page sizes the site accepts. Any other value comes back as its generic
 # bad-request page, which parses as an empty result set.
 ALLOWED_RECORDS_PER_PAGE = (10, 20, 30, 50)
-
-# The site never offers more than 200 records for one query and no parameter
-# lifts that: ``maxresults`` above 200 is rejected. Past this window the site
-# clamps ``start`` to ``201 - recordsPerPage`` and returns all 200 records in a
-# single page, so a client that pages on gets duplicates that look legitimate.
-MAX_RESULTS = 200
 
 _DATE_FORMAT = "%d/%m/%Y"
 

@@ -10,7 +10,6 @@ from .captcha import (
 )
 from .cendoj import (
     ALLOWED_RECORDS_PER_PAGE,
-    MAX_RESULTS,
     CendojClient,
     Coleccion,
     Jurisdiccion,
@@ -31,7 +30,7 @@ from .documents import (
     FullTextResult,
     parse_document_url,
 )
-from .models import SearchPage, Sentencia
+from .models import MAX_RESULTS, SearchPage, Sentencia
 
 __all__ = [
     "ALLOWED_RECORDS_PER_PAGE",

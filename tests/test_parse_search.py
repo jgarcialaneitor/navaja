@@ -16,6 +16,15 @@ from navaja import parse_search_page
 from navaja.cendoj import parse_spanish_date
 from navaja.models import SearchPage, Sentencia
 
+
+def test_max_results_imported_from_all_locations():
+    from navaja import MAX_RESULTS as from_package
+    from navaja.cendoj import MAX_RESULTS as from_cendoj
+    from navaja.models import MAX_RESULTS as from_models
+
+    assert from_package is from_cendoj is from_models
+    assert from_package == 200
+
 FIXTURE = Path(__file__).parent / "fixtures" / "search_clausulas_abusivas.html"
 CLAMPED_FIXTURE = Path(__file__).parent / "fixtures" / "search_clamped_page.html"
 NO_RESULTS_FIXTURE = Path(__file__).parent / "fixtures" / "search_no_results.html"
@@ -175,6 +184,114 @@ def test_empty_page_is_not_clamped():
     page = parse_search_page(NO_RESULTS_FIXTURE.read_text(encoding="utf-8"))
     assert page.sentencias == ()
     assert page.clamped is False
+
+
+def test_materia_extracts_label_from_labelled_summary(page):
+    labelled = [s for s in page.sentencias if s.materia is not None]
+    assert len(labelled) >= 1
+    assert labelled[0].materia == (
+        "Comisión de apertura. Requisitos de validez. "
+        "Reiteración de la jurisprudencia de la sala"
+    )
+
+
+def test_materia_is_none_for_label_free_summary():
+    page = parse_search_page(
+        CLAMPED_FIXTURE.read_text(encoding="utf-8"), records_per_page=10
+    )
+    for sentencia in page.sentencias:
+        assert sentencia.materia is None
+
+
+@pytest.mark.parametrize(
+    "marker",
+    [
+        "DELITO SIN ESPECIFICAR",
+        "MATERIAS NO ESPECIFICADAS",
+        "delito sin especificar",
+        "materias no especificadas",
+    ],
+)
+def test_materia_is_none_for_unclassified_marker(marker):
+    html = (
+        "<html><body>"
+        '<div class="searchresult doc">'
+        '<div class="title"><a href="/search/openDocument/123" data-roj="SAP NA 1/2026">x</a></div>'
+        f'<div class="summary">RESUMEN: {marker}</div>'
+        "</div>"
+        "</body></html>"
+    )
+    page = parse_search_page(html)
+    assert len(page.sentencias) == 1
+    assert page.sentencias[0].materia is None
+
+
+def test_materia_is_none_when_resumen_is_none():
+    sentencia = Sentencia(resumen=None)
+    assert sentencia.materia is None
+
+
+def test_materia_is_none_for_empty_resumen_label():
+    sentencia = Sentencia(resumen="RESUMEN:")
+    assert sentencia.materia is None
+
+
+def test_materia_is_none_for_decoy_resumen_automatico():
+    sentencia = Sentencia(resumen="Resumen Automático: una frase libre")
+    assert sentencia.materia is None
+
+
+def test_materia_appears_in_as_dict_without_dropping_existing_keys(page):
+    labelled = [s for s in page.sentencias if s.materia is not None]
+    assert len(labelled) >= 1
+    payload = labelled[0].as_dict()
+    assert payload["materia"] == (
+        "Comisión de apertura. Requisitos de validez. "
+        "Reiteración de la jurisprudencia de la sala"
+    )
+    assert set(payload) == {
+        "reference",
+        "roj",
+        "ecli",
+        "tipo",
+        "sede",
+        "fecha_resolucion",
+        "num_resolucion",
+        "municipio",
+        "ponente",
+        "num_recurso",
+        "resumen",
+        "url_documento",
+        "optimize",
+        "materia",
+    }
+
+
+def test_total_capped_is_true_when_total_reaches_ceiling(page):
+    assert page.total == 200
+    assert page.total_capped is True
+
+
+def test_total_capped_is_false_for_small_total():
+    page = SearchPage(sentencias=(), total=42)
+    assert page.total_capped is False
+
+
+def test_total_capped_is_false_when_total_is_none():
+    page = SearchPage(sentencias=(), total=None)
+    assert page.total_capped is False
+
+
+def test_total_capped_appears_in_as_dict(page):
+    payload = page.as_dict()
+    assert "total_capped" in payload
+    assert payload["total_capped"] is True
+
+
+def test_labelled_summary_keeps_resumen_prefix_unchanged(page):
+    labelled = [s for s in page.sentencias if "RESUMEN:" in s.resumen]
+    assert len(labelled) >= 1
+    assert labelled[0].resumen.startswith("RESUMEN: ")
 
 
 class TestParseSpanishDate:

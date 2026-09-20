@@ -6,9 +6,19 @@ requires solving the full-text captcha.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import date
 from typing import Any
+
+# The site never returns more than this for one query, nothing lifts it, and
+# past it the site clamps the offset and returns the whole set again.
+MAX_RESULTS = 200
+
+_MATERIA_RE = re.compile(r"^RESUMEN:\s*(?P<label>.+)$", re.IGNORECASE)
+_UNCLASSIFIED_MARKERS = frozenset(
+    ("DELITO SIN ESPECIFICAR", "MATERIAS NO ESPECIFICADAS")
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,6 +57,24 @@ class Sentencia:
     optimize: str | None = None
     """Index date token (``data-optimize``)."""
 
+    @property
+    def materia(self) -> str | None:
+        """The site's own subject classification, extracted from ``resumen``.
+
+        ``resumen`` still carries the raw text, including the ``RESUMEN:``
+        prefix when the site supplied one.
+        """
+        if self.resumen is None:
+            return None
+        text = re.sub(r"\s+", " ", self.resumen).strip()
+        match = _MATERIA_RE.match(text)
+        if match is None:
+            return None
+        label = match.group("label").strip()
+        if label.upper() in _UNCLASSIFIED_MARKERS:
+            return None
+        return label
+
     def as_dict(self) -> dict[str, Any]:
         """Return a JSON-serialisable mapping, dates rendered as ISO strings."""
         data: dict[str, Any] = {}
@@ -55,6 +83,7 @@ class Sentencia:
             if isinstance(value, date):
                 value = value.isoformat()
             data[field_name] = value
+        data["materia"] = self.materia
         return data
 
 
@@ -107,11 +136,21 @@ class SearchPage:
             return len(self.sentencias) >= self.records_per_page
         return self.offset + len(self.sentencias) - 1 < self.total
 
+    @property
+    def total_capped(self) -> bool:
+        """Heuristic: ``total`` is at the site's reported ceiling.
+
+        A query with exactly :data:`MAX_RESULTS` real hits reads as capped,
+        but the alternative is a caller trusting a truncated count.
+        """
+        return self.total is not None and self.total >= MAX_RESULTS
+
     def as_dict(self) -> dict[str, Any]:
         return {
             "page": self.page,
             "records_per_page": self.records_per_page,
             "total": self.total,
+            "total_capped": self.total_capped,
             "has_more": self.has_more,
             "results": [s.as_dict() for s in self.sentencias],
         }
