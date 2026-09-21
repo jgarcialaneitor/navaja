@@ -42,10 +42,12 @@ INVALID_FIXTURE = Path(__file__).parent / "fixtures" / "search_invalid_request.h
 GATE_FIXTURE = Path(__file__).parent / "fixtures" / "search_mass_download_gate.html"
 NO_RESULTS_FIXTURE = Path(__file__).parent / "fixtures" / "search_no_results.html"
 CLAMPED_FIXTURE = Path(__file__).parent / "fixtures" / "search_clamped_page.html"
+TS_COLECCION_FIXTURE = Path(__file__).parent / "fixtures" / "search_ts_coleccion.html"
 INVALID_HTML = INVALID_FIXTURE.read_text(encoding="utf-8")
 GATE_HTML = GATE_FIXTURE.read_text(encoding="utf-8")
 NO_RESULTS_HTML = NO_RESULTS_FIXTURE.read_text(encoding="utf-8")
 CLAMPED_HTML = CLAMPED_FIXTURE.read_text(encoding="utf-8")
+TS_COLECCION_HTML = TS_COLECCION_FIXTURE.read_text(encoding="utf-8")
 
 
 def _client_capturing(sent: list[httpx.Request]) -> CendojClient:
@@ -370,6 +372,46 @@ def test_search_raises_search_error_when_site_returns_clamped_page():
 def test_search_errors_are_search_error_subclasses():
     assert issubclass(SearchRequestError, SearchError)
     assert issubclass(SearchGatedError, SearchError)
+
+
+def test_supreme_court_result_urls_are_accepted_by_the_url_validator():
+    """Offline guard for the search-to-download contract.
+
+    A Coleccion.TS search yields document URLs under ``/search/TS/``. The URL
+    validator once accepted only ``/search/AN/``, so ``iniciar_descargas``
+    refused every Supreme Court result. This runs on the default suite, from a
+    captured real response, so the regression cannot come back unnoticed when
+    the live test is deselected.
+    """
+    with _client_with_body(TS_COLECCION_HTML) as client:
+        page = client.search(
+            SearchFilters(texto="cláusula de conciencia", coleccion=Coleccion.TS),
+            records_per_page=20,
+        )
+
+    urls = [s.url_documento for s in page.sentencias if s.url_documento]
+    assert urls, "the captured Supreme Court response yielded no document URLs"
+    assert all("/search/TS/" in url for url in urls), (
+        "fixture no longer represents the Supreme Court path shape"
+    )
+
+    for url in urls:
+        ref = parse_document_url(url)
+        assert ref.reference in url
+        assert ref.optimize in url
+
+
+def test_url_validator_error_message_names_every_accepted_collection():
+    """The rejection message must describe what is actually accepted."""
+    with pytest.raises(ValueError) as excinfo:
+        parse_document_url(
+            "https://www.poderjudicial.es/search/XX/openDocument/"
+            "aabbccddeeff00112233445566778899/20260911"
+        )
+
+    message = str(excinfo.value)
+    assert "AN" in message
+    assert "TS" in message
 
 
 @pytest.mark.live
