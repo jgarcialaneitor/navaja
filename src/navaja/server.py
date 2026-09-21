@@ -54,6 +54,12 @@ from navaja.documents import (
 from navaja.jobs import JobQueue
 
 
+# Captcha wait timeout shared by the batch runner and the non-tool fetch paths.
+# The blocking ``ver_texto_completo`` tool uses a shorter default because it
+# holds an MCP request open.
+_CAPTCHA_WAIT_SECONDS = 300
+
+
 _client_lock = threading.Lock()
 _client: CendojClient | None = None
 
@@ -505,10 +511,10 @@ def _run_fetch_job(url: str) -> dict[str, Any]:
     """Batch job runner: fetch one URL and return a uniform payload.
 
     A queued job is not holding an MCP tool call open, so it uses the
-    ``300`` second default already used by :func:`serve_captcha` rather than
-    the ``120`` second default of the blocking ``ver_texto_completo`` tool.
+    ``300`` second captcha wait default rather than the ``120`` second default
+    of the blocking ``ver_texto_completo`` tool.
     """
-    return _fetch_full_text_payload(url, espera_segundos=300)
+    return _fetch_full_text_payload(url, espera_segundos=_CAPTCHA_WAIT_SECONDS)
 
 
 @server.tool()
@@ -623,10 +629,14 @@ def iniciar_descargas(urls: list[str]) -> dict:
         urls: list of CENDOJ ``openDocument`` URLs.
 
     Returns:
-        A dict with ``ok``, ``captcha_url``, ``max_concurrentes`` and
-        ``jobs``. ``jobs`` is a list of ``{job_id, url, state}`` records in
-        submission order. An empty ``urls`` list is refused with
-        ``error_code="empty_urls"`` rather than silently accepted.
+        A dict with ``ok``, ``captcha_url``, ``max_concurrentes``,
+        ``batch_id`` and ``jobs``. ``jobs`` is a list of
+        ``{job_id, url, state}`` records in submission order. An empty
+        ``urls`` list is refused with ``error_code="empty_urls"``. More
+        than 100 URLs is refused with ``error_code="too_many_urls"``. Any
+        URL that ``parse_document_url`` cannot parse is refused with
+        ``error_code="invalid_url"`` naming the offending URL. A rejected
+        call enqueues nothing.
     """
     if not urls:
         return {
@@ -635,15 +645,35 @@ def iniciar_descargas(urls: list[str]) -> dict:
             "error": "urls must not be empty",
         }
 
+    if len(urls) > 100:
+        return {
+            "ok": False,
+            "error_code": "too_many_urls",
+            "error": "at most 100 URLs are allowed per batch",
+        }
+
+    for url in urls:
+        try:
+            parse_document_url(url)
+        except ValueError as exc:
+            return {
+                "ok": False,
+                "error_code": "invalid_url",
+                "error": f"invalid url: {url} ({exc})",
+            }
+
     queue = _get_queue()
-    job_ids = queue.submit_many(urls)
-    meta_by_id = {meta["job_id"]: meta for meta in queue.estado()}
+    submission = queue.submit_many(urls)
+    job_ids = submission["job_ids"]
+    batch_id = submission["batch_id"]
+    meta_by_id = {meta["job_id"]: meta for meta in queue.estado(batch_id)}
     captcha_url = _captcha_form_url()
 
     return {
         "ok": True,
         "captcha_url": captcha_url,
         "max_concurrentes": queue.max_concurrentes,
+        "batch_id": batch_id,
         "jobs": [
             {
                 "job_id": job_id,
@@ -656,11 +686,14 @@ def iniciar_descargas(urls: list[str]) -> dict:
 
 
 @server.tool()
-def estado_descargas() -> dict:
-    """Poll the metadata of every batch job.
+def estado_descargas(batch_id: str | None = None) -> dict:
+    """Poll the metadata of one batch.
 
     This is the cheap polling step of the batch flow. It returns the state
-    of every job started by ``iniciar_descargas`` without the full payload
+    of the jobs in a single batch, selected by ``batch_id``. When
+    ``batch_id`` is omitted the most recently submitted batch is returned,
+    which is the common polling pattern after a single
+    ``iniciar_descargas`` call. The result never contains the full payload
     text, so polling a large batch is lightweight.
 
     The captcha form URL is available from ``iniciar_descargas`` before any
@@ -677,14 +710,19 @@ def estado_descargas() -> dict:
     inspect ``ok`` and ``error_code`` per job and must not treat ``done`` as
     success.
 
+    Args:
+        batch_id: optional batch id returned by ``iniciar_descargas``.
+            Defaults to the most recent batch.
+
     Returns:
         A dict with ``ok`` and ``jobs``. ``jobs`` is a list of
         ``{job_id, url, state, attempts, pdf_path, error_code}`` metadata
         records in submission order. ``state`` is one of ``queued``,
-        ``running``, ``done`` or ``failed``.
+        ``running``, ``done`` or ``failed``. An unknown ``batch_id``
+        returns an empty ``jobs`` list.
     """
     queue = _get_queue()
-    return {"ok": True, "jobs": queue.estado()}
+    return {"ok": True, "jobs": queue.estado(batch_id)}
 
 
 @server.tool()
