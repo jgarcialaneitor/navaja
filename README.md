@@ -408,7 +408,7 @@ uv run pytest          # deterministic, runs against saved fixtures
 NAVAJA_LIVE=1 uv run pytest -m live   # opt-in: hits the real site
 ```
 
-Current suite: `280 passed, 1 skipped`.
+Current suite: `324 passed, 1 skipped`.
 
 Tests never touch the live site unless `NAVAJA_LIVE=1` is set.
 
