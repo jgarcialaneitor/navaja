@@ -1,105 +1,115 @@
-# navaja
+<div align="center">
 
-MCP server for personal [CENDOJ](https://www.poderjudicial.es/search/indexAN.jsp)
-case-law research.
+# 🔪 navaja
 
-Ask for case law, get candidates with metadata and the site's own automatic
-summaries, and read the full text of the resolutions you pick.
+**Servidor MCP para investigación personal de jurisprudencia en [CENDOJ](https://www.poderjudicial.es/search/indexAN.jsp)**
 
-## What navaja is
+[![Tests](https://img.shields.io/badge/tests-343%20passed-brightgreen)](#-desarrollo)
+[![Python](https://img.shields.io/badge/python-3.12+-blue)](#-desarrollo)
+[![MCP](https://img.shields.io/badge/MCP-7%20herramientas-8A2BE2)](#-qué-es-navaja)
 
-`navaja-mcp` exposes seven tools for an MCP client:
+*Pregunta por jurisprudencia, recibe candidatas con metadatos y los resúmenes automáticos del propio sitio, y lee el texto completo de las resoluciones que elijas.*
 
-- `buscar_sentencias` — search by free text and the site's advanced filters.
-  No captcha is needed.
-- `listar_localizaciones` — the site's own location vocabulary, ready to pass
-  back into a search. No captcha is needed.
-- `ver_texto_completo` — fetch the full text of one resolution, blocking until
-  the answer is ready.
-- `iniciar_descargas` — start a non-blocking batch of full-text fetches.
-- `estado_descargas` — cheap metadata polling for the batch.
-- `recoger_descarga` — collect one finished batch result.
-- `estado_servidor` — runtime configuration snapshot.
+</div>
 
-Search, metadata and the automatic summaries come straight from the public
-results page. Only the full-text step can trigger the site's
-`Control Descargas masivas` captcha.
+---
 
-## Search filters
+## 📑 Índice
 
-`buscar_sentencias` takes free text plus the filters the site's own advanced
-form offers. Each one was verified against the live endpoint, by measurement
-rather than by reading the front-end.
+| | |
+| --- | --- |
+| [🧭 Qué es navaja](#-qué-es-navaja) | [📄 Texto completo](#-cómo-funciona-la-descarga-de-texto-completo) |
+| [🔍 Filtros de búsqueda](#-filtros-de-búsqueda) | [📦 Descargas por lotes](#-descargas-por-lotes) |
+| [📚 Materia](#-materia) | [💾 Guardado de PDF](#-guardado-de-pdf) |
+| [📍 Localización](#-localización) | [💻 Funciona sin pantalla](#-funciona-sin-pantalla) |
+| [📊 Paginación y el techo de 200](#-paginación-y-el-techo-de-200-registros) | [🔧 Configuración](#-configuración) |
+| [🚫 Cuando el sitio no responde](#-cuando-el-sitio-no-responde) | [🔌 Registro en el cliente MCP](#-registro-en-el-cliente-mcp) |
+| [🔒 Reglas de seguridad](#-reglas-de-seguridad) | [🧪 Desarrollo](#-desarrollo) |
 
-| Argument | Site field | Accepted values |
+---
+
+## 🧭 Qué es navaja
+
+`navaja-mcp` expone **siete herramientas** para un cliente MCP:
+
+| Herramienta | Qué hace | ¿Captcha? |
+| --- | --- | :---: |
+| `buscar_sentencias` | Busca por texto libre y por los filtros avanzados del sitio | ❌ No |
+| `listar_localizaciones` | Devuelve el vocabulario de localizaciones del propio sitio, listo para reutilizar | ❌ No |
+| `ver_texto_completo` | Descarga el texto completo de una resolución, bloqueando hasta tenerlo | ⚠️ Puede |
+| `iniciar_descargas` | Arranca un lote de descargas sin bloquear | ⚠️ Puede |
+| `estado_descargas` | Consulta barata del estado del lote | ❌ No |
+| `recoger_descarga` | Recoge el resultado de un trabajo terminado | ❌ No |
+| `estado_servidor` | Instantánea de la configuración en ejecución | ❌ No |
+
+La búsqueda, los metadatos y los resúmenes automáticos salen directamente de la página pública de resultados. **Solo el paso de texto completo** puede disparar el captcha `Control Descargas masivas` del sitio.
+
+---
+
+## 🔍 Filtros de búsqueda
+
+`buscar_sentencias` acepta texto libre más los filtros que ofrece el formulario avanzado del sitio. Cada uno fue **verificado contra el endpoint real, midiendo**, no leyendo el front-end.
+
+| Argumento | Campo del sitio | Valores aceptados |
 | --- | --- | --- |
-| `texto` | `TEXT` | free text; optional when another criterion is present |
-| `fecha_desde` / `fecha_hasta` | `FECHARESOLUCIONDESDE` / `FECHARESOLUCIONHASTA` | `YYYY-MM-DD` or `DD/MM/AAAA` |
+| `texto` | `TEXT` | texto libre; opcional si hay otro criterio |
+| `fecha_desde` / `fecha_hasta` | `FECHARESOLUCIONDESDE` / `FECHARESOLUCIONHASTA` | `AAAA-MM-DD` o `DD/MM/AAAA` |
 | `jurisdiccion` | `JURISDICCION` | `CIVIL`, `PENAL`, `CONTENCIOSO`, `SOCIAL`, `MILITAR` |
 | `tipo_resolucion` | `TIPORESOLUCION` | `SENTENCIA`, `AUTO` |
-| `roj` / `ecli` | `ROJ` / `ECLI` | exact identifier |
-| `num_resolucion` / `num_recurso` | `NUMERORESOLUCION` / `NUMERORECURSO` | as printed in the resolution |
-| `ponente` | `PONENTE` | magistrate's name |
-| `voces` | `VOCES` | subject vocabulary, e.g. `TRÁFICO DE DROGAS` |
-| `localizacion` | `VALUESCOMUNIDAD` | see below |
-| `coleccion` | `databasematch` | `AN` (every jurisdiction), `TS` (Tribunal Supremo only) |
+| `roj` / `ecli` | `ROJ` / `ECLI` | identificador exacto |
+| `num_resolucion` / `num_recurso` | `NUMERORESOLUCION` / `NUMERORECURSO` | tal y como figura en la resolución |
+| `ponente` | `PONENTE` | nombre del magistrado |
+| `voces` | `VOCES` | vocabulario de materias, p. ej. `TRÁFICO DE DROGAS` |
+| `localizacion` | `VALUESCOMUNIDAD` | ver [abajo](#-localización) |
+
+| `coleccion` | `databasematch` | `AN` (todas las jurisdicciones), `TS` (solo Tribunal Supremo) |
 | `orden` | `sort` | `reciente`, `antiguo` |
-| `campos_extra` | anything else | raw form fields, applied last |
+| `campos_extra` | cualquier otro | campos crudos del formulario, aplicados al final |
 
-Filters combine with AND. The site's own term matching is AND too and has no
-relevance ranking, so results come back ordered by resolution date, and recall
-within one query depends on how you word it. The site caps a query at 200
-records, which is why a broad query returns the same ceiling for every wording.
+> [!IMPORTANT]
+> Los filtros se combinan con **AND**. La coincidencia de términos del sitio también es AND y **no tiene ranking por relevancia**, así que los resultados vuelven ordenados por fecha de resolución, y lo que recuperes en una consulta depende de cómo la redactes. El sitio **corta cualquier consulta en 200 registros**: por eso una búsqueda amplia devuelve el mismo techo con cualquier redacción.
 
-### Subject matter
+### 📚 Materia
 
-The site classifies every resolution, and the classification travels in the
-summary as `RESUMEN: <label>`. `materia` exposes it as its own field. It is
-`null` when the site did not classify the resolution: both
-`DELITO SIN ESPECIFICAR` and `MATERIAS NO ESPECIFICADAS` mean that.
+El sitio clasifica cada resolución, y la clasificación viaja dentro del resumen como `RESUMEN: <etiqueta>`. El campo `materia` la expone por separado. Vale `null` cuando el sitio no clasificó la resolución: tanto `DELITO SIN ESPECIFICAR` como `MATERIAS NO ESPECIFICADAS` significan eso.
 
-There is **no server-side subject filter**, and that is measured rather than
-assumed:
+> [!WARNING]
+> **No existe filtro de materia en el servidor.** Esto está medido, no supuesto:
+>
+> - `MATERIAS` es un campo del formulario del propio sitio, pero **el endpoint lo ignora**. Tres valores distintos, incluido uno válido, devolvieron la línea base sin cambios.
+> - Los operadores de texto libre no sirven de nada: `"tráfico de drogas"` entre comillas equivale a la consulta sin comillas, `+tráfico +drogas` es peor, y `AND` / `Y` no cambian nada.
+> - `voces` **sí** se respeta, pero es un tesauro distinto. No incluye todas las resoluciones cuya etiqueta dice `TRÁFICO DE DROGAS`, así que se deja fuera resultados relevantes.
 
-- `MATERIAS` is a field in the site's own form, but the endpoint ignores it.
-  Three values, including a valid one, returned the baseline unchanged.
-- Free-text operators do nothing useful: `"tráfico de drogas"` in quotes equals
-  the unquoted query, `+tráfico +drogas` is worse, and `AND` / `Y` change
-  nothing.
-- `voces` is honoured but is a different thesaurus. It does not include every
-  resolution whose label says `TRÁFICO DE DROGAS`, so it misses relevant ones.
+**Cómo responder entonces a «las últimas N sobre X en Y»:** pon el lugar en `localizacion`, una redacción del tema en `texto`, pide una página de 10 a 50, y **clasifica los resultados por `materia`**.
 
-So to answer "the last N about X in Y": put the place in `localizacion`, put a
-subject wording in `texto`, ask for a page of 10 to 50, and **classify the
-results by `materia`**. A query for `"tráfico de drogas"` also returns
-resolutions about drink-driving or extranjería that merely mention the phrase,
-and the label is what tells them apart.
+Una consulta por `"tráfico de drogas"` también devuelve resoluciones sobre alcoholemias o extranjería que simplemente mencionan la frase. La etiqueta es lo que las distingue.
 
-### Location
+### 📍 Localización
 
-`localizacion` takes a list. Each entry is either the site's own form, with the
-level in the suffix, or a bare place name, which means a comunidad autónoma:
+`localizacion` acepta una lista. Cada entrada es o bien la forma del propio sitio, con el nivel en el sufijo, o bien un nombre de lugar a secas, que significa comunidad autónoma:
 
 ```python
 buscar_sentencias(texto="tráfico de drogas", localizacion=["MELILLA(C)"])
 buscar_sentencias(localizacion=["Barcelona(P)", "Melilla(S)"])
-buscar_sentencias(localizacion=["Melilla"])   # the same as "MELILLA(C)"
+buscar_sentencias(localizacion=["Melilla"])   # equivale a "MELILLA(C)"
 ```
 
-The levels are `(C)` comunidad autónoma, `(P)` provincia and `(S)` sede.
-Entries are OR-ed with each other and AND-ed with the other filters. Names are
-the site's uppercase vocabulary; the site publishes it at
+| Sufijo | Nivel |
+| :---: | --- |
+| `(C)` | Comunidad autónoma |
+| `(P)` | Provincia |
+| `(S)` | Sede |
+
+Las entradas se combinan entre sí con **OR**, y con el resto de filtros con **AND**. Los nombres son el vocabulario en mayúsculas del sitio, que este publica en:
 
 ```
 POST /search/jurisprudencia.action
   action=getComunidades&field=COMUNIDAD|PROVINCIA|SEDE&publicinterface=true
 ```
 
-which returns pipe-separated `KEY&LABEL` pairs (`MELILLA&MELILLA`,
-`PAÍS VASCO&PAÍS VASCO`).
+y que devuelve pares `CLAVE&ETIQUETA` separados por barras verticales (`MELILLA&MELILLA`, `PAÍS VASCO&PAÍS VASCO`).
 
-`listar_localizaciones` exposes that vocabulary as a tool, already formatted as
-tokens you can pass straight back:
+`listar_localizaciones` expone ese vocabulario como herramienta, ya formateado en tokens que puedes devolver tal cual:
 
 ```python
 listar_localizaciones(nivel="COMUNIDAD")                        # "MELILLA(C)", ...
@@ -107,245 +117,228 @@ listar_localizaciones(nivel="PROVINCIA", comunidad="MELILLA")   # "MELILLA(P)"
 listar_localizaciones(nivel="SEDE", comunidad="MELILLA", provincia="MELILLA")
 ```
 
-The tokens always carry their level suffix, so a provincia token cannot be
-mistaken for a comunidad. A missing parent raises rather than returning an empty
-list.
+Los tokens siempre llevan su sufijo de nivel, así que un token de provincia no puede confundirse con uno de comunidad. Si falta el padre, lanza error en vez de devolver una lista vacía.
 
-The value is the label the site displays, not an internal id: a search with
-Melilla selected sends `MELILLA(C) | `. The codes the front-end keeps in its own
-checkbox values (`ALL@ALL@MELILLA`) are ignored by the server, so a client that
-sends those gets unfiltered results and no error.
+> [!NOTE]
+> El valor es **la etiqueta que muestra el sitio**, no un identificador interno: una búsqueda con Melilla seleccionada envía `MELILLA(C) | `. Los códigos que el front-end guarda en sus propias casillas (`ALL@ALL@MELILLA`) los ignora el servidor, así que un cliente que los mande recibe resultados **sin filtrar y sin ningún error**.
 
-### Pagination and the 200-record ceiling
+### 📊 Paginación y el techo de 200 registros
 
-`records_por_pagina` is one of 10, 20, 30 or 50, and `pagina` is a real page
-number: navaja converts it to the site's record offset, which counts records,
-not pages. A page whose window would pass record 200 is refused rather than
-requested, because past the ceiling the site silently clamps the offset and
-returns the whole result set again — 200 records that look like a normal page.
+`records_por_pagina` es 10, 20, 30 o 50. `pagina` es un número de página de verdad: navaja lo convierte al desplazamiento del sitio, que cuenta **registros**, no páginas.
 
-Getting this wrong is not hypothetical. The previous release forwarded the page
-number as the offset, so page 2 repeated nine of page 1's ten results.
+Una página cuya ventana pasaría del registro 200 se **rechaza** en lugar de pedirse, porque más allá del techo el sitio recorta el desplazamiento en silencio y devuelve otra vez el conjunto entero: 200 registros con pinta de página normal.
 
-`total_capped` reports when `total` sits on that ceiling, so the count is a
-ceiling rather than a count. When it is true, union several subject wordings or
-narrow with a date range instead of paging: past the ceiling the site clamps the
-offset and returns the same records again, so there is nothing further to reach.
+> [!CAUTION]
+> Equivocarse aquí no es hipotético. **Una versión anterior enviaba el número de página como desplazamiento**, así que la página 2 repetía nueve de los diez resultados de la página 1.
 
-### When the site does not answer
+`total_capped` avisa cuando `total` está pegado a ese techo, o sea que el número es un **tope** y no un recuento. Cuando vale `true`, une varias redacciones del tema o acota con un rango de fechas, en vez de paginar: pasado el techo no hay nada más que alcanzar.
 
-A search that matches nothing is an answer: it returns an empty result page.
-Three other outcomes are errors, told apart by the response body because the
-shapes are the same size as legitimate ones:
+### 🚫 Cuando el sitio no responde
 
-- the site rejects the request as invalid → `SearchRequestError`
-- the site serves its `Control de grandes paginaciones` challenge →
-  `SearchGatedError`
-- the site returns more records than the page asked for → `SearchError`
+Una búsqueda que no encuentra nada **es una respuesta**: devuelve una página de resultados vacía. Hay otros tres desenlaces que sí son errores, distinguidos por el cuerpo de la respuesta porque sus formas tienen el mismo tamaño que las legítimas:
 
-navaja does not solve that challenge, and it never reports a refused search as
-an empty result set.
+| Situación | Excepción |
+| --- | --- |
+| El sitio rechaza la petición como inválida | `SearchRequestError` |
+| El sitio sirve su desafío `Control de grandes paginaciones` | `SearchGatedError` |
+| El sitio devuelve más registros de los pedidos | `SearchError` |
 
-### Not modelled
+navaja **no resuelve ese desafío**, y **nunca** presenta una búsqueda rechazada como un resultado vacío.
 
-`ID_NORMA`, `SUBTIPORESOLUCION`, `INSTITUCION`, `SECCION`, `SECCIONAUTO`,
-`SECCIONSOLOPLENO`, `TIPOORGANOPUB` and the `TIPOINTERES_*` flags are reachable
-through `campos_extra`. `ID_NORMA` needs an id space navaja does not know how to
-address: a non-matching id comes back as a legitimate zero-hit page, not as an
-error.
+### 🔧 No modelado
 
-## How full-text retrieval works
+`ID_NORMA`, `SUBTIPORESOLUCION`, `INSTITUCION`, `SECCION`, `SECCIONAUTO`, `SECCIONSOLOPLENO`, `TIPOORGANOPUB` y los indicadores `TIPOINTERES_*` son accesibles vía `campos_extra`.
 
-When you ask for the full text of a resolution, navaja requests the document
-from CENDOJ. If the site responds with its captcha page, navaja shows the
-captcha image through a **long-lived local HTTP form** bound to a private
-network interface and waits for a human to type the answer.
+`ID_NORMA` necesita un espacio de identificadores que navaja no sabe direccionar: un id que no coincide vuelve como una página legítima de cero resultados, no como un error.
 
-The form URL has three states:
+---
 
-- While a challenge is pending, it serves the captcha form.
-- While no challenge is pending, it serves an idle page that says so and
-  refreshes itself every 5 seconds; a tab left open picks up the next
-  challenge without the human reloading.
-- If the URL answers nothing at all, no navaja process is running.
+## 📄 Cómo funciona la descarga de texto completo
 
-The listener stays bound for the whole navaja process rather than only during
-a challenge. That is a deliberate trade-off: a slightly longer-lived local
-listener in exchange for a URL that always answers something useful. It still
-binds only the validated private interface (`0.0.0.0`, `::` and empty hosts
-are refused), and the token is required on every path. A wrong token returns
-a 404 in both the form and idle states.
+Cuando pides el texto completo de una resolución, navaja solicita el documento a CENDOJ. Si el sitio responde con su página de captcha, navaja muestra la imagen a través de un **formulario HTTP local de larga vida**, atado a una interfaz de red privada, y espera a que **una persona** escriba la respuesta.
 
-The `estado_servidor` tool reports whether the listener is bound
-(`captcha_listening`) and the real, usable captcha form URL as
-`captcha_url`. The URL is part of the API surface on purpose: a caller can
-obtain it from `estado_servidor` before running any blocking fetch, hand it
-to the human, and the human opens it once and leaves it open. While no
-challenge is pending the idle page refreshes itself every 5 seconds and
-turns into the captcha form automatically when a challenge arrives. The token
-in the URL gates access to the HTTP form rather than being hidden from the
-caller; anyone with local access can already read it from the persisted token
-file.
+La URL del formulario tiene tres estados:
 
-`ver_texto_completo` returns structured failures with an `error_code`:
-`captcha_timeout` when the human does not answer in time, `captcha_busy`
-when a challenge is already pending on the listener, `captcha_rejected` when
-the site refuses the answer, `full_text_error` for other fetch failures, and
-`invalid_url` when the URL cannot be parsed. Both `captcha_timeout` and
-`captcha_busy` include `captcha_url` in the payload so the caller can open
-the form without reading stderr. The default `espera_segundos` is `120`,
-deliberately well below the MCP client request timeout configured for
-this deployment in `~/.pi/agent/mcp.json` (`330` seconds there), so the
-server has time to return a structured error before the client kills the
-call.
+| Estado | Qué sirve |
+| --- | --- |
+| Hay un desafío pendiente | El formulario del captcha |
+| No hay desafío pendiente | Una página en espera que se autorrefresca cada 5 segundos |
+| No responde nada | No hay ningún proceso navaja corriendo |
 
-There is **no automatic captcha solver** in navaja. The captcha image is never
-sent to a vision model, an OCR service, or any third party. A human reads the
-image and submits the answer through the local form.
+Una pestaña abierta recoge el siguiente desafío **sin que la persona recargue**.
 
-The challenge is session-sticky: once the session has solved it, subsequent
-full-text requests in the same session usually do not ask again. In practice
-this means roughly **one solve per research session**, not one per resolution.
+El listener sigue atado durante toda la vida del proceso, no solo durante un desafío. Es una **concesión deliberada**: un listener local algo más duradero a cambio de una URL que siempre responde algo útil. Aun así solo se ata a la interfaz privada validada (`0.0.0.0`, `::` y hosts vacíos se rechazan), y el token es obligatorio en todas las rutas. Un token incorrecto devuelve 404 en los dos estados.
 
-### Batch full-text fetching
+La herramienta `estado_servidor` informa de si el listener está atado (`captcha_listening`) y de la URL real y usable del formulario (`captcha_url`).
 
-For more than one document, use the three-step batch flow instead of many
-blocking calls:
+> [!TIP]
+> La URL forma parte de la API **a propósito**: quien llama puede obtenerla de `estado_servidor` antes de lanzar ninguna descarga bloqueante, dársela a la persona, y esta la abre una vez y la deja abierta. El token de la URL controla el acceso al formulario HTTP; no pretende ocultarse de quien llama, porque cualquiera con acceso local ya puede leerlo del fichero de token persistido.
 
-1. `iniciar_descargas(urls)` returns immediately with `ok`, `batch_id`,
-   `jobs`, `captcha_url` and `max_concurrentes`. `jobs` contains a
-   `{job_id, url, state}` record for every URL in submission order. The
-   captcha form URL is available before any wait; a human can open it once
-   and leave it open while the batch drains.
-2. Poll `estado_descargas(batch_id)` until the jobs reach a terminal state.
-   Omitting `batch_id` returns the most recent batch. An unknown
-   `batch_id` returns an empty `jobs` list rather than an error. The result
-   is metadata only — job id, URL, state, attempts, pdf path and error code
-   — so polling a large batch is cheap.
-3. Call `recoger_descarga(job_id)` for each finished job. The call is
-   non-destructive: calling it again with the same `job_id` returns the same
-   payload. The payload has exactly the same shape as `ver_texto_completo`,
-   so both paths can be handled by the same code.
+### Fallos estructurados
 
-**Limits:** a batch may contain at most 100 URLs, and every URL is validated
-up front. A rejected call enqueues nothing. Rejection reasons are:
-`error_code="empty_urls"` for an empty list, `error_code="too_many_urls"`
-for more than 100 URLs, and `error_code="invalid_url"` for the first
-unparseable URL, with the offending URL named in `error`. The registry
-retains the 10 most recent batches; older finished batches are pruned
-automatically, and their job ids then read as `unknown_job`. A batch with
-queued or running jobs is never pruned.
+`ver_texto_completo` devuelve fallos con un `error_code`:
 
-**Job states:** `queued`, `running`, `done` or `failed`. A state of `done`
-means the runner *returned*, not that the fetch succeeded. A document that
-failed at the fetch level — for example an unparsable URL — still ends in
-`done` with `ok: false` and an `error_code`. Only an unexpected exception
-escaping the runner yields `failed`. Callers must inspect `ok` and
-`error_code` per job and must not treat `done` as success.
+| `error_code` | Significado |
+| --- | --- |
+| `captcha_timeout` | La persona no respondió a tiempo |
+| `captcha_busy` | Ya hay un desafío pendiente en el listener |
+| `captcha_rejected` | El sitio rechazó la respuesta |
+| `full_text_error` | Otro fallo de descarga |
+| `invalid_url` | La URL no se puede interpretar |
 
-**Concurrency:** the worker count comes from `NAVAJA_MAX_CONCURRENTES` and
-defaults to `1`. The default is a product decision of this project, not a
-site-published limit: the repository contains no numeric CENDOJ quota, no
-`Retry-After` handling and no backoff code. Because the captcha is
-session-sticky, one solved challenge normally serves the whole batch, so one
-worker is the conservative default.
+`captcha_timeout` y `captcha_busy` incluyen `captcha_url` en la carga útil, para que quien llama pueda abrir el formulario sin leer stderr.
 
-### PDF persistence
+El valor por defecto de `espera_segundos` es `120`, deliberadamente muy por debajo del timeout de petición configurado en el cliente MCP, de modo que el servidor tenga tiempo de devolver un error estructurado antes de que el cliente corte la llamada.
 
-When the final response is a PDF, navaja automatically saves the file to disk
-as well as returning the extracted text. This applies to both
-`ver_texto_completo` and `navaja-doc`; there is no per-call opt-in.
+> [!IMPORTANT]
+> **No hay ningún resolutor automático de captcha en navaja.** La imagen del captcha **nunca** se envía a un modelo de visión, a un servicio de OCR ni a ningún tercero. Una persona lee la imagen y envía la respuesta por el formulario local.
 
-The destination directory resolves in this order:
+El desafío se queda **pegado a la sesión**: una vez resuelto, las siguientes peticiones de texto completo en la misma sesión normalmente no vuelven a preguntar. En la práctica esto significa aproximadamente **una resolución de captcha por sesión de investigación**, no una por resolución.
 
-1. `NAVAJA_PDF_DIR`, if set.
-2. `$XDG_DATA_HOME/navaja/pdfs` when `XDG_DATA_HOME` is set.
-3. `~/.local/share/navaja/pdfs` otherwise.
+---
 
-navaja creates the directory on demand.
+## 📦 Descargas por lotes
 
-The filename is taken from the `name=` parameter the server sends in the
-`Content-Type` header, for example `name="STS_3679_2026.pdf"`. That value is
-sanitized to a safe basename before it reaches the filesystem. If the header
-has no usable name, or the name would be unsafe or too long, navaja falls back
-to a deterministic name built from the document URL:
-`<reference>_<optimize>.pdf`. The `pdf_save_reason` field in the result tells
-which rule was used (`server_sent_name`, `missing_name`, `unsafe_name`,
-`overlong_name`, `identical_bytes`, ...).
+Para más de un documento, usa el flujo de tres pasos en lugar de muchas llamadas bloqueantes:
 
-If the response is not a PDF, no file is written and `pdf_save_reason` is
-`not_pdf`. A write failure (permissions, full disk, bad `NAVAJA_PDF_DIR`)
-never fails the fetch itself: `ok` stays `True`, the full text is returned,
-and `pdf_save_error` explains what happened.
+### 1️⃣ Arrancar
 
-For MCP clients, the `ver_texto_completo` result always contains three extra
-keys:
-
-* `pdf_path` — the saved file path, or `None`.
-* `pdf_save_reason` — why the file has that name, or why nothing was written.
-* `pdf_save_error` — `None` on success, otherwise a human-readable message.
-
-### Zero-configuration defaults
-
-By default navaja tries to make the captcha form reachable without manual
-configuration:
-
-* **Host:** `navaja-doc` and `navaja-mcp` auto-detect the bind interface in
-  this order:
-  1. `NAVAJA_CAPTCHA_HOST`, if set.
-  2. The IPv4 address of the `tailscale0` interface, if it exists.
-  3. `127.0.0.1`.
-* **Token:** the captcha URL-path token is stable across runs. It is read from
-  `NAVAJA_CAPTCHA_TOKEN` when set, otherwise from
-  `$XDG_STATE_HOME/navaja/captcha-token` (default
-  `~/.local/state/navaja/captcha-token`). If none exists, a new token is
-  generated with `secrets.token_urlsafe(32)` and persisted. The state directory
-  is created with mode `0700` and the token file with mode `0600`; the file is
-  written atomically so concurrent runs cannot leave it torn.
-
-The chosen host is announced on stderr together with the form URL, so it is
-never a silent exposure.
-
-## It runs headless
-
-navaja does **not** open a browser on the machine that runs the server. The
-local form runs as a tiny HTTP server, and the human reaches it from any device
-that can connect to that interface.
-
-This is deliberately designed for a VPS or other headless host. You can run
-`navaja-mcp` on a server with no display and solve the captcha through an
-SSH tunnel. For example, if the form is served on `127.0.0.1:8765` on the
-remote host, forward it with:
-
-```bash
-ssh -L 8765:127.0.0.1:8765 <your-vps>
+```python
+iniciar_descargas(urls)
+# → { ok, batch_id, jobs, captcha_url, max_concurrentes }
 ```
 
-Then open `http://127.0.0.1:8765/<token>/` locally. This has been verified
-end to end: a real CENDOJ captcha was solved through an SSH tunnel and the
-server returned the PDF on the first attempt. Because the tunnel runs over
-port 22, already allowed by typical host firewalls, no `ufw` change was
-needed.
+Devuelve de inmediato. `jobs` trae un registro `{job_id, url, state}` por cada URL, en orden de envío. La URL del captcha está disponible **antes de cualquier espera**: una persona puede abrirla una vez y dejarla abierta mientras el lote se vacía.
 
-## Configuration
+### 2️⃣ Consultar
 
-Set these environment variables before starting the server:
+```python
+estado_descargas(batch_id)
+```
 
-| Variable | Default | Purpose |
+Sondea hasta que los trabajos lleguen a un estado terminal. Si omites `batch_id`, devuelve el lote más reciente. Un `batch_id` desconocido devuelve una lista `jobs` **vacía**, no un error.
+
+El resultado son **solo metadatos** —id de trabajo, URL, estado, intentos, ruta del PDF y código de error—, así que sondear un lote grande es barato.
+
+### 3️⃣ Recoger
+
+```python
+recoger_descarga(job_id)
+```
+
+La llamada **no es destructiva**: volver a llamarla con el mismo `job_id` devuelve la misma carga útil. Y esa carga tiene exactamente la misma forma que la de `ver_texto_completo`, así que el mismo código puede manejar ambos caminos.
+
+### Límites y validación
+
+Un lote admite **como máximo 100 URLs**, y todas se validan por adelantado. **Una llamada rechazada no encola nada.**
+
+| `error_code` | Motivo |
+| --- | --- |
+| `empty_urls` | Lista vacía |
+| `too_many_urls` | Más de 100 URLs |
+| `invalid_url` | Primera URL no interpretable, nombrada en `error` |
+
+El registro guarda los **10 lotes más recientes**; los lotes terminados más antiguos se podan automáticamente, y sus ids de trabajo pasan a leerse como `unknown_job`. **Un lote con trabajos en cola o en ejecución nunca se poda.**
+
+### Estados de los trabajos
+
+`queued` → `running` → `done` | `failed`
+
+> [!WARNING]
+> Un estado `done` significa que el ejecutor **retornó**, no que la descarga saliera bien. Un documento que falló al descargarse —por ejemplo, con una URL inválida— **también acaba en `done`**, con `ok: false` y un `error_code`. Solo una excepción inesperada que se escape del ejecutor produce `failed`.
+>
+> Quien llama debe inspeccionar `ok` y `error_code` de cada trabajo, y **no debe tratar `done` como éxito**.
+
+### Concurrencia
+
+El número de hilos sale de `NAVAJA_MAX_CONCURRENTES` y vale `1` por defecto.
+
+Ese valor por defecto es **una decisión de producto de este proyecto, no un límite publicado por el sitio**: el repositorio no contiene ninguna cuota numérica de CENDOJ, ni manejo de `Retry-After`, ni código de backoff. Como el captcha se queda pegado a la sesión, un desafío resuelto suele servir para todo el lote, así que un solo hilo es el valor conservador.
+
+---
+
+## 💾 Guardado de PDF
+
+Cuando la respuesta final es un PDF, navaja **guarda el fichero en disco además de devolver el texto extraído**. Vale tanto para `ver_texto_completo` como para `navaja-doc`; no hay que activarlo en cada llamada.
+
+El directorio de destino se resuelve en este orden:
+
+1. `NAVAJA_PDF_DIR`, si está definida.
+2. `$XDG_DATA_HOME/navaja/pdfs`, si `XDG_DATA_HOME` está definida.
+3. `~/.local/share/navaja/pdfs` en caso contrario.
+
+navaja crea el directorio cuando hace falta.
+
+El nombre del fichero se toma del parámetro `name=` que el servidor envía en la cabecera `Content-Type`, por ejemplo `name="STS_3679_2026.pdf"`. Ese valor se sanea hasta un nombre base seguro antes de llegar al sistema de ficheros. Si la cabecera no trae un nombre usable, o el nombre sería inseguro o demasiado largo, navaja recurre a un nombre determinista construido desde la URL del documento: `<referencia>_<optimize>.pdf`.
+
+El campo `pdf_save_reason` dice qué regla se aplicó (`server_sent_name`, `missing_name`, `unsafe_name`, `overlong_name`, `identical_bytes`, ...).
+
+Si la respuesta no es un PDF, no se escribe nada y `pdf_save_reason` vale `not_pdf`.
+
+> [!NOTE]
+> Un fallo de escritura (permisos, disco lleno, `NAVAJA_PDF_DIR` incorrecta) **nunca hace fracasar la descarga**: `ok` sigue siendo `True`, el texto completo se devuelve igual, y `pdf_save_error` explica qué pasó.
+
+El resultado de `ver_texto_completo` siempre incluye tres claves extra:
+
+| Clave | Contenido |
+| --- | --- |
+| `pdf_path` | Ruta del fichero guardado, o `None` |
+| `pdf_save_reason` | Por qué tiene ese nombre, o por qué no se escribió nada |
+| `pdf_save_error` | `None` si fue bien; si no, un mensaje legible |
+
+---
+
+## 🪄 Valores por defecto sin configurar nada
+
+Por defecto navaja intenta que el formulario del captcha sea alcanzable sin configuración manual.
+
+**Host** — `navaja-doc` y `navaja-mcp` detectan la interfaz en este orden:
+
+1. `NAVAJA_CAPTCHA_HOST`, si está definida.
+2. La dirección IPv4 de la interfaz `tailscale0`, si existe.
+3. `127.0.0.1`.
+
+**Token** — el token de la ruta del captcha es estable entre ejecuciones. Se lee de `NAVAJA_CAPTCHA_TOKEN` si está definida, y si no de `$XDG_STATE_HOME/navaja/captcha-token` (por defecto `~/.local/state/navaja/captcha-token`). Si no existe ninguno, se genera con `secrets.token_urlsafe(32)` y se persiste. El directorio de estado se crea con permisos `0700` y el fichero con `0600`; la escritura es atómica, así que dos ejecuciones simultáneas no pueden dejarlo a medias.
+
+El host elegido se anuncia por stderr junto con la URL del formulario, así que **nunca es una exposición silenciosa**.
+
+---
+
+## 💻 Funciona sin pantalla
+
+navaja **no abre ningún navegador** en la máquina que ejecuta el servidor. El formulario local es un servidor HTTP diminuto, y la persona llega a él desde cualquier dispositivo que pueda conectarse a esa interfaz.
+
+Está pensado a propósito para un VPS u otro equipo sin pantalla. Puedes ejecutar `navaja-mcp` en un servidor sin monitor y resolver el captcha por un túnel SSH. Si el formulario se sirve en `127.0.0.1:8765` en la máquina remota:
+
+```bash
+ssh -L 8765:127.0.0.1:8765 <tu-vps>
+```
+
+Luego abre `http://127.0.0.1:8765/<token>/` en local.
+
+> [!TIP]
+> Esto está verificado de punta a punta: se resolvió un captcha real de CENDOJ por un túnel SSH y el servidor devolvió el PDF al primer intento. Como el túnel va por el puerto 22, que los cortafuegos suelen permitir, no hizo falta tocar `ufw`.
+
+---
+
+## 🔧 Configuración
+
+| Variable | Por defecto | Para qué sirve |
 | --- | --- | --- |
-| `NAVAJA_CAPTCHA_HOST` | auto-detect | Interface the local form binds to. When unset, navaja picks the `tailscale0` IPv4 address, falling back to `127.0.0.1`. |
-| `NAVAJA_CAPTCHA_PORT` | `8765` | Port the local form listens on. |
-| `NAVAJA_CAPTCHA_TOKEN` | persisted | Stable URL-path token. When unset, navaja reads or creates `$XDG_STATE_HOME/navaja/captcha-token` (default `~/.local/state/navaja/captcha-token`). Must be at least 16 characters and only contain `A-Z`, `a-z`, `0-9`, `-`, `_`. |
-| `NAVAJA_MAX_CONCURRENTES` | `1` | Worker threads for the batch full-text queue. The default is a product decision of this project, not a site-published limit. |
-| `NAVAJA_PDF_DIR` | `~/.local/share/navaja/pdfs` | Directory where full-text PDFs are automatically saved. Falls back to `$XDG_DATA_HOME/navaja/pdfs` when `XDG_DATA_HOME` is set. |
+| `NAVAJA_CAPTCHA_HOST` | autodetección | Interfaz a la que se ata el formulario local. Sin definir, navaja toma la IPv4 de `tailscale0` y recurre a `127.0.0.1`. |
+| `NAVAJA_CAPTCHA_PORT` | `8765` | Puerto de escucha del formulario local. |
+| `NAVAJA_CAPTCHA_TOKEN` | persistido | Token estable de la ruta. Sin definir, navaja lee o crea `$XDG_STATE_HOME/navaja/captcha-token`. Mínimo 16 caracteres, solo `A-Z`, `a-z`, `0-9`, `-`, `_`. |
+| `NAVAJA_MAX_CONCURRENTES` | `1` | Hilos de trabajo de la cola de descargas. Decisión de producto de este proyecto, no un límite publicado por el sitio. |
+| `NAVAJA_PDF_DIR` | `~/.local/share/navaja/pdfs` | Directorio donde se guardan los PDFs. Recurre a `$XDG_DATA_HOME/navaja/pdfs` si `XDG_DATA_HOME` está definida. |
 
-If `NAVAJA_CAPTCHA_HOST` is `0.0.0.0`, `::`, or empty, the server refuses to
-start. Bind a specific interface.
+> [!CAUTION]
+> Si `NAVAJA_CAPTCHA_HOST` vale `0.0.0.0`, `::` o cadena vacía, **el servidor se niega a arrancar**. Ata una interfaz concreta.
 
-## MCP client registration
+---
 
-Add this `mcpServers` entry to your MCP client config (for example in Claude,
-Cursor, or any stdio MCP host):
+## 🔌 Registro en el cliente MCP
+
+Añade esta entrada `mcpServers` a la configuración de tu cliente MCP (Claude, Cursor, o cualquier host MCP por stdio):
 
 ```json
 {
@@ -354,87 +347,83 @@ Cursor, or any stdio MCP host):
       "command": "uv",
       "args": [
         "--directory",
-        "/home/ubuntu/projects/navaja",
+        "/ruta/a/tu/clon/navaja",
         "run",
         "navaja-mcp"
       ],
       "env": {
-        "NAVAJA_CAPTCHA_HOST": "<your-tailnet-ip>",
+        "NAVAJA_CAPTCHA_HOST": "<tu-ip-de-tailnet>",
         "NAVAJA_CAPTCHA_PORT": "8765",
-        "NAVAJA_CAPTCHA_TOKEN": "<your-stable-token-at-least-16-chars>"
+        "NAVAJA_CAPTCHA_TOKEN": "<tu-token-estable-de-16-caracteres-o-mas>"
       }
     }
   }
 }
 ```
 
-`NAVAJA_CAPTCHA_TOKEN` is optional, but a stable token is recommended when the
-server binds a non-loopback address. Replace `<your-tailnet-ip>` with your
-actual Tailscale IP, or use `127.0.0.1` when the MCP client and the browser run
-on the same machine.
+`NAVAJA_CAPTCHA_TOKEN` es opcional, pero se recomienda un token estable cuando el servidor se ata a una dirección que no es loopback. Sustituye `<tu-ip-de-tailnet>` por tu IP real de Tailscale, o usa `127.0.0.1` cuando el cliente MCP y el navegador corran en la misma máquina.
 
-## Standalone testing
+---
 
-Fetch a single document from the command line with the `navaja-doc` script:
+## 🧰 Uso suelto, sin MCP
+
+Descarga un único documento desde la línea de comandos con `navaja-doc`:
 
 ```bash
-navaja-doc "https://www.poderjudicial.es/search/AN/openDocument/<16-or-32-hex-hash>/<YYYYMMDD>"
+navaja-doc "https://www.poderjudicial.es/search/AN/openDocument/<hash-hex-de-16-o-32>/<AAAAMMDD>"
 ```
 
-If the default port is already held by a running `navaja-mcp` session,
-`navaja-doc` fails fast with an actionable message instead of making a
-CENDOJ round-trip first. Use `--port 0` to let the OS pick a free port; the
-actual form URL is announced on stderr.
+Si el puerto por defecto ya lo tiene una sesión de `navaja-mcp`, `navaja-doc` falla rápido con un mensaje accionable en vez de hacer primero un viaje a CENDOJ. Usa `--port 0` para que el sistema elija un puerto libre; la URL real del formulario se anuncia por stderr.
 
-When the response is a PDF, `navaja-doc` saves it automatically to the
-directory described in [PDF persistence](#pdf-persistence) above and reports
-the path in its stdout output.
-
-To get a real document URL right now, run:
+Para conseguir una URL de documento real ahora mismo:
 
 ```bash
 uv run python -c \
   "from navaja.cendoj import CendojClient; c=CendojClient(); print(c.search('clausulas abusivas').as_dict()['results'][0]['url_documento']); c.close()"
 ```
 
-Then paste that URL into `navaja-doc`.
+Luego pega esa URL en `navaja-doc`.
 
-## Security rules
+---
 
-The local captcha form is a small web surface. Treat it carefully:
+## 🔒 Reglas de seguridad
 
-1. **Never bind `0.0.0.0`**. The code rejects it. Bind only a specific
-   interface: `127.0.0.1`, a Tailscale IP, or another private address.
-2. **Keep the form on a private network** or reach it through an SSH tunnel.
-   Do not expose it to the public internet.
-3. **Tailscale users:** use `tailscale serve`, **never** `tailscale funnel`.
-   `funnel` publishes the service to the public internet; `serve` stays on your
-   tailnet.
+El formulario local del captcha es una pequeña superficie web. Trátala con cuidado.
 
-These rules exist because this project's own host was previously compromised
-through an exposed port. Binding narrowly is not a formality here.
+**1. Nunca ates `0.0.0.0`.** El código lo rechaza. Ata solo una interfaz concreta: `127.0.0.1`, una IP de Tailscale, u otra dirección privada.
 
-## Development
+**2. Mantén el formulario en una red privada** o llega a él por un túnel SSH. No lo expongas a internet.
+
+**3. Si usas Tailscale:** usa `tailscale serve`, **nunca** `tailscale funnel`. `funnel` publica el servicio en internet; `serve` se queda en tu tailnet.
+
+> [!CAUTION]
+> Estas reglas existen porque **el propio equipo de este proyecto fue comprometido** a través de un puerto expuesto. Atar de forma estrecha no es aquí una formalidad.
+
+---
+
+## 🧪 Desarrollo
 
 ```bash
 uv sync
-uv run pytest          # deterministic, runs against saved fixtures
-NAVAJA_LIVE=1 uv run pytest -m live   # opt-in: hits the real site
+uv run pytest                          # determinista, contra fixtures guardados
+NAVAJA_LIVE=1 uv run pytest -m live    # opcional: golpea el sitio real
 ```
 
-Current suite: `338 passed, 1 skipped`.
+**Suite actual: `343 passed, 2 skipped`.**
 
-Tests never touch the live site unless `NAVAJA_LIVE=1` is set.
+Los tests **nunca** tocan el sitio real salvo que definas `NAVAJA_LIVE=1`.
 
-## Verified
+---
 
-The live CENDOJ captcha round-trip has been verified end to end:
+## ✅ Verificado
+
+El viaje completo con captcha real de CENDOJ está verificado de punta a punta:
 
 ```bash
 uv run navaja-doc "https://www.poderjudicial.es/search/AN/openDocument/3fb62a5395c8aaa1a0a8778d75e36f0d/20260917"
 ```
 
-Output:
+Salida:
 
 ```
 Fetching full text for https://www.poderjudicial.es/search/AN/openDocument/3fb62a5395c8aaa1a0a8778d75e36f0d/20260917
@@ -449,22 +438,12 @@ Nº de Recurso: 288/2022 Nº de Resolución: 1413/2026 Procedimiento: Recurso de
 Ponente: PEDRO JOSE VELA TORRES Tipo de Resolución: Sentencia
 ```
 
-What this proves:
+Qué demuestra esto:
 
-- A correct human answer to the site's `stickyImg` captcha returns the real
-  PDF. The full round-trip works.
-- It succeeded on the first attempt, using only the existing captcha POST
-  body. No extra cookies, Referer header, or retry dance were needed.
-- The local-form-plus-SSH-tunnel flow works on a headless VPS. The tunnel
-  runs over port 22, already allowed on `tailscale0`, so the host firewall
-  (`ufw`) did not need to be changed.
-- `pypdf` extracts clean text from the returned PDF.
-- The PDF metadata is richer than the search-result parser currently
-  produces. The document carries `Órgano`, `Sede`, `Sección`, `Fecha`,
-  `Nº de Recurso`, `Nº de Resolución`, `Procedimiento`, `Ponente`,
-  `Tipo de Resolución` and `Id Cendoj`. Notably, it includes
-  `Sede: Madrid`, which the current search parser leaves empty for
-  Tribunal Supremo rulings.
+- Una respuesta humana correcta al captcha `stickyImg` del sitio **devuelve el PDF real**. El circuito completo funciona.
+- Funcionó **al primer intento**, usando solo el cuerpo POST del captcha que ya existía. No hicieron falta cookies extra, cabecera `Referer` ni baile de reintentos.
+- El flujo de formulario local + túnel SSH **funciona en un VPS sin pantalla**.
+- `pypdf` extrae texto limpio del PDF devuelto.
+- Los metadatos del PDF son **más ricos** que los que produce ahora el parser de resultados de búsqueda. El documento lleva `Órgano`, `Sede`, `Sección`, `Fecha`, `Nº de Recurso`, `Nº de Resolución`, `Procedimiento`, `Ponente`, `Tipo de Resolución` e `Id Cendoj`. En particular incluye `Sede: Madrid`, que el parser de búsqueda deja vacío para las resoluciones del Tribunal Supremo.
 
-This verification was performed with `navaja-doc` directly, not through an
-MCP client.
+Esta verificación se hizo con `navaja-doc` directamente, no a través de un cliente MCP.
