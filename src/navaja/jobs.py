@@ -24,6 +24,7 @@ Public API:
 
 from __future__ import annotations
 
+import queue
 import threading
 import uuid
 from collections.abc import Callable
@@ -31,6 +32,11 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from queue import Queue
 from typing import Any
+
+
+# Number of batches retained in memory.  Older batches are pruned oldest-first,
+# but only when every job in the batch has reached a terminal state.
+_MAX_BATCHES_RETENIDOS = 10
 
 
 class JobState(StrEnum):
@@ -48,6 +54,7 @@ class Job:
 
     job_id: str
     url: str
+    batch_id: str
     state: JobState = JobState.QUEUED
     payload: dict[str, Any] | None = None
     error: str | None = None
@@ -109,6 +116,9 @@ class JobQueue:
         self._max_concurrentes = max_concurrentes
         self._jobs: list[Job] = []
         self._jobs_by_id: dict[str, Job] = {}
+        self._batches: dict[str, list[Job]] = {}
+        self._batch_order: list[str] = []
+        self._last_batch_id: str | None = None
         self._work: Queue[str | None] = Queue()
         self._lock = threading.Lock()
         self._workers: list[threading.Thread] = []
@@ -175,8 +185,8 @@ class JobQueue:
                 return
 
             try:
-                job_id = self._work.get(timeout=0.1)
-            except Exception:
+                job_id = self._work.get()
+            except queue.Empty:
                 continue
 
             if job_id is None:
@@ -187,7 +197,7 @@ class JobQueue:
                 while True:
                     try:
                         extra = self._work.get_nowait()
-                    except Exception:
+                    except queue.Empty:
                         break
                     if extra is None:
                         self._work.task_done()
@@ -197,28 +207,89 @@ class JobQueue:
 
             self._run_job(job_id)
 
-    def submit(self, url: str) -> str:
-        """Enqueue one job and return a unique, stable job id."""
+    def _prune_batches(self) -> None:
+        """Drop oldest finished batches while we exceed the retention limit.
+
+        A batch with any queued or running job is never pruned, and pruning
+        stops at the oldest busy batch so younger batches are retained while
+        an older one is still active.
+        """
+        while len(self._batch_order) > _MAX_BATCHES_RETENIDOS:
+            candidate_id = self._batch_order[0]
+            batch = self._batches.get(candidate_id, [])
+            if any(job.state in (JobState.QUEUED, JobState.RUNNING) for job in batch):
+                # Oldest batch is still active; do not prune it or anything
+                # younger while it is alive.
+                break
+            self._batch_order.pop(0)
+            pruned = self._batches.pop(candidate_id, [])
+            for job in pruned:
+                self._jobs_by_id.pop(job.job_id, None)
+                try:
+                    self._jobs.remove(job)
+                except ValueError:
+                    pass
+
+    def _submit_batch(self, urls: list[str]) -> dict[str, Any]:
+        """Create one batch for ``urls`` and enqueue its jobs.
+
+        Returns:
+            A dict ``{"batch_id": str, "job_ids": list[str]}``.
+        """
         self._ensure_workers()
-        job_id = uuid.uuid4().hex
-        job = Job(job_id=job_id, url=url)
+        batch_id = uuid.uuid4().hex
+        jobs: list[Job] = []
         with self._lock:
-            self._jobs.append(job)
-            self._jobs_by_id[job_id] = job
-        self._work.put(job_id)
-        return job_id
+            for url in urls:
+                job_id = uuid.uuid4().hex
+                job = Job(job_id=job_id, url=url, batch_id=batch_id)
+                self._jobs.append(job)
+                self._jobs_by_id[job_id] = job
+                jobs.append(job)
+            self._batches[batch_id] = jobs
+            self._batch_order.append(batch_id)
+            self._last_batch_id = batch_id
+            self._prune_batches()
+        for job in jobs:
+            self._work.put(job.job_id)
+        return {"batch_id": batch_id, "job_ids": [job.job_id for job in jobs]}
 
-    def submit_many(self, urls: list[str]) -> list[str]:
-        """Enqueue many jobs preserving order and return their ids."""
-        return [self.submit(url) for url in urls]
+    def submit(self, url: str) -> str:
+        """Enqueue one job and return a unique, stable job id.
 
-    def estado(self) -> list[dict[str, Any]]:
-        """Return metadata for every job in submission order.
+        The job is placed in its own single-job batch so ``submit`` remains
+        compatible with callers that do not need batch scoping.
+        """
+        return self._submit_batch([url])["job_ids"][0]
 
-        The result never contains the payload text; it only exposes the small
-        set of fields callers poll cheaply for a batch.
+    def submit_many(self, urls: list[str]) -> dict[str, Any]:
+        """Enqueue many jobs preserving order and return their batch identity.
+
+        Returns:
+            A dict with ``batch_id`` (the id shared by every job in this
+            submission) and ``job_ids`` (the per-URL identifiers in submission
+            order).
+        """
+        return self._submit_batch(urls)
+
+    def estado(self, batch_id: str | None = None) -> list[dict[str, Any]]:
+        """Return metadata for jobs in a single batch.
+
+        Args:
+            batch_id: id of the batch to inspect.  When ``None`` the most
+                recently submitted batch is returned.
+
+        Returns:
+            Metadata records in submission order for the selected batch.
+            An unknown ``batch_id`` returns an empty list rather than raising.
+            The result never contains the payload text; it only exposes the
+            small set of fields callers poll cheaply for a batch.
         """
         with self._lock:
+            if batch_id is None:
+                batch_id = self._last_batch_id
+            if batch_id is None or batch_id not in self._batches:
+                return []
             return [
                 {
                     "job_id": job.job_id,
@@ -228,7 +299,7 @@ class JobQueue:
                     "pdf_path": (job.payload or {}).get("pdf_path"),
                     "error_code": (job.payload or {}).get("error_code"),
                 }
-                for job in self._jobs
+                for job in self._batches[batch_id]
             ]
 
     def recoger(self, job_id: str) -> dict[str, Any]:
@@ -236,7 +307,8 @@ class JobQueue:
 
         * If the job is queued or running, returns :func:`PENDING` without
           blocking.
-        * If the id is unknown, returns :func:`UNKNOWN_JOB`.
+        * If the id is unknown (including pruned batches), returns
+          :func:`UNKNOWN_JOB`.
         * If the runner raised, returns a failure payload with
           ``error_code == "runner_failure"``.
         """

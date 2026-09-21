@@ -115,8 +115,11 @@ def test_submit_returns_unique_stable_id(queue: JobQueue) -> None:
     assert id1 != id3
 
 
-def test_submit_many_returns_unique_ids(queue: JobQueue) -> None:
-    ids = queue.submit_many(["u1", "u2", "u3"])
+def test_submit_many_returns_batch_id_and_unique_job_ids(queue: JobQueue) -> None:
+    result = queue.submit_many(["u1", "u2", "u3"])
+    assert set(result.keys()) == {"batch_id", "job_ids"}
+    assert isinstance(result["batch_id"], str)
+    ids = result["job_ids"]
     assert len(ids) == 3
     assert job_ids_are_unique(ids)
 
@@ -148,8 +151,7 @@ def test_concurrency_bound_is_real() -> None:
     runner, resume, _ = make_runner()
     q = JobQueue(runner=runner, max_concurrentes=1)
     try:
-        q.submit("a")
-        q.submit("b")
+        q.submit_many(["a", "b"])
         # Wait until the first job is inside the runner.
         assert q._jobs  # sanity: jobs exist
         q._jobs[0].running.wait(timeout=5)
@@ -193,8 +195,7 @@ def test_estado_leaks_no_payload_text(queue: JobQueue) -> None:
 
     q = JobQueue(runner=runner, max_concurrentes=1)
     try:
-        q.submit("first")
-        q.submit("finish")
+        q.submit_many(["first", "finish"])
         done.wait(timeout=5)
         q.stop()
         for entry in q.estado():
@@ -387,8 +388,8 @@ def test_stop_drains_jobs_still_queued() -> None:
     runner, resume, _ = make_runner()
     q = JobQueue(runner=runner, max_concurrentes=1)
     try:
-        first_id = q.submit("a")
-        second_id = q.submit("b")
+        result = q.submit_many(["a", "b"])
+        first_id, second_id = result["job_ids"]
         q._jobs[0].running.wait(timeout=5)
 
         q.stop()
@@ -455,7 +456,7 @@ def test_state_reads_are_safe_while_workers_change_state() -> None:
     errors: list[BaseException] = []
 
     try:
-        job_ids = q.submit_many(urls)
+        job_ids = q.submit_many(urls)["job_ids"]
 
         def reader() -> None:
             try:
@@ -516,5 +517,172 @@ def test_job_id_not_derived_from_url() -> None:
         assert job_id != "http://example.com"
         # URL should not be a substring of the id.
         assert "example.com" not in job_id
+    finally:
+        q.stop()
+
+
+# --- batch identity and pruning tests ----------------------------------------
+
+
+def test_submit_creates_single_job_batch() -> None:
+    q = JobQueue(runner=lambda url: {"ok": True})
+    try:
+        job_id = q.submit("x")
+        state = q.estado()
+        assert len(state) == 1
+        assert state[0]["job_id"] == job_id
+        assert q._jobs[0].batch_id is not None
+    finally:
+        q.stop()
+
+
+def test_estado_defaults_to_newest_batch() -> None:
+    runner, resume, _ = make_runner()
+    q = JobQueue(runner=runner, max_concurrentes=1)
+    try:
+        first = q.submit_many(["a"])
+        second = q.submit_many(["b"])
+        assert q.estado() == q.estado(second["batch_id"])
+        assert q.estado() != q.estado(first["batch_id"])
+        resume()
+        q.stop()
+    finally:
+        q.stop()
+
+
+def test_estado_explicit_batch_id_filters() -> None:
+    runner, resume, _ = make_runner()
+    q = JobQueue(runner=runner, max_concurrentes=1)
+    try:
+        alpha = q.submit_many(["a", "b"])
+        beta = q.submit_many(["c"])
+        assert len(q.estado(alpha["batch_id"])) == 2
+        assert [j["url"] for j in q.estado(alpha["batch_id"])] == ["a", "b"]
+        assert len(q.estado(beta["batch_id"])) == 1
+        assert q.estado(beta["batch_id"])[0]["url"] == "c"
+        resume()
+        q.stop()
+    finally:
+        q.stop()
+
+
+def test_estado_unknown_batch_id_returns_empty() -> None:
+    q = JobQueue(runner=lambda url: {"ok": True})
+    try:
+        q.submit_many(["a"])
+        assert q.estado("no-such-batch") == []
+    finally:
+        q.stop()
+
+
+def test_pruning_retains_only_max_batches() -> None:
+    q = JobQueue(runner=lambda url: {"ok": True})
+    try:
+        submissions = [q.submit_many([f"url-{i}"]) for i in range(12)]
+        # Wait for all jobs to finish so pruning can run.
+        for job in q._jobs:
+            job.finished.wait(timeout=5)
+        # Force a re-prune after jobs are terminal (pruning already ran on
+        # submission, but job state transitions happen outside the submit lock).
+        # estado() does not mutate state, so we trigger another submission to
+        # invoke pruning again now that jobs are done.
+        trigger = q.submit_many(["trigger"])
+        # 13 batches with a limit of 10 means the 3 oldest are pruned.
+        for sub in submissions[:3]:
+            assert q.estado(sub["batch_id"]) == []
+        # The 9 submissions indices 3-11 plus the trigger batch are retained.
+        for sub in submissions[3:]:
+            assert len(q.estado(sub["batch_id"])) == 1
+        assert len(q.estado(trigger["batch_id"])) == 1
+        assert len(q.estado()) == 1
+    finally:
+        q.stop()
+
+
+def test_busy_batch_is_never_pruned() -> None:
+    # Only the "busy" url blocks: a runner that gates every job would make the
+    # ten terminal batches below wait for the gate timeout, one after another.
+    gate = threading.Event()
+
+    def runner(url: str) -> dict:
+        if url == "busy":
+            gate.wait(timeout=5)
+        return {"url": url, "payload": f"ok {url}"}
+
+    def resume() -> None:
+        gate.set()
+
+    q = JobQueue(runner=runner, max_concurrentes=1)
+    try:
+        # Create 10 quick terminal batches so the retention limit is full.
+        terminal = [q.submit_many([f"url-{i}"]) for i in range(10)]
+        for job in q._jobs:
+            job.finished.wait(timeout=5)
+
+        # Now submit an 11th batch whose job blocks in the runner.
+        busy = q.submit_many(["busy"])
+        q._jobs[-1].running.wait(timeout=5)
+
+        # Submit a 12th batch; pruning must not drop the busy 11th batch.
+        extra = q.submit_many(["extra"])
+        assert len(q.estado(busy["batch_id"])) == 1
+        assert q.estado(busy["batch_id"])[0]["url"] == "busy"
+
+        # Release the runner so the suite can shut down cleanly.
+        resume()
+        for job in q._jobs:
+            job.finished.wait(timeout=5)
+
+        # The oldest terminal batch got pruned to make room.
+        assert q.estado(terminal[0]["batch_id"]) == []
+        # The busy batch and everything younger remains.
+        assert len(q.estado(busy["batch_id"])) == 1
+        assert len(q.estado(extra["batch_id"])) == 1
+    finally:
+        q.stop()
+
+
+def test_recoger_on_pruned_job_returns_unknown_job() -> None:
+    q = JobQueue(runner=lambda url: {"ok": True})
+    try:
+        submissions = [q.submit_many([f"url-{i}"]) for i in range(12)]
+        for job in q._jobs:
+            job.finished.wait(timeout=5)
+        q.submit_many(["trigger"])
+        pruned_id = submissions[0]["job_ids"][0]
+        assert q.recoger(pruned_id) == UNKNOWN_JOB(pruned_id)
+    finally:
+        q.stop()
+
+
+def test_recoger_is_idempotent() -> None:
+    q = JobQueue(runner=lambda url: {"ok": True, "text": "hello"})
+    try:
+        job_id = q.submit("x")
+        q._jobs[0].finished.wait(timeout=5)
+        first = q.recoger(job_id)
+        second = q.recoger(job_id)
+        assert first == second == {"ok": True, "text": "hello"}
+    finally:
+        q.stop()
+
+
+def test_stop_does_not_hang_with_blocking_get() -> None:
+    """Regression: replacing the 0.1 s poll with a blocking get must not hang
+    stop() when the queue is empty or when jobs are still draining."""
+    runner, resume, _ = make_runner()
+    q = JobQueue(runner=runner, max_concurrentes=2)
+    try:
+        q.submit_many(["a", "b", "c"])
+        # Let some jobs start, then stop while work remains.
+        q._jobs[0].running.wait(timeout=5)
+        q.stop()
+        # stop() must return promptly and the queued/running jobs must drain.
+        resume()
+        for job in q._jobs:
+            job.finished.wait(timeout=5)
+        for job_id in [j.job_id for j in q._jobs]:
+            payload = q.recoger(job_id)
+            assert payload.get("url") is not None
     finally:
         q.stop()
