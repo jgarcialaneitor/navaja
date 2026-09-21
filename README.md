@@ -173,8 +173,26 @@ are refused), and the token is required on every path. A wrong token returns
 a 404 in both the form and idle states.
 
 The `estado_servidor` tool reports whether the listener is bound
-(`captcha_listening`) and a masked form URL (`captcha_url_masked`). It
-deliberately never returns the token.
+(`captcha_listening`) and the real, usable captcha form URL as
+`captcha_url`. The URL is part of the API surface on purpose: a caller can
+obtain it from `estado_servidor` before running any blocking fetch, hand it
+to the human, and the human opens it once and leaves it open. While no
+challenge is pending the idle page refreshes itself every 5 seconds and
+turns into the captcha form automatically when a challenge arrives. The token
+in the URL gates access to the HTTP form rather than being hidden from the
+caller; anyone with local access can already read it from the persisted token
+file.
+
+`ver_texto_completo` returns structured failures with an `error_code`:
+`captcha_timeout` when the human does not answer in time, `captcha_busy`
+when a challenge is already pending on the listener, `captcha_rejected` when
+the site refuses the answer, `full_text_error` for other fetch failures, and
+`invalid_url` when the URL cannot be parsed. Both `captcha_timeout` and
+`captcha_busy` include `captcha_url` in the payload so the caller can open
+the form without reading stderr. The default `espera_segundos` is `120`,
+deliberately well below this deployment's MCP client request timeout (`330`
+seconds in the default Pi configuration), so the server has time to return a
+structured error before the client kills the call.
 
 There is **no automatic captcha solver** in navaja. The captcha image is never
 sent to a vision model, an OCR service, or any third party. A human reads the
