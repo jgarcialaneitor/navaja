@@ -212,15 +212,29 @@ this means roughly **one solve per research session**, not one per resolution.
 For more than one document, use the three-step batch flow instead of many
 blocking calls:
 
-1. `iniciar_descargas(urls)` returns immediately with a `captcha_url` and a
-   job id for every URL. The captcha form URL is available before any wait;
-   a human can open it once and leave it open while the batch drains.
-2. Poll `estado_descargas()` until the jobs reach a terminal state. The
-   result is metadata only — job id, URL, state, attempts, pdf path and
-   error code — so polling a large batch is cheap.
-3. Call `recoger_descarga(job_id)` for each finished job. The payload has
-   exactly the same shape as `ver_texto_completo`, so both paths can be
-   handled by the same code.
+1. `iniciar_descargas(urls)` returns immediately with `ok`, `batch_id`,
+   `jobs`, `captcha_url` and `max_concurrentes`. `jobs` contains a
+   `{job_id, url, state}` record for every URL in submission order. The
+   captcha form URL is available before any wait; a human can open it once
+   and leave it open while the batch drains.
+2. Poll `estado_descargas(batch_id)` until the jobs reach a terminal state.
+   Omitting `batch_id` returns the most recent batch. An unknown
+   `batch_id` returns an empty `jobs` list rather than an error. The result
+   is metadata only — job id, URL, state, attempts, pdf path and error code
+   — so polling a large batch is cheap.
+3. Call `recoger_descarga(job_id)` for each finished job. The call is
+   non-destructive: calling it again with the same `job_id` returns the same
+   payload. The payload has exactly the same shape as `ver_texto_completo`,
+   so both paths can be handled by the same code.
+
+**Limits:** a batch may contain at most 100 URLs, and every URL is validated
+up front. A rejected call enqueues nothing. Rejection reasons are:
+`error_code="empty_urls"` for an empty list, `error_code="too_many_urls"`
+for more than 100 URLs, and `error_code="invalid_url"` for the first
+unparseable URL, with the offending URL named in `error`. The registry
+retains the 10 most recent batches; older finished batches are pruned
+automatically, and their job ids then read as `unknown_job`. A batch with
+queued or running jobs is never pruned.
 
 **Job states:** `queued`, `running`, `done` or `failed`. A state of `done`
 means the runner *returned*, not that the fetch succeeded. A document that
@@ -408,7 +422,7 @@ uv run pytest          # deterministic, runs against saved fixtures
 NAVAJA_LIVE=1 uv run pytest -m live   # opt-in: hits the real site
 ```
 
-Current suite: `324 passed, 1 skipped`.
+Current suite: `338 passed, 1 skipped`.
 
 Tests never touch the live site unless `NAVAJA_LIVE=1` is set.
 
