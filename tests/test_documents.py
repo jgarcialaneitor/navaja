@@ -6,6 +6,7 @@ never hit the live site and never block for a human.
 
 from __future__ import annotations
 
+import os
 from urllib.parse import parse_qs, urlparse
 
 import httpx
@@ -16,7 +17,10 @@ from navaja.cendoj import BASE_URL, CendojClient, INDEX_URL
 from navaja.documents import (
     DocumentRef,
     FullTextResult,
+    PdfSaveResult,
     parse_document_url,
+    resolve_pdf_destination,
+    save_pdf,
 )
 
 REFERENCE = "aabbccddeeff00112233445566778899"
@@ -265,3 +269,263 @@ def test_fetch_rejects_non_cendoj_url():
     with CendojClient() as client:
         with pytest.raises(ValueError):
             client.fetch_full_text("https://example.com/document")
+
+
+def _make_document_ref(
+    reference: str = REFERENCE,
+    optimize: str = OPTIMIZE,
+) -> DocumentRef:
+    return DocumentRef(
+        reference=reference,
+        optimize=optimize,
+        access_to_pdf_url="",
+    )
+
+
+# --- PDF destination resolver ---
+
+
+def test_resolve_pdf_destination_prefers_env_var(monkeypatch, tmp_path):
+    target = tmp_path / "from_env"
+    monkeypatch.setenv("NAVAJA_PDF_DIR", str(target))
+    path, reason = resolve_pdf_destination()
+    assert path == target
+    assert reason == "NAVAJA_PDF_DIR"
+
+
+def test_resolve_pdf_destination_uses_xdg_data_home(monkeypatch, tmp_path):
+    monkeypatch.delenv("NAVAJA_PDF_DIR", raising=False)
+    xdg = tmp_path / "xdg"
+    monkeypatch.setenv("XDG_DATA_HOME", str(xdg))
+    path, reason = resolve_pdf_destination()
+    assert path == xdg / "navaja" / "pdfs"
+    assert reason == "XDG_DATA_HOME"
+
+
+def test_resolve_pdf_destination_uses_local_share_default(monkeypatch, tmp_path):
+    monkeypatch.delenv("NAVAJA_PDF_DIR", raising=False)
+    monkeypatch.delenv("XDG_DATA_HOME", raising=False)
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    path, reason = resolve_pdf_destination()
+    assert path == home / ".local" / "share" / "navaja" / "pdfs"
+    assert reason == "XDG default"
+
+
+# --- PDF writer ---
+
+
+def test_save_pdf_creates_destination_directory(tmp_path):
+    ref = _make_document_ref()
+    dest = tmp_path / "new" / "pdfs"
+    result = save_pdf(
+        PDF_BYTES,
+        'application/pdf; name="SAP_ML_110_2026.pdf"',
+        ref,
+        dest,
+    )
+    assert result.ok is True
+    assert result.path == dest / "SAP_ML_110_2026.pdf"
+    assert result.path.exists()
+    assert result.path.read_bytes() == PDF_BYTES
+
+
+def test_save_pdf_uses_server_sent_name(tmp_path):
+    ref = _make_document_ref()
+    result = save_pdf(
+        PDF_BYTES,
+        'application/pdf; name="SAP_ML_110_2026.pdf"',
+        ref,
+        tmp_path,
+    )
+    assert result.ok is True
+    assert isinstance(result, PdfSaveResult)
+    assert result.path == tmp_path / "SAP_ML_110_2026.pdf"
+    assert result.reason == "server_sent_name"
+    assert result.path.read_bytes() == PDF_BYTES
+
+
+@pytest.mark.parametrize(
+    "content_type",
+    [
+        'application/pdf; name="../../evil.pdf"',
+        'application/pdf; name="/etc/passwd.pdf"',
+        'application/pdf; name="~/.bashrc.pdf"',
+        'application/pdf; name="..\\evil.pdf"',
+        'application/pdf; name="folder/evil.pdf"',
+        'application/pdf; name=".."',
+        'application/pdf; name=""',
+    ],
+)
+def test_save_pdf_rejects_unsafe_name(content_type, tmp_path):
+    ref = _make_document_ref()
+    result = save_pdf(PDF_BYTES, content_type, ref, tmp_path)
+    assert result.ok is True
+    assert result.path == tmp_path / f"{REFERENCE}_{OPTIMIZE}.pdf"
+    # Nothing escaped the destination directory.
+    assert all(p.parent == tmp_path for p in tmp_path.iterdir())
+
+
+def test_save_pdf_rejects_absolute_path(tmp_path):
+    ref = _make_document_ref()
+    absolute = tmp_path / "outside.pdf"
+    result = save_pdf(
+        PDF_BYTES,
+        f'application/pdf; name="{absolute}"',
+        ref,
+        tmp_path,
+    )
+    assert result.ok is True
+    assert result.path == tmp_path / f"{REFERENCE}_{OPTIMIZE}.pdf"
+    assert result.reason == "unsafe_name"
+
+
+def test_save_pdf_fallback_when_header_missing(tmp_path):
+    ref = _make_document_ref()
+    result = save_pdf(PDF_BYTES, None, ref, tmp_path)
+    assert result.ok is True
+    assert result.path == tmp_path / f"{REFERENCE}_{OPTIMIZE}.pdf"
+    assert result.reason == "missing_name"
+
+
+def test_save_pdf_fallback_when_no_name_parameter(tmp_path):
+    ref = _make_document_ref()
+    result = save_pdf(PDF_BYTES, "application/pdf", ref, tmp_path)
+    assert result.ok is True
+    assert result.path == tmp_path / f"{REFERENCE}_{OPTIMIZE}.pdf"
+    assert result.reason == "missing_name"
+
+
+def test_save_pdf_appends_pdf_extension(tmp_path):
+    ref = _make_document_ref()
+    result = save_pdf(
+        PDF_BYTES,
+        'application/pdf; name="SAP_ML_110_2026"',
+        ref,
+        tmp_path,
+    )
+    assert result.ok is True
+    assert result.path == tmp_path / "SAP_ML_110_2026.pdf"
+
+
+def test_save_pdf_collision_identical_bytes(tmp_path):
+    ref = _make_document_ref()
+    content_type = 'application/pdf; name="SAP_ML_110_2026.pdf"'
+    first = save_pdf(PDF_BYTES, content_type, ref, tmp_path)
+    second = save_pdf(PDF_BYTES, content_type, ref, tmp_path)
+    assert first.path == second.path
+    assert second.reason == "identical_bytes"
+    assert len(list(tmp_path.iterdir())) == 1
+
+
+def test_save_pdf_collision_different_bytes(tmp_path):
+    ref = _make_document_ref()
+    content_type = 'application/pdf; name="SAP_ML_110_2026.pdf"'
+    other_bytes = b"%PDF-1.4 different content"
+    first = save_pdf(PDF_BYTES, content_type, ref, tmp_path)
+    second = save_pdf(other_bytes, content_type, ref, tmp_path)
+    assert first.path != second.path
+    assert first.path.name == "SAP_ML_110_2026.pdf"
+    assert second.path.name == "SAP_ML_110_2026_1.pdf"
+    assert second.path.read_bytes() == other_bytes
+
+
+def test_save_pdf_surfaces_mkdir_failure(monkeypatch, tmp_path):
+    def _raise_permission_error(*args, **kwargs):
+        raise PermissionError(13, "Permission denied")
+
+    monkeypatch.setattr("pathlib.Path.mkdir", _raise_permission_error)
+    ref = _make_document_ref()
+    result = save_pdf(PDF_BYTES, "application/pdf", ref, tmp_path)
+    assert result.ok is False
+    assert result.path is None
+    assert result.reason == "mkdir_failed"
+    assert "Permission denied" in result.error
+
+
+def test_save_pdf_surfaces_write_failure(monkeypatch, tmp_path):
+    def _raise_io_error(self, data):
+        raise OSError(28, "No space left on device")
+
+    monkeypatch.setattr("pathlib.Path.write_bytes", _raise_io_error)
+    ref = _make_document_ref()
+    result = save_pdf(PDF_BYTES, "application/pdf", ref, tmp_path)
+    assert result.ok is False
+    assert result.path is None
+    assert result.reason == "write_failed"
+    assert "No space left on device" in result.error
+
+
+def test_save_pdf_skips_non_pdf_content_type(tmp_path):
+    ref = _make_document_ref()
+    result = save_pdf(HTML_DOC, "text/html", ref, tmp_path)
+    assert result.ok is False
+    assert result.path is None
+    assert result.reason == "not_pdf"
+    assert len(list(tmp_path.iterdir())) == 0
+
+
+def test_save_pdf_surfaces_name_too_long(tmp_path):
+    name_len = 300
+    try:
+        max_name = os.pathconf(tmp_path, "PC_NAME_MAX")
+    except (ValueError, OSError):
+        max_name = 255
+    if max_name >= name_len:
+        pytest.skip("filesystem supports names of this length")
+
+    long_name = "a" * name_len
+    ref = _make_document_ref()
+    result = save_pdf(
+        PDF_BYTES,
+        f'application/pdf; name="{long_name}"',
+        ref,
+        tmp_path,
+    )
+    assert isinstance(result, PdfSaveResult)
+    assert result.ok is True
+    assert result.path == tmp_path / f"{REFERENCE}_{OPTIMIZE}.pdf"
+    assert result.reason == "overlong_name"
+    assert result.path.exists()
+    assert result.path.read_bytes() == PDF_BYTES
+
+
+def test_save_pdf_surfaces_directory_collision(tmp_path):
+    ref = _make_document_ref()
+    filename = "SAP_ML_110_2026.pdf"
+    (tmp_path / filename).mkdir()
+    result = save_pdf(
+        PDF_BYTES,
+        f'application/pdf; name="{filename}"',
+        ref,
+        tmp_path,
+    )
+    assert result.ok is False
+    assert result.reason == "directory_collision"
+    assert result.path is None
+    assert result.error is not None
+
+
+def test_save_pdf_surfaces_unreadable_collision(tmp_path):
+    if os.geteuid() == 0:
+        pytest.skip("root bypasses file permissions")
+
+    ref = _make_document_ref()
+    filename = "existing.pdf"
+    target = tmp_path / filename
+    target.write_bytes(b"locked content")
+    target.chmod(0o000)
+    try:
+        result = save_pdf(
+            PDF_BYTES,
+            f'application/pdf; name="{filename}"',
+            ref,
+            tmp_path,
+        )
+    finally:
+        target.chmod(0o644)
+    assert result.ok is False
+    assert result.reason == "write_failed"
+    assert result.path is None
+    assert result.error is not None

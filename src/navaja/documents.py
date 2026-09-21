@@ -7,9 +7,13 @@ This module deliberately does NOT implement any automatic captcha solver.
 
 from __future__ import annotations
 
+import errno
 import io
+import os
 import re
 from dataclasses import dataclass
+from email.message import Message
+from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlencode, urlparse
 
@@ -156,4 +160,266 @@ def _captcha_post_data(ref: DocumentRef, answer: str) -> dict[str, str]:
         "databasematch": "AN",
         "captcha": answer,
     }
+
+
+def resolve_pdf_destination() -> tuple[Path, str]:
+    """Resolve the directory where downloaded PDFs should be persisted.
+
+    Resolution order:
+
+    1. ``NAVAJA_PDF_DIR`` environment variable, if set.
+    2. ``$XDG_DATA_HOME/navaja/pdfs`` when ``XDG_DATA_HOME`` is set,
+       otherwise ``~/.local/share/navaja/pdfs``.
+
+    Returns:
+        A ``(path, reason)`` tuple. ``reason`` names the source of the
+        decision.
+    """
+    env_dir = os.environ.get("NAVAJA_PDF_DIR")
+    if env_dir:
+        return Path(env_dir), "NAVAJA_PDF_DIR"
+
+    data_home = os.environ.get("XDG_DATA_HOME")
+    if data_home:
+        return Path(data_home) / "navaja" / "pdfs", "XDG_DATA_HOME"
+
+    return Path.home() / ".local" / "share" / "navaja" / "pdfs", "XDG default"
+
+
+def _parse_content_type_name(content_type: str | None) -> str | None:
+    """Extract the ``name=`` parameter from a Content-Type header value."""
+    if not content_type:
+        return None
+    msg = Message()
+    msg["Content-Type"] = content_type
+    value = msg.get_param("name")
+    if isinstance(value, tuple):
+        # RFC 2231 / RFC 5987 encoded parameter: (charset, language, value)
+        _, _, raw = value
+        return raw
+    return value
+
+
+def _sanitize_filename(name: str) -> str | None:
+    """Return a safe basename from the server-sent ``name=`` value.
+
+    Rejects NUL bytes, absolute paths, path separators, parent-directory
+    references, leading tildes, and empty results.
+    """
+    if not name or "\x00" in name:
+        return None
+    if os.path.isabs(name):
+        return None
+    if "/" in name or "\\" in name or ".." in name:
+        return None
+    base = os.path.basename(name).strip()
+    if not base or base in {".", ".."}:
+        return None
+    if base.startswith("~"):
+        return None
+    return base
+
+
+def _ensure_pdf_extension(name: str) -> str:
+    """Return ``name`` with a ``.pdf`` suffix, adding it if necessary."""
+    if name.lower().endswith(".pdf"):
+        return name
+    return f"{name}.pdf"
+
+
+def _fallback_filename(ref: DocumentRef) -> str:
+    """Deterministic filename built from ``ref`` fields."""
+    return f"{ref.reference}_{ref.optimize}.pdf"
+
+
+def _filename_from_content_type(
+    content_type: str | None,
+    ref: DocumentRef,
+    name_max: int,
+) -> tuple[str, str]:
+    """Choose a safe filename and report the reason for the choice.
+
+    Returns:
+        A ``(filename, reason)`` tuple. ``reason`` is one of
+        ``server_sent_name``, ``missing_name``, ``unsafe_name``, or
+        ``overlong_name``.
+    """
+    raw_name = _parse_content_type_name(content_type)
+    if raw_name is None:
+        return _fallback_filename(ref), "missing_name"
+    safe = _sanitize_filename(raw_name)
+    if safe is None:
+        return _fallback_filename(ref), "unsafe_name"
+    candidate = _ensure_pdf_extension(safe)
+    if len(os.fsencode(candidate)) > name_max:
+        return _fallback_filename(ref), "overlong_name"
+    return candidate, "server_sent_name"
+
+
+def _unique_path(dest: Path, filename: str, pdf_bytes: bytes) -> tuple[Path, str]:
+    """Return a path inside ``dest`` for ``filename``, handling collisions.
+
+    Collision strategy: if the target already exists with identical bytes,
+    report it as already satisfied. If the bytes differ, insert an
+    incrementing counter before the ``.pdf`` extension until a unique name
+    is found.
+
+    This helper does not catch its own filesystem errors: callers are
+    expected to wrap it and convert OSError subclasses into a failed
+    :class:`PdfSaveResult`.
+    """
+    target = dest / filename
+    if not target.exists():
+        return target, "written"
+
+    existing = target.read_bytes()
+    if existing == pdf_bytes:
+        return target, "identical_bytes"
+
+    stem = Path(filename).stem
+    suffix = Path(filename).suffix or ".pdf"
+    counter = 1
+    while True:
+        candidate = dest / f"{stem}_{counter}{suffix}"
+        if not candidate.exists():
+            return candidate, "written"
+        if candidate.read_bytes() == pdf_bytes:
+            return candidate, "identical_bytes"
+        counter += 1
+
+
+def _filesystem_error_result(exc: OSError, path: Path) -> PdfSaveResult:
+    """Map a filesystem probe failure to a coherent failure result."""
+    if exc.errno == errno.ENAMETOOLONG:
+        reason = "name_too_long"
+    elif exc.errno == errno.EISDIR:
+        reason = "directory_collision"
+    else:
+        reason = "write_failed"
+    return PdfSaveResult(
+        ok=False,
+        path=None,
+        reason=reason,
+        error=f"Could not access {path}: {exc}",
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class PdfSaveResult:
+    """Outcome of an attempt to persist PDF bytes.
+
+    Fields:
+        ok: whether the bytes were written or already present identically.
+        path: the filesystem path, or None when no file was written.
+        reason: short human-readable description of the outcome.
+        error: human-readable error message when ok is False.
+    """
+
+    ok: bool
+    path: Path | None
+    reason: str
+    error: str | None = None
+
+
+def save_pdf(
+    pdf_bytes: bytes,
+    content_type: str | None,
+    ref: DocumentRef,
+    destination: str | os.PathLike[str],
+) -> PdfSaveResult:
+    """Save ``pdf_bytes`` into ``destination`` with a safe filename.
+
+    The filename is taken from the ``name=`` parameter in ``content_type``
+    when present and safe; otherwise a deterministic fallback built from
+    ``ref.reference`` and ``ref.optimize`` is used. The destination
+    directory is created on demand.
+
+    Collision strategy: if the target path already exists and contains
+    identical bytes, the existing file is reported as already satisfied.
+    If the bytes differ, a counter suffix is inserted before ``.pdf`` until
+    a unique name is found.
+
+    Filesystem problems encountered while probing for collisions (for
+    example, a directory occupying the target path, or an unreadable
+    existing file) are reported as failed saves with ``ok=False`` rather
+    than raised. An overlong server-sent filename is detected before any
+    filesystem probe and is degraded to the deterministic fallback built
+    from ``ref``; the returned ``reason`` is ``overlong_name`` so the
+    caller can still tell the fallback was used.
+
+    Args:
+        pdf_bytes: the raw PDF bytes to persist.
+        content_type: the Content-Type header value of the response.
+        ref: the document reference used for the deterministic fallback.
+        destination: directory where the file should be written.
+
+    Returns:
+        A :class:`PdfSaveResult` describing the path written or the reason
+        the write failed.
+    """
+    if not pdf_bytes:
+        return PdfSaveResult(
+            ok=False,
+            path=None,
+            reason="empty_payload",
+            error="No PDF bytes to persist",
+        )
+
+    if content_type and "application/pdf" not in content_type:
+        return PdfSaveResult(
+            ok=False,
+            path=None,
+            reason="not_pdf",
+            error="Content-Type does not indicate a PDF",
+        )
+
+    dest = Path(destination)
+    try:
+        dest.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        return PdfSaveResult(
+            ok=False,
+            path=None,
+            reason="mkdir_failed",
+            error=f"Could not create destination directory {dest}: {exc}",
+        )
+
+    try:
+        name_max = os.pathconf(dest, "PC_NAME_MAX")
+    except (ValueError, OSError):
+        name_max = 255
+
+    filename, name_reason = _filename_from_content_type(content_type, ref, name_max)
+    candidate = dest / filename
+    try:
+        candidate.resolve().relative_to(dest.resolve())
+    except ValueError:
+        return PdfSaveResult(
+            ok=False,
+            path=None,
+            reason="path_escape",
+            error="Resolved path escapes the destination directory",
+        )
+    except OSError as exc:
+        return _filesystem_error_result(exc, candidate)
+
+    try:
+        target, collision_reason = _unique_path(dest, filename, pdf_bytes)
+    except OSError as exc:
+        return _filesystem_error_result(exc, candidate)
+
+    if collision_reason == "identical_bytes":
+        return PdfSaveResult(ok=True, path=target, reason="identical_bytes")
+
+    try:
+        target.write_bytes(pdf_bytes)
+    except OSError as exc:
+        return PdfSaveResult(
+            ok=False,
+            path=None,
+            reason="write_failed",
+            error=f"Could not write PDF to {target}: {exc}",
+        )
+
+    return PdfSaveResult(ok=True, path=target, reason=name_reason)
 
