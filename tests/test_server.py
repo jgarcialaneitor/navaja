@@ -10,9 +10,11 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import io
+import json
 import os
 import socket
 import threading
+import time
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +25,7 @@ from urllib.parse import parse_qs
 from navaja import (
     CendojClient,
     FullTextError,
+    FullTextResult,
     NivelLocalizacion,
     SearchError,
     SearchGatedError,
@@ -328,6 +331,7 @@ def _clean_env(monkeypatch, tmp_path):
         "NAVAJA_CAPTCHA_HOST",
         "NAVAJA_CAPTCHA_PORT",
         "NAVAJA_CAPTCHA_TOKEN",
+        "NAVAJA_MAX_CONCURRENTES",
         "NAVAJA_PDF_DIR",
     ):
         monkeypatch.delenv(name, raising=False)
@@ -1399,3 +1403,370 @@ def test_buscar_sentencias_schema_lists_new_parameters():
         "campos_extra",
     ):
         assert name in properties, f"{name} missing from schema"
+
+
+def _marker_fulltext_transport(
+    marker: str, sent: list[httpx.Request] | None = None
+) -> httpx.MockTransport:
+    """Like ``_fulltext_transport`` but the final HTML body carries ``marker``."""
+    if sent is None:
+        sent = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        sent.append(request)
+        url = str(request.url)
+        if url == INDEX_URL:
+            return httpx.Response(200, text="<html><body>form</body></html>")
+        if "action=accessToPDF" in url:
+            return httpx.Response(
+                200,
+                text=(
+                    '<html><img src="/search/stickyImg">'
+                    '<form action="captcha"></form></html>'
+                ),
+                headers={"content-type": "text/html"},
+            )
+        if url.endswith("/search/stickyImg"):
+            return httpx.Response(
+                200, content=b"fake-png", headers={"content-type": "image/png"}
+            )
+        if request.method == "POST" and url.startswith(
+            "https://www.poderjudicial.es/search/contenidos.action"
+        ):
+            return httpx.Response(
+                200,
+                text=f"<html><body>{marker}</body></html>",
+                headers={"content-type": "text/html"},
+            )
+        return httpx.Response(404)
+
+    return httpx.MockTransport(handler)
+
+
+def _wait_for_jobs(done_check, timeout: float = 5.0) -> bool:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if done_check():
+            return True
+        time.sleep(0.01)
+    return False
+
+
+# --- Batch download tools ----------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def _reset_shared_queue():
+    """Stop and forget the module-level job queue around every test."""
+    queue = getattr(navaja_server, "_queue", None)
+    if queue is not None:
+        queue.stop()
+    navaja_server._queue = None
+    yield
+    queue = getattr(navaja_server, "_queue", None)
+    if queue is not None:
+        queue.stop()
+    navaja_server._queue = None
+
+
+def test_batch_tools_are_registered():
+    tools = asyncio.run(server.list_tools())
+    names = {tool.name for tool in tools}
+    for name in ("iniciar_descargas", "estado_descargas", "recoger_descarga"):
+        assert name in names
+
+
+def test_iniciar_descargas_returns_documented_shape(monkeypatch):
+    sent: list[httpx.Request] = []
+    SpyClient = _spy_client_class(_fulltext_transport, sent)
+    monkeypatch.setattr("navaja.server.CendojClient", SpyClient)
+    monkeypatch.setattr(
+        "navaja.cendoj.serve_captcha", lambda *args, **kwargs: CaptchaAnswer("ABCD")
+    )
+
+    urls = [DOC_URL, DOC_URL]
+    result = navaja_server.iniciar_descargas(urls)
+
+    assert result["ok"] is True
+    assert result["captcha_url"].startswith("http://")
+    assert result["max_concurrentes"] == 1
+    assert isinstance(result["batch_id"], str)
+    assert len(result["jobs"]) == 2
+    for job, url in zip(result["jobs"], urls):
+        assert set(job.keys()) == {"job_id", "url", "state"}
+        assert isinstance(job["job_id"], str)
+        assert job["url"] == url
+        assert job["state"] in {"queued", "running", "done"}
+    assert "ABCD" not in json.dumps(result)
+
+
+def test_iniciar_descargas_rejects_empty_urls():
+    result = navaja_server.iniciar_descargas([])
+    assert result["ok"] is False
+    assert result["error_code"] == "empty_urls"
+    assert "empty" in result["error"].lower()
+    assert json.dumps(result)
+
+
+def test_estado_descargas_leaks_no_payload_text(monkeypatch):
+    marker = "UNIQUE_MARKER_42"
+    sent: list[httpx.Request] = []
+
+    def transport_factory(s: list[httpx.Request]) -> httpx.MockTransport:
+        return _marker_fulltext_transport(marker, s)
+
+    SpyClient = _spy_client_class(transport_factory, sent)
+    monkeypatch.setattr("navaja.server.CendojClient", SpyClient)
+    monkeypatch.setattr(
+        "navaja.cendoj.serve_captcha", lambda *args, **kwargs: CaptchaAnswer("ABCD")
+    )
+
+    start = navaja_server.iniciar_descargas([DOC_URL])
+    job_id = start["jobs"][0]["job_id"]
+
+    def is_done():
+        for job in navaja_server.estado_descargas()["jobs"]:
+            if job["job_id"] == job_id and job["state"] == "done":
+                return True
+        return False
+
+    assert _wait_for_jobs(is_done), "job did not finish"
+
+    result = navaja_server.estado_descargas()
+    serialised = json.dumps(result)
+    assert marker not in serialised
+    for job in result["jobs"]:
+        assert set(job.keys()) == {
+            "job_id",
+            "url",
+            "state",
+            "attempts",
+            "pdf_path",
+            "error_code",
+        }
+
+
+def test_recoger_descarga_pending_finished_and_unknown(monkeypatch):
+    blocker = threading.Event()
+
+    class BlockingClient(CendojClient):
+        def fetch_full_text(self, url, *, host, port, timeout, token):
+            assert blocker.wait(timeout=10.0)
+            return FullTextResult(
+                ok=True,
+                content_type="text/html",
+                text="collected body",
+                pdf_bytes=None,
+                attempts=1,
+                requests=2,
+            )
+
+    monkeypatch.setattr("navaja.server.CendojClient", BlockingClient)
+
+    start = navaja_server.iniciar_descargas([DOC_URL])
+    job_id = start["jobs"][0]["job_id"]
+
+    pending = navaja_server.recoger_descarga(job_id)
+    assert pending["ok"] is False
+    assert pending["error_code"] == "pending"
+    assert pending["job_id"] == job_id
+
+    unknown = navaja_server.recoger_descarga("no-such-job-id")
+    assert unknown["ok"] is False
+    assert unknown["error_code"] == "unknown_job"
+    assert unknown["job_id"] == "no-such-job-id"
+
+    blocker.set()
+
+    def is_done():
+        for job in navaja_server.estado_descargas()["jobs"]:
+            if job["job_id"] == job_id and job["state"] == "done":
+                return True
+        return False
+
+    assert _wait_for_jobs(is_done), "job did not finish"
+
+    finished = navaja_server.recoger_descarga(job_id)
+    assert finished["ok"] is True
+    assert finished["text"] == "collected body"
+    assert finished["attempts"] == 1
+    assert finished["requests"] == 2
+    assert finished["pdf_path"] is None
+    assert finished["pdf_save_reason"] == "not_pdf"
+    assert "error_code" not in finished
+
+
+def test_batch_multi_url_completes(monkeypatch):
+    sent: list[httpx.Request] = []
+    SpyClient = _spy_client_class(_fulltext_transport, sent)
+    monkeypatch.setattr("navaja.server.CendojClient", SpyClient)
+    monkeypatch.setattr(
+        "navaja.cendoj.serve_captcha", lambda *args, **kwargs: CaptchaAnswer("ABCD")
+    )
+
+    urls = [DOC_URL, DOC_URL, DOC_URL]
+    start = navaja_server.iniciar_descargas(urls)
+
+    def all_done():
+        jobs = navaja_server.estado_descargas()["jobs"]
+        return len(jobs) == len(urls) and all(job["state"] == "done" for job in jobs)
+
+    assert _wait_for_jobs(all_done), "not all jobs finished"
+
+    for job in start["jobs"]:
+        payload = navaja_server.recoger_descarga(job["job_id"])
+        assert payload["ok"] is True
+        assert "text" in payload
+
+
+def test_recoger_descarga_normalises_runner_crash(monkeypatch, capsys):
+    class CrashClient(CendojClient):
+        def fetch_full_text(self, url, *, host, port, timeout, token):
+            raise ValueError("simulated unexpected runner crash")
+
+    monkeypatch.setattr("navaja.server.CendojClient", CrashClient)
+
+    start = navaja_server.iniciar_descargas([DOC_URL])
+    job_id = start["jobs"][0]["job_id"]
+
+    def is_failed():
+        for job in navaja_server.estado_descargas()["jobs"]:
+            if job["job_id"] == job_id and job["state"] == "failed":
+                return True
+        return False
+
+    assert _wait_for_jobs(is_failed), "job did not fail"
+
+    result = navaja_server.recoger_descarga(job_id)
+    assert result["ok"] is False
+    assert result["error_code"] == "runner_failure"
+    assert "simulated unexpected runner crash" in result["error"]
+    assert result["attempts"] is None
+    assert result["requests"] is None
+    assert result["content_type"] is None
+    assert result["text"] is None
+    assert result["pdf_path"] is None
+    assert result["pdf_save_reason"] == "not_attempted"
+    assert result["pdf_save_error"] is None
+    assert json.dumps(result)
+    assert capsys.readouterr().out == ""
+
+
+def test_max_concurrentes_default(monkeypatch):
+    monkeypatch.delenv("NAVAJA_MAX_CONCURRENTES", raising=False)
+    sent: list[httpx.Request] = []
+    SpyClient = _spy_client_class(_fulltext_transport, sent)
+    monkeypatch.setattr("navaja.server.CendojClient", SpyClient)
+
+    result = navaja_server.iniciar_descargas([DOC_URL])
+    assert result["max_concurrentes"] == 1
+
+
+def test_max_concurrentes_valid_override(monkeypatch):
+    monkeypatch.setenv("NAVAJA_MAX_CONCURRENTES", "3")
+    sent: list[httpx.Request] = []
+    SpyClient = _spy_client_class(_fulltext_transport, sent)
+    monkeypatch.setattr("navaja.server.CendojClient", SpyClient)
+
+    result = navaja_server.iniciar_descargas([DOC_URL])
+    assert result["max_concurrentes"] == 3
+
+
+@pytest.mark.parametrize("bad", ["0", "-1", "abc", "1.5"])
+def test_max_concurrentes_invalid_value(bad, monkeypatch):
+    monkeypatch.setenv("NAVAJA_MAX_CONCURRENTES", bad)
+    with pytest.raises(ValueError, match="NAVAJA_MAX_CONCURRENTES"):
+        navaja_server.iniciar_descargas([DOC_URL])
+
+
+def test_no_stdout_on_batch_tools(capsys, monkeypatch):
+    sent: list[httpx.Request] = []
+    SpyClient = _spy_client_class(_fulltext_transport, sent)
+    monkeypatch.setattr("navaja.server.CendojClient", SpyClient)
+    monkeypatch.setattr(
+        "navaja.cendoj.serve_captcha", lambda *args, **kwargs: CaptchaAnswer("ABCD")
+    )
+
+    start = navaja_server.iniciar_descargas([DOC_URL])
+    navaja_server.estado_descargas()
+    navaja_server.recoger_descarga(start["jobs"][0]["job_id"])
+    assert capsys.readouterr().out == ""
+
+
+# --- batch registry hardening tests ------------------------------------------
+
+
+def test_iniciar_descargas_rejects_more_than_100_urls(monkeypatch):
+    result = navaja_server.iniciar_descargas([DOC_URL] * 101)
+    assert result["ok"] is False
+    assert result["error_code"] == "too_many_urls"
+    assert "100" in result["error"]
+
+
+def test_iniciar_descargas_rejects_invalid_url_and_enqueues_nothing(monkeypatch):
+    sent: list[httpx.Request] = []
+    SpyClient = _spy_client_class(_fulltext_transport, sent)
+    monkeypatch.setattr("navaja.server.CendojClient", SpyClient)
+
+    result = navaja_server.iniciar_descargas([DOC_URL, "https://example.com/not-valid"])
+    assert result["ok"] is False
+    assert result["error_code"] == "invalid_url"
+    assert "https://example.com/not-valid" in result["error"]
+
+    # No HTTP traffic and no queued jobs: the call was rejected before
+    # touching the client or the queue.
+    assert not sent
+    queue = navaja_server._get_queue()
+    assert queue.estado() == []
+
+
+def test_iniciar_descargas_rejected_call_does_not_affect_later_batch(monkeypatch):
+    sent: list[httpx.Request] = []
+    SpyClient = _spy_client_class(_fulltext_transport, sent)
+    monkeypatch.setattr("navaja.server.CendojClient", SpyClient)
+    monkeypatch.setattr(
+        "navaja.cendoj.serve_captcha", lambda *args, **kwargs: CaptchaAnswer("ABCD")
+    )
+
+    rejected = navaja_server.iniciar_descargas(["https://example.com/bad"])
+    assert rejected["error_code"] == "invalid_url"
+
+    valid = navaja_server.iniciar_descargas([DOC_URL])
+    assert valid["ok"] is True
+    assert len(valid["jobs"]) == 1
+
+    def is_done():
+        jobs = navaja_server.estado_descargas()["jobs"]
+        return len(jobs) == 1 and jobs[0]["state"] == "done"
+
+    assert _wait_for_jobs(is_done), "valid batch did not finish"
+
+
+def test_estado_descargas_filters_by_batch_id(monkeypatch):
+    sent: list[httpx.Request] = []
+    SpyClient = _spy_client_class(_fulltext_transport, sent)
+    monkeypatch.setattr("navaja.server.CendojClient", SpyClient)
+    monkeypatch.setattr(
+        "navaja.cendoj.serve_captcha", lambda *args, **kwargs: CaptchaAnswer("ABCD")
+    )
+
+    alpha = navaja_server.iniciar_descargas([DOC_URL])
+    beta = navaja_server.iniciar_descargas([DOC_URL, DOC_URL])
+
+    alpha_jobs = navaja_server.estado_descargas(alpha["batch_id"])["jobs"]
+    beta_jobs = navaja_server.estado_descargas(beta["batch_id"])["jobs"]
+
+    assert len(alpha_jobs) == 1
+    assert len(beta_jobs) == 2
+    assert {j["job_id"] for j in alpha_jobs}.isdisjoint(j["job_id"] for j in beta_jobs)
+
+    # Default is the most recent batch.
+    default_jobs = navaja_server.estado_descargas()["jobs"]
+    assert len(default_jobs) == 2
+    assert {j["job_id"] for j in default_jobs} == {j["job_id"] for j in beta_jobs}
+
+
+def test_estado_descargas_unknown_batch_id_returns_empty():
+    result = navaja_server.estado_descargas("no-such-batch-id")
+    assert result["ok"] is True
+    assert result["jobs"] == []

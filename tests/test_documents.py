@@ -7,6 +7,7 @@ never hit the live site and never block for a human.
 from __future__ import annotations
 
 import os
+import threading
 from urllib.parse import parse_qs, urlparse
 
 import httpx
@@ -270,6 +271,93 @@ def test_fetch_rejects_non_cendoj_url():
     with CendojClient() as client:
         with pytest.raises(ValueError):
             client.fetch_full_text("https://example.com/document")
+
+
+def test_fetch_full_text_progress_line_goes_to_stderr(capsys, monkeypatch):
+    client, _sent, _post_count = _make_client(monkeypatch, final="pdf")
+
+    with client:
+        result = client.fetch_full_text(DOC_URL)
+
+    captured = capsys.readouterr()
+    assert result.ok is True
+    assert captured.out == ""
+    assert f"Fetching full text for {DOC_URL}" in captured.err
+
+
+def test_fetch_full_text_bootstraps_session_once_under_concurrency(monkeypatch):
+    """Two cold threads must issue exactly one JSESSIONID bootstrap GET.
+
+    The mock transport blocks the bootstrap response until both threads have
+    had a chance to race; without the session lock two GETs would be issued.
+    """
+    release_event = threading.Event()
+    sent: list[httpx.Request] = []
+    sent_lock = threading.Lock()
+
+    def fake_serve(
+        image: bytes,
+        *,
+        host: str,
+        port: int,
+        timeout: float,
+    ) -> CaptchaAnswer:
+        assert image == b"fake-png"
+        return CaptchaAnswer._create(
+            "TEST123", port=port, url=f"http://{host}:{port}/token/"
+        )
+
+    monkeypatch.setattr("navaja.cendoj.serve_captcha", fake_serve)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        with sent_lock:
+            sent.append(request)
+        url = str(request.url)
+        if url == INDEX_URL:
+            release_event.wait()
+            return httpx.Response(200, text="<html>session</html>")
+        if "action=accessToPDF" in url:
+            return httpx.Response(200, text=CAPTCHA_HTML)
+        if "stickyImg" in url:
+            return httpx.Response(200, content=b"fake-png")
+        if request.method == "POST" and "contenidos.action" in url:
+            return httpx.Response(
+                200,
+                content=PDF_BYTES,
+                headers={"content-type": "application/pdf"},
+            )
+        return httpx.Response(404)
+
+    client = CendojClient(transport=httpx.MockTransport(handler))
+
+    def target() -> None:
+        client.fetch_full_text(DOC_URL)
+
+    t1 = threading.Thread(target=target, daemon=True)
+    t2 = threading.Thread(target=target, daemon=True)
+    t1.start()
+    t2.start()
+
+    # Give both threads time to enter _ensure_session and race.
+    try:
+        t1.join(timeout=0.2)
+        t2.join(timeout=0.2)
+        assert t1.is_alive() and t2.is_alive(), "threads must still be blocked on bootstrap"
+
+        bootstrap_gets = [r for r in sent if str(r.url) == INDEX_URL]
+        assert len(bootstrap_gets) == 1, "only one bootstrap GET must be issued"
+    finally:
+        # Always wake the mock transport so daemon threads exit promptly,
+        # even if an assertion fails above.
+        release_event.set()
+        t1.join(timeout=5.0)
+        t2.join(timeout=5.0)
+        client.close()
+
+    assert not t1.is_alive() and not t2.is_alive()
+
+    bootstrap_gets = [r for r in sent if str(r.url) == INDEX_URL]
+    assert len(bootstrap_gets) == 1
 
 
 def _make_document_ref(

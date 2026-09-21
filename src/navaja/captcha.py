@@ -526,8 +526,19 @@ body {{ font-family: system-ui, sans-serif; max-width: 480px; margin: 2rem auto;
 
 _ACK_PAGE = b"""<!DOCTYPE html>
 <html lang="es">
-<head><meta charset="utf-8"><title>Recibido</title></head>
-<body><p>Respuesta recibida. Pod&eacute;s cerrar esta pesta&ntilde;a.</p></body>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="refresh" content="5">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CENDOJ captcha</title>
+<style>
+body { font-family: system-ui, sans-serif; max-width: 480px; margin: 2rem auto; padding: 0 1rem; }
+</style>
+</head>
+<body>
+<p>Respuesta recibida.</p>
+<p>Si llega otro captcha, esta p&aacute;gina se actualizar&aacute; autom&aacute;ticamente.</p>
+</body>
 </html>"""
 
 

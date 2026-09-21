@@ -382,6 +382,35 @@ def test_idle_page_contains_refresh_directive_and_running_message():
     assert "Navaja está en ejecución" in page.text
 
 
+def test_ack_page_keeps_title_and_refreshes_after_answer():
+    """The post-answer page auto-refreshes so a batch queue does not stall.
+
+    The title must stay ``CENDOJ captcha`` because ``src/navaja/cli.py`` uses
+    it as a navaja-listener marker.
+    """
+    port = _free_port()
+    token = "ack-page-token-001"
+    result, thread, stderr = _run_server(TINY_PNG, port, timeout=5.0, token=token)
+
+    url = _wait_for_url(stderr, time.monotonic() + 2.0)
+    assert url is not None, "server did not print its form URL"
+
+    page = httpx.get(url)
+    challenge_id = _challenge_id_from_page(page)
+
+    resp = httpx.post(url, data={"captcha": "solved", "challenge": challenge_id})
+    assert resp.status_code == 200
+    assert "<title>CENDOJ captcha</title>" in resp.text
+    assert "http-equiv=\"refresh\"" in resp.text
+    assert "content=\"5\"" in resp.text
+    assert "Respuesta recibida" in resp.text
+    assert "se actualizar&aacute; autom&aacute;ticamente" in resp.text
+    assert "Pod&eacute;s cerrar esta pesta&ntilde;a" not in resp.text
+
+    thread.join(timeout=5.0)
+    assert result.get("answer") == "solved"
+
+
 def test_png_returns_404_while_idle():
     port = _free_port()
     token = "idle-png-token-002"
