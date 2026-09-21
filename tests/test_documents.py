@@ -66,6 +66,32 @@ def test_parse_document_url_accepts_real_shape():
     _assert_access_url(ref)
 
 
+def test_parse_document_url_accepts_real_ts_url():
+    url = "https://www.poderjudicial.es/search/TS/openDocument/bc29b4e30a2d7b90/20121016"
+    ref = parse_document_url(url)
+    assert isinstance(ref, DocumentRef)
+    assert ref.reference == "bc29b4e30a2d7b90"
+    assert ref.optimize == "20121016"
+    parsed = urlparse(ref.access_to_pdf_url)
+    assert parsed.path == "/search/contenidos.action"
+    params = parse_qs(parsed.query)
+    assert params["action"] == ["accessToPDF"]
+    assert params["publicinterface"] == ["true"]
+    assert params["tab"] == ["AN"]
+    assert params["reference"] == ["bc29b4e30a2d7b90"]
+    assert params["encode"] == ["true"]
+    assert params["optimize"] == ["20121016"]
+    assert params["databasematch"] == ["AN"]
+
+
+def test_parse_document_url_ts_and_an_urls_produce_same_access_url():
+    ts_url = "https://www.poderjudicial.es/search/TS/openDocument/1d15140b1eccb473/20151204"
+    an_url = "https://www.poderjudicial.es/search/AN/openDocument/1d15140b1eccb473/20151204"
+    ts_ref = parse_document_url(ts_url)
+    an_ref = parse_document_url(an_url)
+    assert ts_ref.access_to_pdf_url == an_ref.access_to_pdf_url
+
+
 def test_parse_document_url_accepts_16_character_hash():
     reference = "d4a421d6eba4fbfa"
     optimize = "20170502"
@@ -99,6 +125,7 @@ def test_parse_document_url_preserves_hash_casing():
         "https://www.poderjudicial.es/search/AN/openDocument/d4a421d6eba4fbfaaaaaaaaaaaaaaaaaa/20210705",
         "https://www.poderjudicial.es/search/AN/openDocument//20170502",
         "https://www.poderjudicial.es/search/AN/openDocument/d4a421d6eba4fb-f/20170502",
+        "https://www.poderjudicial.es/search/XX/openDocument/aabbccddeeff00112233445566778899/20260911",
     ],
 )
 def test_parse_document_url_rejects_malformed_urls(url: str):
