@@ -44,10 +44,8 @@ from navaja.captcha import (
     stop_shared_captcha_server,
 )
 from navaja.documents import (
-    PdfSaveResult,
     parse_document_url,
-    resolve_pdf_destination,
-    save_pdf,
+    save_full_text_pdf,
 )
 
 
@@ -464,36 +462,7 @@ def ver_texto_completo(
             "pdf_save_error": None,
         }
 
-    if result.ok and result.pdf_bytes is not None:
-        try:
-            destination, _dest_reason = resolve_pdf_destination()
-            pdf_save_result = save_pdf(
-                result.pdf_bytes,
-                result.content_type,
-                ref,
-                destination,
-            )
-        except Exception as exc:  # pragma: no cover - defensive fallback
-            pdf_save_result = PdfSaveResult(
-                ok=False,
-                path=None,
-                reason="resolve_failed",
-                error=f"Could not resolve PDF destination: {exc}",
-            )
-    elif result.ok:
-        pdf_save_result = PdfSaveResult(
-            ok=False,
-            path=None,
-            reason="not_pdf",
-            error=None,
-        )
-    else:
-        pdf_save_result = PdfSaveResult(
-            ok=False,
-            path=None,
-            reason="not_attempted",
-            error=None,
-        )
+    pdf_save_result = save_full_text_pdf(result, ref)
 
     payload = {
         "ok": result.ok,

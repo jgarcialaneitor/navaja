@@ -20,6 +20,7 @@ from navaja.documents import (
     PdfSaveResult,
     parse_document_url,
     resolve_pdf_destination,
+    save_full_text_pdf,
     save_pdf,
 )
 
@@ -529,3 +530,90 @@ def test_save_pdf_surfaces_unreadable_collision(tmp_path):
     assert result.reason == "write_failed"
     assert result.path is None
     assert result.error is not None
+
+
+# --- Full-text PDF save decision ---
+
+
+def test_save_full_text_pdf_returns_not_attempted_when_fetch_failed():
+    ref = _make_document_ref()
+    result = FullTextResult(
+        ok=False,
+        content_type=None,
+        text="",
+        pdf_bytes=None,
+        attempts=3,
+        requests=4,
+        error="captcha rejected",
+    )
+    save_result = save_full_text_pdf(result, ref)
+    assert save_result == PdfSaveResult(
+        ok=False,
+        path=None,
+        reason="not_attempted",
+        error=None,
+    )
+
+
+def test_save_full_text_pdf_returns_not_pdf_when_no_pdf_bytes():
+    ref = _make_document_ref()
+    result = FullTextResult(
+        ok=True,
+        content_type="text/html",
+        text="<p>html</p>",
+        pdf_bytes=None,
+        attempts=1,
+        requests=2,
+    )
+    save_result = save_full_text_pdf(result, ref)
+    assert save_result == PdfSaveResult(
+        ok=False,
+        path=None,
+        reason="not_pdf",
+        error=None,
+    )
+
+
+def test_save_full_text_pdf_returns_resolve_failed_when_destination_raises(
+    monkeypatch,
+):
+    def _raise_runtime_error():
+        raise RuntimeError("XDG variable points to a broken path")
+
+    monkeypatch.setattr(
+        "navaja.documents.resolve_pdf_destination",
+        _raise_runtime_error,
+    )
+    ref = _make_document_ref()
+    result = FullTextResult(
+        ok=True,
+        content_type="application/pdf",
+        text="",
+        pdf_bytes=PDF_BYTES,
+        attempts=1,
+        requests=2,
+    )
+    save_result = save_full_text_pdf(result, ref)
+    assert save_result.ok is False
+    assert save_result.path is None
+    assert save_result.reason == "resolve_failed"
+    assert "Could not resolve PDF destination" in save_result.error
+
+
+def test_save_full_text_pdf_saves_pdf_and_returns_result(monkeypatch, tmp_path):
+    monkeypatch.setenv("NAVAJA_PDF_DIR", str(tmp_path))
+    ref = _make_document_ref()
+    result = FullTextResult(
+        ok=True,
+        content_type='application/pdf; name="SAP_ML_110_2026.pdf"',
+        text="",
+        pdf_bytes=PDF_BYTES,
+        attempts=1,
+        requests=2,
+    )
+    save_result = save_full_text_pdf(result, ref)
+    assert save_result.ok is True
+    assert save_result.path is not None
+    assert save_result.path.parent == tmp_path
+    assert save_result.path.name == "SAP_ML_110_2026.pdf"
+    assert save_result.path.read_bytes() == PDF_BYTES

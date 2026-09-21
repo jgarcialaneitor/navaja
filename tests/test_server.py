@@ -777,7 +777,7 @@ def test_ver_texto_completo_save_failure_still_ok_and_text(monkeypatch, tmp_path
             error="disk full",
         )
 
-    monkeypatch.setattr("navaja.server.save_pdf", failing_save)
+    monkeypatch.setattr("navaja.documents.save_pdf", failing_save)
 
     result = ver_texto_completo(DOC_URL, espera_segundos=1)
 
@@ -802,7 +802,7 @@ def test_ver_texto_completo_bad_pdf_dir_degrades_to_reported_failure(
     def bad_resolver():
         raise ValueError("malformed NAVAJA_PDF_DIR")
 
-    monkeypatch.setattr("navaja.server.resolve_pdf_destination", bad_resolver)
+    monkeypatch.setattr("navaja.documents.resolve_pdf_destination", bad_resolver)
 
     result = ver_texto_completo(DOC_URL, espera_segundos=1)
 

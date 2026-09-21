@@ -16,7 +16,12 @@ import httpx
 
 from navaja.captcha import resolve_captcha_host, resolve_captcha_token
 from navaja.cendoj import CendojClient
-from navaja.documents import FullTextResult
+from navaja.documents import (
+    FullTextResult,
+    PdfSaveResult,
+    parse_document_url,
+    save_full_text_pdf,
+)
 
 
 # Seconds allowed for the pre-flight TCP connect probe.
@@ -95,7 +100,11 @@ def _preview(text: str, limit: int = 500) -> str:
     return snippet.replace("\n", " ")
 
 
-def _report(result: FullTextResult, out_path: str | None) -> None:
+def _report(
+    result: FullTextResult,
+    out_path: str | None,
+    pdf_save_result: PdfSaveResult,
+) -> None:
     status = "success" if result.ok else "failure"
     print(f"Result: {status}")
     print(f"Attempts: {result.attempts}")
@@ -108,6 +117,15 @@ def _report(result: FullTextResult, out_path: str | None) -> None:
         with open(out_path, "w", encoding="utf-8") as fh:
             fh.write(result.text)
         print(f"Wrote {len(result.text)} characters to {out_path}")
+
+    if pdf_save_result.path is not None:
+        print(f"PDF: {pdf_save_result.path} ({pdf_save_result.reason})")
+    elif pdf_save_result.reason in ("not_pdf", "not_attempted"):
+        print(f"PDF: not saved ({pdf_save_result.reason})")
+    else:
+        print(
+            f"PDF: not saved ({pdf_save_result.reason}): {pdf_save_result.error}"
+        )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -174,7 +192,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
 
-    _report(result, args.out)
+    ref = parse_document_url(args.url)
+    pdf_save_result = save_full_text_pdf(result, ref)
+
+    _report(result, args.out, pdf_save_result)
     return 0 if result.ok else 1
 
 

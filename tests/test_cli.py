@@ -17,7 +17,7 @@ import pytest
 
 from navaja import cli
 from navaja.captcha import CaptchaServer
-from navaja.documents import FullTextResult
+from navaja.documents import FullTextResult, PdfSaveResult
 
 
 TOKEN = "cli-test-token-0123456789"
@@ -320,3 +320,86 @@ def test_late_bind_conflict_reports_the_same_guidance(
     assert "address already in use" not in captured.err
     assert "is in use by another process" in captured.err
     assert "--port 0" in captured.err
+
+
+def _pdf_result() -> FullTextResult:
+    return FullTextResult(
+        ok=True,
+        content_type='application/pdf; name="SAP_123_2026.pdf"',
+        text="text extracted from the PDF",
+        pdf_bytes=b"%PDF-1.4 test bytes",
+        attempts=1,
+        requests=2,
+    )
+
+
+def test_pdf_is_saved_automatically(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("NAVAJA_PDF_DIR", str(tmp_path))
+    monkeypatch.setattr(
+        cli, "CendojClient", _recording_client([], _pdf_result())
+    )
+
+    exit_code = cli.main([DOCUMENT_URL, "--host", HOST, "--port", "0"])
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "Result: success" in captured.out
+    assert "text extracted from the PDF" in captured.out
+    saved = list(tmp_path.iterdir())
+    assert len(saved) == 1
+    assert saved[0].name == "SAP_123_2026.pdf"
+    assert saved[0].read_bytes() == b"%PDF-1.4 test bytes"
+    assert "PDF:" in captured.out
+    assert str(saved[0]) in captured.out
+    assert "server_sent_name" in captured.out
+
+
+def test_non_pdf_response_saves_nothing(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("NAVAJA_PDF_DIR", str(tmp_path))
+    monkeypatch.setattr(cli, "CendojClient", _recording_client([], _ok_result()))
+
+    exit_code = cli.main([DOCUMENT_URL, "--host", HOST, "--port", "0"])
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert list(tmp_path.iterdir()) == []
+    assert "PDF: not saved" in captured.out
+    assert "not_pdf" in captured.out
+
+
+def test_pdf_save_failure_does_not_fail_fetch(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("NAVAJA_PDF_DIR", str(tmp_path))
+    monkeypatch.setattr(
+        cli, "CendojClient", _recording_client([], _pdf_result())
+    )
+
+    def _failing_save(*args, **kwargs):
+        return PdfSaveResult(
+            ok=False,
+            path=None,
+            reason="write_failed",
+            error="disk full",
+        )
+
+    monkeypatch.setattr("navaja.documents.save_pdf", _failing_save)
+
+    exit_code = cli.main([DOCUMENT_URL, "--host", HOST, "--port", "0"])
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "Result: success" in captured.out
+    assert "text extracted from the PDF" in captured.out
+    assert "disk full" in captured.out
+    assert list(tmp_path.iterdir()) == []

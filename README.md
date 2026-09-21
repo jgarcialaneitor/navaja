@@ -184,6 +184,41 @@ The challenge is session-sticky: once the session has solved it, subsequent
 full-text requests in the same session usually do not ask again. In practice
 this means roughly **one solve per research session**, not one per resolution.
 
+### PDF persistence
+
+When the final response is a PDF, navaja automatically saves the file to disk
+as well as returning the extracted text. This applies to both
+`ver_texto_completo` and `navaja-doc`; there is no per-call opt-in.
+
+The destination directory resolves in this order:
+
+1. `NAVAJA_PDF_DIR`, if set.
+2. `$XDG_DATA_HOME/navaja/pdfs` when `XDG_DATA_HOME` is set.
+3. `~/.local/share/navaja/pdfs` otherwise.
+
+navaja creates the directory on demand.
+
+The filename is taken from the `name=` parameter the server sends in the
+`Content-Type` header, for example `name="STS_3679_2026.pdf"`. That value is
+sanitized to a safe basename before it reaches the filesystem. If the header
+has no usable name, or the name would be unsafe or too long, navaja falls back
+to a deterministic name built from the document URL:
+`<reference>_<optimize>.pdf`. The `pdf_save_reason` field in the result tells
+which rule was used (`server_sent_name`, `missing_name`, `unsafe_name`,
+`overlong_name`, `identical_bytes`, ...).
+
+If the response is not a PDF, no file is written and `pdf_save_reason` is
+`not_pdf`. A write failure (permissions, full disk, bad `NAVAJA_PDF_DIR`)
+never fails the fetch itself: `ok` stays `True`, the full text is returned,
+and `pdf_save_error` explains what happened.
+
+For MCP clients, the `ver_texto_completo` result always contains three extra
+keys:
+
+* `pdf_path` — the saved file path, or `None`.
+* `pdf_save_reason` — why the file has that name, or why nothing was written.
+* `pdf_save_error` — `None` on success, otherwise a human-readable message.
+
 ### Zero-configuration defaults
 
 By default navaja tries to make the captcha form reachable without manual
@@ -235,6 +270,7 @@ Set these environment variables before starting the server:
 | `NAVAJA_CAPTCHA_HOST` | auto-detect | Interface the local form binds to. When unset, navaja picks the `tailscale0` IPv4 address, falling back to `127.0.0.1`. |
 | `NAVAJA_CAPTCHA_PORT` | `8765` | Port the local form listens on. |
 | `NAVAJA_CAPTCHA_TOKEN` | persisted | Stable URL-path token. When unset, navaja reads or creates `$XDG_STATE_HOME/navaja/captcha-token` (default `~/.local/state/navaja/captcha-token`). Must be at least 16 characters and only contain `A-Z`, `a-z`, `0-9`, `-`, `_`. |
+| `NAVAJA_PDF_DIR` | `~/.local/share/navaja/pdfs` | Directory where full-text PDFs are automatically saved. Falls back to `$XDG_DATA_HOME/navaja/pdfs` when `XDG_DATA_HOME` is set. |
 
 If `NAVAJA_CAPTCHA_HOST` is `0.0.0.0`, `::`, or empty, the server refuses to
 start. Bind a specific interface.
@@ -283,6 +319,10 @@ If the default port is already held by a running `navaja-mcp` session,
 CENDOJ round-trip first. Use `--port 0` to let the OS pick a free port; the
 actual form URL is announced on stderr.
 
+When the response is a PDF, `navaja-doc` saves it automatically to the
+directory described in [PDF persistence](#pdf-persistence) above and reports
+the path in its stdout output.
+
 To get a real document URL right now, run:
 
 ```bash
@@ -315,7 +355,7 @@ uv run pytest          # deterministic, runs against saved fixtures
 NAVAJA_LIVE=1 uv run pytest -m live   # opt-in: hits the real site
 ```
 
-Current suite: `240 passed, 1 skipped`.
+Current suite: `280 passed, 1 skipped`.
 
 Tests never touch the live site unless `NAVAJA_LIVE=1` is set.
 

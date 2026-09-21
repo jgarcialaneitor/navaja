@@ -423,3 +423,60 @@ def save_pdf(
 
     return PdfSaveResult(ok=True, path=target, reason=name_reason)
 
+
+def save_full_text_pdf(
+    result: FullTextResult,
+    ref: DocumentRef,
+) -> PdfSaveResult:
+    """Decide whether to persist a PDF from ``result`` and do it.
+
+    This is the shared decision point used by every entry point that may
+    leave a fetched PDF on disk. It maps the three non-save outcomes to
+    their reason vocabulary and narrows the defensive ``resolve_failed``
+    guard so that only a failure in :func:`resolve_pdf_destination` is
+    reported as a destination-resolution failure.
+
+    Args:
+        result: the outcome of the full-text fetch.
+        ref: the parsed document reference (already known to the caller).
+
+    Returns:
+        A :class:`PdfSaveResult`. Reasons produced here are:
+        ``not_attempted`` when ``result.ok`` is ``False``,
+        ``not_pdf`` when the response was not a PDF, and
+        ``resolve_failed`` when the destination directory cannot be
+        resolved. All other reasons come from :func:`save_pdf`.
+    """
+    if not result.ok:
+        return PdfSaveResult(
+            ok=False,
+            path=None,
+            reason="not_attempted",
+            error=None,
+        )
+
+    if result.pdf_bytes is None:
+        return PdfSaveResult(
+            ok=False,
+            path=None,
+            reason="not_pdf",
+            error=None,
+        )
+
+    try:
+        destination, _dest_reason = resolve_pdf_destination()
+    except Exception as exc:
+        return PdfSaveResult(
+            ok=False,
+            path=None,
+            reason="resolve_failed",
+            error=f"Could not resolve PDF destination: {exc}",
+        )
+
+    return save_pdf(
+        result.pdf_bytes,
+        result.content_type,
+        ref,
+        destination,
+    )
+

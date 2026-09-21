@@ -83,8 +83,9 @@ Out of scope, deliberately:
       responses, and write failures.
 - [x] 2. Wire into `ver_texto_completo`: save on success, expose the path and
       the skip/failure reason in the payload, keep `text` unchanged.
-- [ ] 3. CLI parity and README documentation of the variable, default path and
-      naming rule.
+- [x] 3. CLI parity and README documentation of the variable, default path and
+      naming rule. Implemented and verified; native review could not close
+      (see below). Not committed.
 
 ## Evidence
 
@@ -171,3 +172,73 @@ All non-blocking advisories, recorded here as separate later work:
   pointer, which makes pypdf emit a warning.
 - `tests/test_server.py:740` / a path assertion uses a prefix check where a
   containment check is the intended meaning.
+
+### Task 3
+
+`navaja-doc` now saves the PDF automatically with the same semantics as the
+MCP tool, and reports the path or the reason nothing was written. `--out`
+keeps its meaning: extracted text, text mode. README documents the behaviour,
+the variable, the resolution order, the naming rule and the payload keys.
+
+During this task the decision block was duplicated verbatim between
+`server.py` and `cli.py`, so the reason vocabulary briefly lived in two
+places. It was extracted to `save_full_text_pdf(result, ref)` in
+`documents.py`, which both entry points now call. The extraction also
+resolved the first follow-up above: the defensive guard now wraps only
+`resolve_pdf_destination`, so `resolve_failed` means what it says.
+
+A first version of the extraction carried two injectable callables
+(`resolve_destination`, `save`) that existed solely so pre-existing tests
+could keep monkeypatching `navaja.server` and `navaja.cli`. That was test
+mechanics in a production signature; the parameters were removed and the
+tests now patch `navaja.documents`, where the behaviour lives.
+
+Verification: `uv run pytest` \u2192 280 passed, 1 skipped.
+
+### Review status of task 3: approved on retry
+
+The first attempt (lineage `review-af5c840e23bddcac`) could not close: the
+reliability findings were inferential, the provider required a refuter pass,
+and no model was configured for `review-refuter`. Recorded below for history.
+
+After the feature document itself was updated, the candidate changed, and a
+fresh review of the new target closed cleanly: lineage
+`review-09d1f54366a71e5e`, tier medium, lens `review-reliability`, approved
+and acknowledged. That run produced only advisory findings and needed no
+refuter, so the earlier block was specific to the previous candidate.
+
+Advisory findings from the approved run, all non-blocking:
+
+- `README.md:359` / the stated suite count contradicted the real one (276 vs
+  280). Fixed.
+- `src/navaja/cli.py:195` / `parse_document_url` sits outside the guarded
+  block. Verified harmless: `fetch_full_text` parses the same URL inside the
+  `try`, so an invalid URL returns before that line is reached. Redundant
+  defence, not a live defect.
+- `src/navaja/documents.py:465-480` / the narrowed guard deserves a direct
+  test.
+- `src/navaja/cli.py:121-124` / the `not_attempted` branch of `_report` is
+  uncovered.
+- `src/navaja/cli.py:125-128` / the `else` branch prints `None` when `error`
+  is unset.
+
+### Historical: the blocked first attempt
+
+Lineage `review-af5c840e23bddcac`, tier medium, lens `review-reliability`.
+The reliability lens captured successfully, and its findings were inferential
+rather than deterministic, so the provider required a refuter pass. That pass
+cannot run in this environment:
+
+> Pi host relay reviewer launch configuration is invalid: no model is
+> configured for review-refuter; assign it a model in the agent model routing
+> config
+
+Retried once against the slot that STATUS reoffered, with identical output.
+The failure is deterministic configuration, not a transient error.
+
+Consequence: the lineage stays open in `reviewing`, no authority was burned,
+and **the reliability findings for this candidate were never surfaced**. The
+task 3 changes are implemented and green but unreviewed, and they are not
+committed. Resolving this needs a model assigned to `review-refuter` in the
+agent model routing config, after which the review can be restarted for this
+candidate.
