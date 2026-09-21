@@ -8,13 +8,17 @@ summaries, and read the full text of the resolutions you pick.
 
 ## What navaja is
 
-`navaja-mcp` exposes four tools for an MCP client:
+`navaja-mcp` exposes seven tools for an MCP client:
 
 - `buscar_sentencias` — search by free text and the site's advanced filters.
   No captcha is needed.
 - `listar_localizaciones` — the site's own location vocabulary, ready to pass
   back into a search. No captcha is needed.
-- `ver_texto_completo` — fetch the full text of a resolution.
+- `ver_texto_completo` — fetch the full text of one resolution, blocking until
+  the answer is ready.
+- `iniciar_descargas` — start a non-blocking batch of full-text fetches.
+- `estado_descargas` — cheap metadata polling for the batch.
+- `recoger_descarga` — collect one finished batch result.
 - `estado_servidor` — runtime configuration snapshot.
 
 Search, metadata and the automatic summaries come straight from the public
@@ -203,6 +207,35 @@ The challenge is session-sticky: once the session has solved it, subsequent
 full-text requests in the same session usually do not ask again. In practice
 this means roughly **one solve per research session**, not one per resolution.
 
+### Batch full-text fetching
+
+For more than one document, use the three-step batch flow instead of many
+blocking calls:
+
+1. `iniciar_descargas(urls)` returns immediately with a `captcha_url` and a
+   job id for every URL. The captcha form URL is available before any wait;
+   a human can open it once and leave it open while the batch drains.
+2. Poll `estado_descargas()` until the jobs reach a terminal state. The
+   result is metadata only — job id, URL, state, attempts, pdf path and
+   error code — so polling a large batch is cheap.
+3. Call `recoger_descarga(job_id)` for each finished job. The payload has
+   exactly the same shape as `ver_texto_completo`, so both paths can be
+   handled by the same code.
+
+**Job states:** `queued`, `running`, `done` or `failed`. A state of `done`
+means the runner *returned*, not that the fetch succeeded. A document that
+failed at the fetch level — for example an unparsable URL — still ends in
+`done` with `ok: false` and an `error_code`. Only an unexpected exception
+escaping the runner yields `failed`. Callers must inspect `ok` and
+`error_code` per job and must not treat `done` as success.
+
+**Concurrency:** the worker count comes from `NAVAJA_MAX_CONCURRENTES` and
+defaults to `1`. The default is a product decision of this project, not a
+site-published limit: the repository contains no numeric CENDOJ quota, no
+`Retry-After` handling and no backoff code. Because the captcha is
+session-sticky, one solved challenge normally serves the whole batch, so one
+worker is the conservative default.
+
 ### PDF persistence
 
 When the final response is a PDF, navaja automatically saves the file to disk
@@ -289,6 +322,7 @@ Set these environment variables before starting the server:
 | `NAVAJA_CAPTCHA_HOST` | auto-detect | Interface the local form binds to. When unset, navaja picks the `tailscale0` IPv4 address, falling back to `127.0.0.1`. |
 | `NAVAJA_CAPTCHA_PORT` | `8765` | Port the local form listens on. |
 | `NAVAJA_CAPTCHA_TOKEN` | persisted | Stable URL-path token. When unset, navaja reads or creates `$XDG_STATE_HOME/navaja/captcha-token` (default `~/.local/state/navaja/captcha-token`). Must be at least 16 characters and only contain `A-Z`, `a-z`, `0-9`, `-`, `_`. |
+| `NAVAJA_MAX_CONCURRENTES` | `1` | Worker threads for the batch full-text queue. The default is a product decision of this project, not a site-published limit. |
 | `NAVAJA_PDF_DIR` | `~/.local/share/navaja/pdfs` | Directory where full-text PDFs are automatically saved. Falls back to `$XDG_DATA_HOME/navaja/pdfs` when `XDG_DATA_HOME` is set. |
 
 If `NAVAJA_CAPTCHA_HOST` is `0.0.0.0`, `::`, or empty, the server refuses to
