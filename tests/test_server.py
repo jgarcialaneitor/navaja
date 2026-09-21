@@ -21,6 +21,7 @@ from urllib.parse import parse_qs
 
 from navaja import (
     CendojClient,
+    FullTextError,
     NivelLocalizacion,
     SearchError,
     SearchGatedError,
@@ -32,7 +33,8 @@ from navaja.captcha import (
     stop_shared_captcha_server,
 )
 from navaja import server as navaja_server
-from navaja.cendoj import INDEX_URL, LOCALIZACIONES_URL, SEARCH_URL
+from navaja.cendoj import CONTENIDOS_URL, INDEX_URL, LOCALIZACIONES_URL, SEARCH_URL
+from navaja.documents import PdfSaveResult
 from navaja.server import (
     _captcha_lifespan,
     buscar_sentencias,
@@ -51,6 +53,45 @@ DOC_URL = (
     "https://www.poderjudicial.es/search/AN/openDocument/"
     "ab58557b5ca08f54a0a8778d75e36f0d/20260916"
 )
+
+# Minimal valid PDF with extractable text, for offline full-text tests.
+PDF_BYTES = b"""%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 44 >>
+stream
+BT
+/F1 12 Tf
+100 700 Td
+(Hello PDF) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000261 00000 n 
+0000000355 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+434
+%%EOF
+"""
 
 
 def _free_port() -> int:
@@ -156,6 +197,44 @@ def _combined_transport(sent: list[httpx.Request] | None = None) -> httpx.MockTr
     return httpx.MockTransport(handler)
 
 
+def _pdf_fulltext_transport(
+    sent: list[httpx.Request] | None = None,
+    pdf_bytes: bytes = PDF_BYTES,
+    content_type: str = 'application/pdf; name="SAP_ML_110_2026.pdf"',
+) -> httpx.MockTransport:
+    """Return a PDF on the final POST, so ``pdf_bytes`` is populated."""
+    if sent is None:
+        sent = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        sent.append(request)
+        url = str(request.url)
+        if url == INDEX_URL:
+            return httpx.Response(200, text="<html><body>form</body></html>")
+        if "action=accessToPDF" in url:
+            return httpx.Response(
+                200,
+                text=(
+                    '<html><img src="/search/stickyImg">'
+                    '<form action="captcha"></form></html>'
+                ),
+                headers={"content-type": "text/html"},
+            )
+        if url.endswith("/search/stickyImg"):
+            return httpx.Response(
+                200, content=b"fake-png", headers={"content-type": "image/png"}
+            )
+        if request.method == "POST" and url.startswith(CONTENIDOS_URL):
+            return httpx.Response(
+                200,
+                content=pdf_bytes,
+                headers={"content-type": content_type},
+            )
+        return httpx.Response(404)
+
+    return httpx.MockTransport(handler)
+
+
 def _localizaciones_transport(
     result: str = "&TODAS|MELILLA&MELILLA",
     sent: list[httpx.Request] | None = None,
@@ -242,7 +321,12 @@ def _reset_shared_client():
 @pytest.fixture(autouse=True)
 def _clean_env(monkeypatch, tmp_path):
     """Clear server-specific environment variables so tests are deterministic."""
-    for name in ("NAVAJA_CAPTCHA_HOST", "NAVAJA_CAPTCHA_PORT", "NAVAJA_CAPTCHA_TOKEN"):
+    for name in (
+        "NAVAJA_CAPTCHA_HOST",
+        "NAVAJA_CAPTCHA_PORT",
+        "NAVAJA_CAPTCHA_TOKEN",
+        "NAVAJA_PDF_DIR",
+    ):
         monkeypatch.delenv(name, raising=False)
     # Keep token persistence out of the real home directory.
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "xdg-state"))
@@ -627,6 +711,191 @@ def test_ver_texto_completo_success_path_still_returns_ok_true(monkeypatch):
     assert result["requests"] >= 2
     assert result["content_type"] is not None
     assert "text" in result
+    assert result["pdf_path"] is None
+    assert result["pdf_save_reason"] == "not_pdf"
+    assert result["pdf_save_error"] is None
+
+
+def test_ver_texto_completo_saves_pdf_and_reports_path(monkeypatch, tmp_path):
+    pdf_dir = tmp_path / "pdfs"
+    monkeypatch.setenv("NAVAJA_PDF_DIR", str(pdf_dir))
+    sent: list[httpx.Request] = []
+    SpyClient = _spy_client_class(_pdf_fulltext_transport, sent)
+    monkeypatch.setattr("navaja.server.CendojClient", SpyClient)
+    monkeypatch.setattr(
+        "navaja.cendoj.serve_captcha", lambda *args, **kwargs: CaptchaAnswer("ABCD")
+    )
+
+    result = ver_texto_completo(DOC_URL, espera_segundos=1)
+
+    assert result["ok"] is True
+    assert result["pdf_path"] is not None
+    assert result["pdf_save_reason"] == "server_sent_name"
+    assert result["pdf_save_error"] is None
+
+    saved = Path(result["pdf_path"])
+    assert saved.exists()
+    assert saved.read_bytes() == PDF_BYTES
+    assert saved.name == "SAP_ML_110_2026.pdf"
+    assert str(saved).startswith(str(pdf_dir))
+
+
+def test_ver_texto_completo_html_response_skips_pdf_save(monkeypatch, tmp_path):
+    pdf_dir = tmp_path / "pdfs"
+    monkeypatch.setenv("NAVAJA_PDF_DIR", str(pdf_dir))
+    sent: list[httpx.Request] = []
+    SpyClient = _spy_client_class(_fulltext_transport, sent)
+    monkeypatch.setattr("navaja.server.CendojClient", SpyClient)
+    monkeypatch.setattr(
+        "navaja.cendoj.serve_captcha", lambda *args, **kwargs: CaptchaAnswer("ABCD")
+    )
+
+    result = ver_texto_completo(DOC_URL, espera_segundos=1)
+
+    assert result["ok"] is True
+    assert result["pdf_path"] is None
+    assert result["pdf_save_reason"] == "not_pdf"
+    assert result["pdf_save_error"] is None
+    assert not pdf_dir.exists() or not any(pdf_dir.iterdir())
+
+
+def test_ver_texto_completo_save_failure_still_ok_and_text(monkeypatch, tmp_path):
+    pdf_dir = tmp_path / "pdfs"
+    monkeypatch.setenv("NAVAJA_PDF_DIR", str(pdf_dir))
+    sent: list[httpx.Request] = []
+    SpyClient = _spy_client_class(_pdf_fulltext_transport, sent)
+    monkeypatch.setattr("navaja.server.CendojClient", SpyClient)
+    monkeypatch.setattr(
+        "navaja.cendoj.serve_captcha", lambda *args, **kwargs: CaptchaAnswer("ABCD")
+    )
+
+    def failing_save(*args, **kwargs):
+        return PdfSaveResult(
+            ok=False,
+            path=None,
+            reason="write_failed",
+            error="disk full",
+        )
+
+    monkeypatch.setattr("navaja.server.save_pdf", failing_save)
+
+    result = ver_texto_completo(DOC_URL, espera_segundos=1)
+
+    assert result["ok"] is True
+    assert result["text"] == "Hello PDF"
+    assert result["pdf_path"] is None
+    assert result["pdf_save_reason"] == "write_failed"
+    assert result["pdf_save_error"] == "disk full"
+
+
+def test_ver_texto_completo_bad_pdf_dir_degrades_to_reported_failure(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv("NAVAJA_PDF_DIR", str(tmp_path / "pdfs"))
+    sent: list[httpx.Request] = []
+    SpyClient = _spy_client_class(_pdf_fulltext_transport, sent)
+    monkeypatch.setattr("navaja.server.CendojClient", SpyClient)
+    monkeypatch.setattr(
+        "navaja.cendoj.serve_captcha", lambda *args, **kwargs: CaptchaAnswer("ABCD")
+    )
+
+    def bad_resolver():
+        raise ValueError("malformed NAVAJA_PDF_DIR")
+
+    monkeypatch.setattr("navaja.server.resolve_pdf_destination", bad_resolver)
+
+    result = ver_texto_completo(DOC_URL, espera_segundos=1)
+
+    assert result["ok"] is True
+    assert result["text"] == "Hello PDF"
+    assert result["pdf_path"] is None
+    assert result["pdf_save_reason"] == "resolve_failed"
+    assert "malformed NAVAJA_PDF_DIR" in result["pdf_save_error"]
+
+
+@pytest.mark.parametrize(
+    "scenario, expected_code",
+    [
+        ("invalid_url", "invalid_url"),
+        ("captcha_timeout", "captcha_timeout"),
+        ("full_text_error", "full_text_error"),
+        ("captcha_rejected", "captcha_rejected"),
+    ],
+)
+def test_ver_texto_completo_error_paths_return_uniform_pdf_keys(
+    monkeypatch, tmp_path, scenario, expected_code
+):
+    pdf_dir = tmp_path / "pdfs"
+    monkeypatch.setenv("NAVAJA_PDF_DIR", str(pdf_dir))
+
+    if scenario == "invalid_url":
+        result = ver_texto_completo(
+            "https://www.poderjudicial.es/not-a-document", espera_segundos=1
+        )
+    elif scenario == "captcha_timeout":
+        sent: list[httpx.Request] = []
+        SpyClient = _spy_client_class(_fulltext_transport, sent)
+        monkeypatch.setattr("navaja.server.CendojClient", SpyClient)
+        exc = CaptchaTimeoutError("no captcha answer received")
+        exc.url = "http://127.0.0.1:8765/test-token/"
+        monkeypatch.setattr(
+            "navaja.cendoj.serve_captcha",
+            lambda *args, **kwargs: (_ for _ in ()).throw(exc),
+        )
+        result = ver_texto_completo(DOC_URL, espera_segundos=1)
+    elif scenario == "full_text_error":
+        sent: list[httpx.Request] = []
+        SpyClient = _spy_client_class(_fulltext_transport, sent)
+        monkeypatch.setattr("navaja.server.CendojClient", SpyClient)
+
+        def raise_full_text_error(*args, **kwargs):
+            raise FullTextError("site returned an unexpected response")
+
+        monkeypatch.setattr(
+            "navaja.server.CendojClient.fetch_full_text", raise_full_text_error
+        )
+        result = ver_texto_completo(DOC_URL, espera_segundos=1)
+    else:  # captcha_rejected
+        sent: list[httpx.Request] = []
+        SpyClient = _spy_client_class(_captcha_always_transport, sent)
+        monkeypatch.setattr("navaja.server.CendojClient", SpyClient)
+        monkeypatch.setattr(
+            "navaja.cendoj.serve_captcha",
+            lambda *args, **kwargs: CaptchaAnswer("WRONG"),
+        )
+        result = ver_texto_completo(DOC_URL, espera_segundos=1)
+
+    assert result["error_code"] == expected_code
+    assert "pdf_path" in result
+    assert result["pdf_path"] is None
+    assert "pdf_save_reason" in result
+    assert result["pdf_save_reason"] == "not_attempted"
+    assert "pdf_save_error" in result
+    assert result["pdf_save_error"] is None
+
+
+def test_ver_texto_completo_error_path_and_non_pdf_success_have_distinct_reasons(
+    monkeypatch,
+):
+    """An error path must not claim the same reason as a non-PDF response."""
+    error_result = ver_texto_completo(
+        "https://www.poderjudicial.es/not-a-document", espera_segundos=1
+    )
+    assert error_result["error_code"] == "invalid_url"
+    assert error_result["pdf_save_reason"] == "not_attempted"
+
+    sent: list[httpx.Request] = []
+    SpyClient = _spy_client_class(_fulltext_transport, sent)
+    monkeypatch.setattr("navaja.server.CendojClient", SpyClient)
+    monkeypatch.setattr(
+        "navaja.cendoj.serve_captcha",
+        lambda *args, **kwargs: CaptchaAnswer("ABCD"),
+    )
+    success_result = ver_texto_completo(DOC_URL, espera_segundos=1)
+
+    assert success_result["ok"] is True
+    assert success_result["pdf_save_reason"] == "not_pdf"
+    assert error_result["pdf_save_reason"] != success_result["pdf_save_reason"]
 
 
 # --- Captcha listener lifespan tests ----------------------------------------

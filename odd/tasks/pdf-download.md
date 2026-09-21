@@ -81,7 +81,7 @@ Out of scope, deliberately:
 - [x] 1. Destination resolver and safe PDF writer, with tests covering
       traversal attempts, absent/garbage header names, collisions, non-PDF
       responses, and write failures.
-- [ ] 2. Wire into `ver_texto_completo`: save on success, expose the path and
+- [x] 2. Wire into `ver_texto_completo`: save on success, expose the path and
       the skip/failure reason in the payload, keep `text` unchanged.
 - [ ] 3. CLI parity and README documentation of the variable, default path and
       naming rule.
@@ -126,4 +126,48 @@ Known residual, accepted: a TOCTOU symlink race between the collision probe
 and `write_bytes` requires a local attacker who already has write access to a
 user-owned directory, so it grants no privilege.
 
-Not committed yet; commit is the user's decision.
+Committed as `2f644c7`.
+
+### Task 2
+
+`ver_texto_completo` now saves automatically whenever the fetched response is
+a PDF, and the payload always carries three more keys: `pdf_path`,
+`pdf_save_reason` and `pdf_save_error`. The keys are present on every return
+path, so callers never probe for them.
+
+`pdf_save_reason` separates three situations that the first implementation
+conflated under `not_pdf`:
+
+- `not_attempted` / no response was ever retrieved (`invalid_url`,
+  `captcha_timeout`, `captcha_rejected`, `full_text_error`).
+- `not_pdf` / a response arrived and was not a PDF.
+- `resolve_failed` / the destination could not be resolved.
+
+A save problem never downgrades the fetch: `ok` stays `True` and `text` is
+returned in full. The verifier executed three hostile `NAVAJA_PDF_DIR` values
+against the real code path / a path that is a file, a target under a read-only
+parent, and a `chmod 000` directory / and all three degraded to a reported
+reason with the complete text intact and an empty stdout.
+
+Verification: `uv run pytest` \u2192 273 passed, 1 skipped.
+
+Native review: lineage `review-db439f8918bb7502`, tier medium, lens
+`review-reliability`, approved and acknowledged (authority burned).
+
+### Follow-ups from the approved review
+
+All non-blocking advisories, recorded here as separate later work:
+
+- `src/navaja/server.py:467-482` / the `try` wraps both `resolve_pdf_destination`
+  and `save_pdf`, so an unexpected exception from the latter would be reported
+  as a destination-resolution failure. Narrow the guard.
+- `src/navaja/server.py:476` / `pragma: no cover` sits on a branch that a test
+  actually exercises.
+- `src/navaja/server.py:504-506` / the payload derives its keys from `path` and
+  `reason` and never reads `PdfSaveResult.ok`.
+- `src/navaja/server.py:490-496` / the `not_attempted` branch is reachable only
+  through a not-ok `FullTextResult`; add a direct test.
+- `tests/test_server.py:69-92` / the PDF fixture has an inconsistent startxref
+  pointer, which makes pypdf emit a warning.
+- `tests/test_server.py:740` / a path assertion uses a prefix check where a
+  containment check is the intended meaning.

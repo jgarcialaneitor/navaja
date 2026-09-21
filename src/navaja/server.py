@@ -43,7 +43,12 @@ from navaja.captcha import (
     start_shared_captcha_server,
     stop_shared_captcha_server,
 )
-from navaja.documents import parse_document_url
+from navaja.documents import (
+    PdfSaveResult,
+    parse_document_url,
+    resolve_pdf_destination,
+    save_pdf,
+)
 
 
 _client_lock = threading.Lock()
@@ -366,15 +371,32 @@ def ver_texto_completo(
 
     Returns:
         A dict with ``ok``, ``attempts``, ``requests``, ``content_type`` and
-        ``text``. On failure ``ok`` is ``False`` and the dict also carries
-        ``error`` and ``error_code`` (``captcha_timeout``,
-        ``captcha_rejected``, ``full_text_error`` or ``invalid_url``). When
-        a captcha timeout occurs, ``captcha_url`` contains the form URL so
-        the caller can retry at the same address. The captcha answer itself
-        is never returned.
+        ``text``. When the final response is a PDF, the file is automatically
+        saved to the directory resolved from ``NAVAJA_PDF_DIR`` (falling back
+        to ``$XDG_DATA_HOME/navaja/pdfs`` and then
+        ``~/.local/share/navaja/pdfs``). In that case the dict also carries
+        ``pdf_path`` (the saved file path as a string), ``pdf_save_reason``
+        (why the file has that name, e.g. ``server_sent_name`` or
+        ``identical_bytes``), and ``pdf_save_error`` (``None`` on success).
+
+        If the response is not a PDF, ``pdf_path`` is ``None`` and
+        ``pdf_save_reason`` is ``not_pdf``. If saving fails, ``ok`` remains
+        ``True`` (the fetch itself succeeded), ``text`` is unchanged, and
+        ``pdf_save_error`` contains a human-readable failure message. A
+        failure to resolve the destination directory itself is reported as
+        ``pdf_save_reason="resolve_failed"``.
+
+        On failure ``ok`` is ``False`` and the dict also carries ``error`` and
+        ``error_code`` (``captcha_timeout``, ``captcha_rejected``,
+        ``full_text_error`` or ``invalid_url``). The same PDF keys are always
+        present so callers never have to probe for them, and on these error
+        paths ``pdf_save_reason`` is ``not_attempted`` because no response was
+        fetched and no save was attempted. When a captcha timeout occurs,
+        ``captcha_url`` contains the form URL so the caller can retry at the
+        same address. The captcha answer itself is never returned.
     """
     try:
-        parse_document_url(url)
+        ref = parse_document_url(url)
     except ValueError as exc:
         return {
             "ok": False,
@@ -384,6 +406,9 @@ def ver_texto_completo(
             "requests": None,
             "content_type": None,
             "text": None,
+            "pdf_path": None,
+            "pdf_save_reason": "not_attempted",
+            "pdf_save_error": None,
         }
 
     host, host_reason = resolve_captcha_host()
@@ -418,6 +443,9 @@ def ver_texto_completo(
             "requests": None,
             "content_type": None,
             "text": None,
+            "pdf_path": None,
+            "pdf_save_reason": "not_attempted",
+            "pdf_save_error": None,
         }
         if hasattr(exc, "url"):
             payload["captcha_url"] = exc.url
@@ -431,7 +459,41 @@ def ver_texto_completo(
             "requests": None,
             "content_type": None,
             "text": None,
+            "pdf_path": None,
+            "pdf_save_reason": "not_attempted",
+            "pdf_save_error": None,
         }
+
+    if result.ok and result.pdf_bytes is not None:
+        try:
+            destination, _dest_reason = resolve_pdf_destination()
+            pdf_save_result = save_pdf(
+                result.pdf_bytes,
+                result.content_type,
+                ref,
+                destination,
+            )
+        except Exception as exc:  # pragma: no cover - defensive fallback
+            pdf_save_result = PdfSaveResult(
+                ok=False,
+                path=None,
+                reason="resolve_failed",
+                error=f"Could not resolve PDF destination: {exc}",
+            )
+    elif result.ok:
+        pdf_save_result = PdfSaveResult(
+            ok=False,
+            path=None,
+            reason="not_pdf",
+            error=None,
+        )
+    else:
+        pdf_save_result = PdfSaveResult(
+            ok=False,
+            path=None,
+            reason="not_attempted",
+            error=None,
+        )
 
     payload = {
         "ok": result.ok,
@@ -439,6 +501,9 @@ def ver_texto_completo(
         "requests": result.requests,
         "content_type": result.content_type,
         "text": result.text,
+        "pdf_path": str(pdf_save_result.path) if pdf_save_result.path else None,
+        "pdf_save_reason": pdf_save_result.reason,
+        "pdf_save_error": pdf_save_result.error,
     }
     if result.error is not None:
         payload["error"] = result.error
