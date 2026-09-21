@@ -190,9 +190,10 @@ the site refuses the answer, `full_text_error` for other fetch failures, and
 `invalid_url` when the URL cannot be parsed. Both `captcha_timeout` and
 `captcha_busy` include `captcha_url` in the payload so the caller can open
 the form without reading stderr. The default `espera_segundos` is `120`,
-deliberately well below this deployment's MCP client request timeout (`330`
-seconds in the default Pi configuration), so the server has time to return a
-structured error before the client kills the call.
+deliberately well below the MCP client request timeout configured for
+this deployment in `~/.pi/agent/mcp.json` (`330` seconds there), so the
+server has time to return a structured error before the client kills the
+call.
 
 There is **no automatic captcha solver** in navaja. The captcha image is never
 sent to a vision model, an OCR service, or any third party. A human reads the

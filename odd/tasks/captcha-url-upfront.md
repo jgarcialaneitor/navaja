@@ -158,7 +158,23 @@ this deployment's `~/.pi/agent/mcp.json` value. Softened in both `README.md`
 and the `ver_texto_completo` docstring. No behaviour change; suite re-run green
 at `283 passed, 1 skipped in 23.12s`.
 
-Final diff: 3 files changed, 179 insertions, 29 deletions.
+Follow-up verification round 3, covering exactly those two post-verification
+edits: five claims confirmed (`283 passed, 1 skipped`; the registered tool
+schema still reports `espera_segundos` default 120 with `url` the only
+required parameter; `estado_servidor` still returns a URL that a real HTTP GET
+serves with 200; nothing else in live documentation presents 330 s as
+universal; both committed slices touch exactly the paths they claim, with a
+clean tree). It raised one wording defect, now corrected: 'in the default Pi
+configuration' implied that 330 s was Pi's shipped default, and it is not. It
+is a per-server value in `~/.pi/agent/mcp.json` (`bome-melilla` in the same
+file sets `requestTimeoutMs: 30000`), and the MCP adapter falls back to the MCP
+SDK default when the value is absent. The wording now names the config file
+directly. Round 3 also corrected the line below.
+
+Committed range `84ce698..HEAD`: `README.md`, `src/navaja/server.py`,
+`tests/test_server.py` and this feature document. An earlier version of this
+line said '3 files changed, 179 insertions', which silently excluded this
+document itself.
 
 ### Work unit commits
 

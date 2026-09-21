@@ -367,10 +367,10 @@ def ver_texto_completo(
     Args:
         url: a CENDOJ ``openDocument`` URL.
         espera_segundos: how long to wait for the human answer, in seconds.
-            The default is ``120``, well below this deployment's MCP client
-            request timeout (``330`` seconds in the default Pi configuration),
-            so the server has time to return a structured error before the
-            client kills the call.
+            The default is ``120``, well below the MCP client request timeout
+            configured for this deployment in ``~/.pi/agent/mcp.json``
+            (``330`` seconds there), so the server has time to return a
+            structured error before the client kills the call.
 
     Returns:
         A dict with ``ok``, ``attempts``, ``requests``, ``content_type`` and
