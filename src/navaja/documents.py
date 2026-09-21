@@ -68,7 +68,7 @@ class FullTextError(RuntimeError):
 
 
 _DOCUMENT_PATH_RE = re.compile(
-    r"^/search/AN/openDocument/([0-9a-fA-F]{16}|[0-9a-fA-F]{32})/(\d{8})/?\Z"
+    r"^/search/(AN|TS)/openDocument/([0-9a-fA-F]{16}|[0-9a-fA-F]{32})/(\d{8})/?\Z"
 )
 
 
@@ -89,10 +89,10 @@ def parse_document_url(url: str) -> DocumentRef:
     match = _DOCUMENT_PATH_RE.match(parsed.path)
     if not match:
         raise ValueError(
-            "URL path must be /search/AN/openDocument/<16-or-32-hex-hash>/<YYYYMMDD>"
+            "URL path must be /search/(AN|TS)/openDocument/<16-or-32-hex-hash>/<YYYYMMDD>"
         )
 
-    reference, optimize = match.groups()
+    _collection, reference, optimize = match.groups()
     params: dict[str, str] = {
         "action": "accessToPDF",
         "publicinterface": "true",

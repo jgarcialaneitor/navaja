@@ -1,0 +1,1468 @@
+<!DOCTYPE aside PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<aside xmlns:autn="http://schemas.autonomy.com/aci/">
+<div class="filtersidebar">
+<div class="lnksearchfilters">
+<a href="#" onclick="javascript:toggleFilters(this); return false;"><span>FILTROS</span></a>
+<div id="jurisprudenciaresults_filters" class="searchfilters">
+<ul>
+<li class="checkfilters">
+<div class="checkfiltersButton">
+<button class="btn btn-primary" href="#" onclick="javascript:toggleCheckfilters('jurisprudencia');">Filtrar</button>
+</div>
+</li>
+<li class="navfiltro" data-totalhits="1773" data-idtab="jurisprudencia" data-name="JURISDICCION">
+<a href="#" onclick="javascript:toggleFilter(this); return false;" data-idtab="jurisprudencia" data-database="TS">Jurisdicci&oacute;n <i class="pull-right fa fa-caret-down" aria-hidden="true"></i></a><button style="display:none;" onclick="javascript:removeCheckfilters('jurisprudencia', 'JURISDICCION', this); return false;" data-l10n-id="results.searchresults.filter.button.delfilter" type="button" class="btn btn-primary btn-sm pull-right delfilter">borrar filtro</button>
+<div id="navpfiltroJurisd" class="navpfiltro nicescroll" style="display:none;" tabindex="0"></div>
+</li>
+<li class="navfiltro" data-totalhits="1773" data-idtab="jurisprudencia" data-name="SUBTIPORESOLUCION">
+<a href="#" onclick="javascript:toggleFilter(this); return false;" data-idtab="jurisprudencia" data-database="TS">Resoluci&oacute;n <i class="pull-right fa fa-caret-down" aria-hidden="true"></i></a><button style="display:none;" onclick="javascript:removeCheckfilters('jurisprudencia', 'SUBTIPORESOLUCION', this); return false;" data-l10n-id="results.searchresults.filter.button.delfilter" type="button" class="btn btn-primary btn-sm pull-right delfilter">borrar filtro</button>
+<div id="navpfiltroResolucion" class="navpfiltro nicescroll" style="display:none;" tabindex="0"></div>
+</li>
+<li class="navfiltro" data-totalhits="1773" data-idtab="jurisprudencia" data-name="ANYO">
+<a href="#" onclick="javascript:toggleFilter(this); return false;" data-idtab="jurisprudencia" data-database="TS">A&ntilde;o <i class="pull-right fa fa-caret-down" aria-hidden="true"></i></a><button style="display:none;" onclick="javascript:removeCheckfilters('jurisprudencia', 'ANYO', this); return false;" data-l10n-id="results.searchresults.filter.button.delfilter" type="button" class="btn btn-primary btn-sm pull-right delfilter">borrar filtro</button>
+<div id="navpfiltroAnyo" class="navpfiltro nicescroll" style="display:none;" tabindex="0"></div>
+</li>
+<li class="navfiltro" data-totalhits="1773" data-idtab="jurisprudencia" data-name="PONENTE">
+<a href="#" onclick="javascript:toggleFilter(this); return false;" data-idtab="jurisprudencia" data-database="TS">Ponente <i class="pull-right fa fa-caret-down" aria-hidden="true"></i></a><button style="display:none;" onclick="javascript:removeCheckfilters('jurisprudencia', 'PONENTE', this); return false;" data-l10n-id="results.searchresults.filter.button.delfilter" type="button" class="btn btn-primary btn-sm pull-right delfilter">borrar filtro</button>
+<div id="navpfiltroPonente" class="navpfiltro nicescroll" style="display:none;" tabindex="0"></div>
+</li>
+<li class="checkfilters">
+<div class="checkfiltersButton">
+<button class="btn btn-primary" href="#" onclick="javascript:toggleCheckfilters('jurisprudencia');">Filtrar</button>
+</div>
+</li>
+</ul>
+</div>
+</div>
+<div class="text-center botonera">
+<a href="#" class="btn btn-default newalert"><img src="/search/img/envbell.png" alt=""> Crear alerta</a>
+</div>
+</div>
+</aside><div class="resultswrapper">
+<div class="toppagination row">
+<form id="frmFilterjurisprudencia" name="frmFilterjurisprudencia" action="#" class="searchform" onsubmit="goToPage('jurisprudencia',$(this).find('.slectnavgoto input').val());">
+<input type="hidden" name="total" id="frmFilterjurisprudencia_total" value="200"><input type="hidden" name="records" id="frmFilterjurisprudencia_records" value="20"><input type="hidden" name="page" id="frmFilterjurisprudencia_page" value="1">
+<div class="col-md-5 numhits hidden-xs">
+<b>1773 resultados</b><span class="limitresults tooltips" title="Solamente se muestran hasta 200 resultados, utilice los filtros para acotar la consulta"> (<i class="fa fa-exclamation-circle" aria-hidden="true"></i> m&aacute;ximo documentos a recuperar 200)</span>
+</div>
+<div class="col-xs-12 col-md-7 sort">
+<div class="pull-right col-xs-12 nopad">
+<div id="jurisprudenciaresults_toppagination" class="pull-right searchpagination top nopad"></div>
+<div class="pull-right sortfield hidden-xs">
+<label for="frmFilterjurisprudencia_cbosort" class="oculta">Ordenar:</label><select id="frmFilterjurisprudencia_cbosort" name="cbosort" onchange="javascript:ordenar('jurisprudencia', true);" class="selectpicker form-control pull-left"><option value="Relevance" data-l10n-id="results.pagination.sort.coincidencia">
+												Coincidencia
+											</option><option value="IN_FECHARESOLUCION:increasing" data-l10n-id="results.pagination.sort.fecha.resol.asc">
+												Fecha Resol. [0..9]
+											</option><option value="IN_FECHARESOLUCION:decreasing" data-l10n-id="results.pagination.sort.fecha.resol.desc" selected="true">
+												Fecha Resol. [9..0]
+											</option><option value="IN_FECHAENTRADA:numberdecreasing">
+												Lo m&aacute;s nuevo
+											</option><option value="IP_TIPOORGANO:alphabetical" data-l10n-id="results.pagination.sort.organo.asc">
+												Organo [a..z]
+											</option><option value="IP_TIPOORGANO:reversealphabetical" data-l10n-id="results.pagination.sort.organo.desc">
+												Organo [z..a]
+											</option></select>
+</div>
+<div class="pull-right hidden-xs">
+<label for="frmFilterjurisprudencia_cboresults" class="hidden-xs cboresults">Ver</label>
+<div class="recordsperpagefield ">
+<select id="frmFilterjurisprudencia_cboresults" onchange="javascript:ordenar('jurisprudencia', true);" class="selectpicker form-control"><option value="10">10</option><option value="20" selected="true">20</option><option value="30">30</option><option value="50">50</option></select>
+</div>
+</div>
+</div>
+</div>
+</form>
+</div>
+<div id="jurisprudenciaresults_searchresults" class="row searchresults">
+<div class="row searchresult doc" id="jurisprudenciaresults_content-11853351" data-ref="11853351" data-db="TS" data-fechares="20260907" data-alertdoc="">
+<div class="col-xs-12 col-sm-11 content">
+<div class="title">
+<a href="#" data-link="https://www.poderjudicial.es/search/TS/openDocument/ee62f935e8a3d299a0a8778d75e36f0d/20260917" onclick="markOpenedDoc($(this));openDocumentNewWindow(this);return false;" class="tooltips new-button hidden-xs" title="Abrir el documento en nueva ventana" data-placement="top" aria-label="Icono Abrir el documento en nueva ventana" data-databasematch="TS" data-reference="11853351" data-statsqueryid="320795975" data-links="cl&aacute;usula de conciencia" data-optimize="20260917" data-start="1" data-lang="1"><i class="fa fa-external-link" aria-hidden="true"></i></a><span class="separator hidden-xs">&nbsp;</span><a href="https://www.poderjudicial.es/search/TS/openDocument/ee62f935e8a3d299a0a8778d75e36f0d/20260917" id="ref-11853351" onclick="markOpenedDoc($(this));openDocumentFromHref(this);return false;" data-databasematch="TS" data-reference="11853351" data-statsqueryid="320795975" data-links="cl&aacute;usula de conciencia" data-optimize="20260917" data-roj="STS 3668/2026" data-fechares="20260907" data-alertdoc="" data-start="1" data-lang="1" data-langiso="es">STS, a 07 de septiembre de 2026 - ROJ: STS 3668/2026</a>
+</div>
+<div class="metadatos">
+<ul>
+<li>
+<b>ECLI:ES:TS:2026:3668</b>
+</li>
+<li>
+<b>Sala de lo Civil</b>
+</li>
+<li>N&ordm; de Resoluci&oacute;n: <b>1371/2026</b>
+</li>
+<li>Municipio: <b>Madrid</b>
+</li>
+<li>Ponente: <b>RAFAEL SARAZ&Aacute; JIMENA</b>
+</li>
+<li>N&ordm; Recurso: <b>1589/2020</b>
+</li>
+</ul>
+</div>
+<div class="summary" id="jur-summary-1">
+                                    RESUMEN: <b><font color=red>Cláusula</font> suelo en contrato entre profesionales. Recurso extraordinario por infracción procesal: incongruencia por alteración de la causa de pedir. Se desestima. Recurso de casación. No se aprecia vulneración de la buena fe contractual ni abuso de posición dominante. Se estima. Reiteración de jurisprudencia</b>
+</div>
+<div id="resultLineaJur-11853351" class="resultlineajur" style="display: none;">
+<div class="lineajurheader">
+<h4>Resoluciones del Caso</h4>
+</div>
+<div class="lineajurcontent cuerpo"></div>
+</div>
+</div>
+<div class="col-sm-1">
+<div class="info pull-right">
+<ul></ul>
+</div>
+</div>
+<div class="col-xs-12 actions">
+<div class="pull-left docactions">
+<ul>
+<li id="jur-leglink-1" class="hidden-xs hidden legislacion" data-toggle="popover" data-a="jur-legdiv-1" data-placement="bottom" data-pos="1">
+<a href="#" onclick="return false;" class="tooltips" title="Legislaci&oacute;n relacionada" data-placement="top">
+								Legislaci&oacute;n <i class="fa fa-angle-down" aria-hidden="true"></i></a>
+</li>
+</ul>
+<div id="jur-legdiv-1" class="showLegRel hidden popover-content"></div>
+</div>
+<div class="pull-right docactions">
+<ul>
+<li class="tooltips lineaj" title="Ver resoluciones del Caso" data-placement="bottom">
+<a href="#" onclick="showLineaJur('11853351','20260917'); return false;"><img alt="Ver resoluciones del Caso" src="/search/img/lineaj.png"></a>
+</li>
+<li class="social tooltips" title="compartir en Facebook" data-placement="bottom">
+<a href="#" class="fb-button" aria-label="Icono compartir en Facebook" data-href="https://www.poderjudicial.es/search/TS/openDocument/ee62f935e8a3d299a0a8778d75e36f0d/20260917" data-title="ROJ: STS 3668/2026"><i class="fa fa-facebook-square" aria-hidden="true"></i></a>
+</li>
+<li class="social tooltips twitter" title="compartir en Twitter" data-placement="bottom">
+<a href="#" class="twtr-button" aria-label="Icono compartir en Twitter. Pulse para compartir en Twitter" data-href="https://www.poderjudicial.es/search/TS/openDocument/ee62f935e8a3d299a0a8778d75e36f0d/20260917" data-title="ROJ: STS 3668/2026">
+<svg class="social_twitter" viewBox="0 0 26 26" aria-hidden="true">
+<g>
+<path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path>
+</g>
+</svg>
+</a>
+</li>
+<li class="social tooltips" title="copiar enlace" data-placement="bottom">
+<a href="#" class="cp-button" aria-label="Icono copiar enlace al portapapeles" data-clipboard-text="https://www.poderjudicial.es/search/TS/openDocument/ee62f935e8a3d299a0a8778d75e36f0d/20260917"><i class="fa fa-clipboard" aria-hidden="true"></i></a>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="row searchresult doc" id="jurisprudenciaresults_content-11853340" data-ref="11853340" data-db="TS" data-fechares="20260907" data-alertdoc="">
+<div class="col-xs-12 col-sm-12 content">
+<div class="title">
+<a href="#" data-link="https://www.poderjudicial.es/search/TS/openDocument/0064f3b31d94b1eea0a8778d75e36f0d/20260917" onclick="markOpenedDoc($(this));openDocumentNewWindow(this);return false;" class="tooltips new-button hidden-xs" title="Abrir el documento en nueva ventana" data-placement="top" aria-label="Icono Abrir el documento en nueva ventana" data-databasematch="TS" data-reference="11853340" data-statsqueryid="320795975" data-links="cl&aacute;usula de conciencia" data-optimize="20260917" data-start="2" data-lang="1"><i class="fa fa-external-link" aria-hidden="true"></i></a><span class="separator hidden-xs">&nbsp;</span><a href="https://www.poderjudicial.es/search/TS/openDocument/0064f3b31d94b1eea0a8778d75e36f0d/20260917" id="ref-11853340" onclick="markOpenedDoc($(this));openDocumentFromHref(this);return false;" data-databasematch="TS" data-reference="11853340" data-statsqueryid="320795975" data-links="cl&aacute;usula de conciencia" data-optimize="20260917" data-roj="STS 3654/2026" data-fechares="20260907" data-alertdoc="" data-start="2" data-lang="1" data-langiso="es">STS, a 07 de septiembre de 2026 - ROJ: STS 3654/2026</a>
+</div>
+<div class="metadatos">
+<ul>
+<li>
+<b>ECLI:ES:TS:2026:3654</b>
+</li>
+<li>
+<b>Sala de lo Civil</b>
+</li>
+<li>N&ordm; de Resoluci&oacute;n: <b>1375/2026</b>
+</li>
+<li>Municipio: <b>Madrid</b>
+</li>
+<li>Ponente: <b>RAFAEL SARAZ&Aacute; JIMENA</b>
+</li>
+<li>N&ordm; Recurso: <b>2625/2022</b>
+</li>
+</ul>
+</div>
+<div class="summary" id="jur-summary-2">
+                                    RESUMEN: <b>Reiteración de jurisprudencia sobre novación de <font color=red>cláusula</font> suelo abusiva y renuncia de acciones en acuerdo transaccional respecto de un préstamo hipotecario concertado con consumidores (Banco de Sabadell). Validez de acuerdo posterior que modifica a la baja la <font color=red>cláusula</font> suelo y nulidad de la renuncia. Reiteración de jurisprudencia sobre la prescripción de la acción de restitución de gastos. Reiteración de la jurisprudencia sobre la imposición de costas en primera instancia</b>
+</div>
+</div>
+<div class="">
+<div class="info pull-right">
+<ul></ul>
+</div>
+</div>
+<div class="col-xs-12 actions">
+<div class="pull-left docactions">
+<ul>
+<li id="jur-leglink-2" class="hidden-xs hidden legislacion" data-toggle="popover" data-a="jur-legdiv-2" data-placement="bottom" data-pos="2">
+<a href="#" onclick="return false;" class="tooltips" title="Legislaci&oacute;n relacionada" data-placement="top">
+								Legislaci&oacute;n <i class="fa fa-angle-down" aria-hidden="true"></i></a>
+</li>
+</ul>
+<div id="jur-legdiv-2" class="showLegRel hidden popover-content"></div>
+</div>
+<div class="pull-right docactions">
+<ul>
+<li class="social tooltips" title="compartir en Facebook" data-placement="bottom">
+<a href="#" class="fb-button" aria-label="Icono compartir en Facebook" data-href="https://www.poderjudicial.es/search/TS/openDocument/0064f3b31d94b1eea0a8778d75e36f0d/20260917" data-title="ROJ: STS 3654/2026"><i class="fa fa-facebook-square" aria-hidden="true"></i></a>
+</li>
+<li class="social tooltips twitter" title="compartir en Twitter" data-placement="bottom">
+<a href="#" class="twtr-button" aria-label="Icono compartir en Twitter. Pulse para compartir en Twitter" data-href="https://www.poderjudicial.es/search/TS/openDocument/0064f3b31d94b1eea0a8778d75e36f0d/20260917" data-title="ROJ: STS 3654/2026">
+<svg class="social_twitter" viewBox="0 0 26 26" aria-hidden="true">
+<g>
+<path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path>
+</g>
+</svg>
+</a>
+</li>
+<li class="social tooltips" title="copiar enlace" data-placement="bottom">
+<a href="#" class="cp-button" aria-label="Icono copiar enlace al portapapeles" data-clipboard-text="https://www.poderjudicial.es/search/TS/openDocument/0064f3b31d94b1eea0a8778d75e36f0d/20260917"><i class="fa fa-clipboard" aria-hidden="true"></i></a>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="row searchresult doc" id="jurisprudenciaresults_content-11812264" data-ref="11812264" data-db="TS" data-fechares="20260723" data-alertdoc="">
+<div class="col-xs-12 col-sm-11 content">
+<div class="title">
+<a href="#" data-link="https://www.poderjudicial.es/search/TS/openDocument/adc99d180cddf723a0a8778d75e36f0d/20260803" onclick="markOpenedDoc($(this));openDocumentNewWindow(this);return false;" class="tooltips new-button hidden-xs" title="Abrir el documento en nueva ventana" data-placement="top" aria-label="Icono Abrir el documento en nueva ventana" data-databasematch="TS" data-reference="11812264" data-statsqueryid="320795975" data-links="cl&aacute;usula de conciencia" data-optimize="20260803" data-start="3" data-lang="1"><i class="fa fa-external-link" aria-hidden="true"></i></a><span class="separator hidden-xs">&nbsp;</span><a href="https://www.poderjudicial.es/search/TS/openDocument/adc99d180cddf723a0a8778d75e36f0d/20260803" id="ref-11812264" onclick="markOpenedDoc($(this));openDocumentFromHref(this);return false;" data-databasematch="TS" data-reference="11812264" data-statsqueryid="320795975" data-links="cl&aacute;usula de conciencia" data-optimize="20260803" data-roj="STS 3391/2026" data-fechares="20260723" data-alertdoc="" data-start="3" data-lang="1" data-langiso="es">STS, a 23 de julio de 2026 - ROJ: STS 3391/2026</a>
+</div>
+<div class="metadatos">
+<ul>
+<li>
+<b>ECLI:ES:TS:2026:3391</b>
+</li>
+<li>
+<b>Sala de lo Civil</b>
+</li>
+<li>N&ordm; de Resoluci&oacute;n: <b>1311/2026</b>
+</li>
+<li>Municipio: <b>Madrid</b>
+</li>
+<li>Ponente: <b>RAQUEL BLAZQUEZ MARTIN</b>
+</li>
+<li>N&ordm; Recurso: <b>447/2022</b>
+</li>
+</ul>
+</div>
+<div class="summary" id="jur-summary-3">
+									RESUMEN: <b>Legitimación activa del comprador de una finca para ejercitar una acción de cumplimiento contractual, aunque haya perdido la condición de propietario por el hecho de haber transmitido la finca a terceros.</b>
+</div>
+<div id="resultLineaJur-11812264" class="resultlineajur" style="display: none;">
+<div class="lineajurheader">
+<h4>Resoluciones del Caso</h4>
+</div>
+<div class="lineajurcontent cuerpo"></div>
+</div>
+</div>
+<div class="col-sm-1">
+<div class="info pull-right">
+<ul></ul>
+</div>
+</div>
+<div class="col-xs-12 actions">
+<div class="pull-left docactions">
+<ul>
+<li id="jur-leglink-3" class="hidden-xs hidden legislacion" data-toggle="popover" data-a="jur-legdiv-3" data-placement="bottom" data-pos="3">
+<a href="#" onclick="return false;" class="tooltips" title="Legislaci&oacute;n relacionada" data-placement="top">
+								Legislaci&oacute;n <i class="fa fa-angle-down" aria-hidden="true"></i></a>
+</li>
+</ul>
+<div id="jur-legdiv-3" class="showLegRel hidden popover-content"></div>
+</div>
+<div class="pull-right docactions">
+<ul>
+<li class="tooltips lineaj" title="Ver resoluciones del Caso" data-placement="bottom">
+<a href="#" onclick="showLineaJur('11812264','20260803'); return false;"><img alt="Ver resoluciones del Caso" src="/search/img/lineaj.png"></a>
+</li>
+<li class="social tooltips" title="compartir en Facebook" data-placement="bottom">
+<a href="#" class="fb-button" aria-label="Icono compartir en Facebook" data-href="https://www.poderjudicial.es/search/TS/openDocument/adc99d180cddf723a0a8778d75e36f0d/20260803" data-title="ROJ: STS 3391/2026"><i class="fa fa-facebook-square" aria-hidden="true"></i></a>
+</li>
+<li class="social tooltips twitter" title="compartir en Twitter" data-placement="bottom">
+<a href="#" class="twtr-button" aria-label="Icono compartir en Twitter. Pulse para compartir en Twitter" data-href="https://www.poderjudicial.es/search/TS/openDocument/adc99d180cddf723a0a8778d75e36f0d/20260803" data-title="ROJ: STS 3391/2026">
+<svg class="social_twitter" viewBox="0 0 26 26" aria-hidden="true">
+<g>
+<path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path>
+</g>
+</svg>
+</a>
+</li>
+<li class="social tooltips" title="copiar enlace" data-placement="bottom">
+<a href="#" class="cp-button" aria-label="Icono copiar enlace al portapapeles" data-clipboard-text="https://www.poderjudicial.es/search/TS/openDocument/adc99d180cddf723a0a8778d75e36f0d/20260803"><i class="fa fa-clipboard" aria-hidden="true"></i></a>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="row searchresult doc" id="jurisprudenciaresults_content-11812246" data-ref="11812246" data-db="TS" data-fechares="20260721" data-alertdoc="">
+<div class="col-xs-12 col-sm-11 content">
+<div class="title">
+<a href="#" data-link="https://www.poderjudicial.es/search/TS/openDocument/3b7ff56ce68f2ea2a0a8778d75e36f0d/20260803" onclick="markOpenedDoc($(this));openDocumentNewWindow(this);return false;" class="tooltips new-button hidden-xs" title="Abrir el documento en nueva ventana" data-placement="top" aria-label="Icono Abrir el documento en nueva ventana" data-databasematch="TS" data-reference="11812246" data-statsqueryid="320795975" data-links="cl&aacute;usula de conciencia" data-optimize="20260803" data-start="4" data-lang="1"><i class="fa fa-external-link" aria-hidden="true"></i></a><span class="separator hidden-xs">&nbsp;</span><a href="https://www.poderjudicial.es/search/TS/openDocument/3b7ff56ce68f2ea2a0a8778d75e36f0d/20260803" id="ref-11812246" onclick="markOpenedDoc($(this));openDocumentFromHref(this);return false;" data-databasematch="TS" data-reference="11812246" data-statsqueryid="320795975" data-links="cl&aacute;usula de conciencia" data-optimize="20260803" data-roj="STS 3373/2026" data-fechares="20260721" data-alertdoc="" data-start="4" data-lang="1" data-langiso="es">STS, a 21 de julio de 2026 - ROJ: STS 3373/2026</a>
+</div>
+<div class="metadatos">
+<ul>
+<li>
+<b>ECLI:ES:TS:2026:3373</b>
+</li>
+<li>
+<b>Sala de lo Civil</b>
+</li>
+<li>N&ordm; de Resoluci&oacute;n: <b>1272/2026</b>
+</li>
+<li>Municipio: <b>Madrid</b>
+</li>
+<li>Ponente: <b>RAFAEL SARAZ&Aacute; JIMENA</b>
+</li>
+<li>N&ordm; Recurso: <b>5895/2023</b>
+</li>
+</ul>
+</div>
+<div class="summary" id="jur-summary-4">
+									RESUMEN: <b>Abusividad de la <font color=red>cláusula</font> que fija el interés remuneratorio, evaluada conjuntamente con las que establecen el sistema de amortización revolving. Reiteración de la doctrina de las SSTS del pleno 154 y 155/2025, de 30 de marzo.</b>
+</div>
+<div id="resultLineaJur-11812246" class="resultlineajur" style="display: none;">
+<div class="lineajurheader">
+<h4>Resoluciones del Caso</h4>
+</div>
+<div class="lineajurcontent cuerpo"></div>
+</div>
+</div>
+<div class="col-sm-1">
+<div class="info pull-right">
+<ul></ul>
+</div>
+</div>
+<div class="col-xs-12 actions">
+<div class="pull-left docactions">
+<ul>
+<li id="jur-leglink-4" class="hidden-xs hidden legislacion" data-toggle="popover" data-a="jur-legdiv-4" data-placement="bottom" data-pos="4">
+<a href="#" onclick="return false;" class="tooltips" title="Legislaci&oacute;n relacionada" data-placement="top">
+								Legislaci&oacute;n <i class="fa fa-angle-down" aria-hidden="true"></i></a>
+</li>
+</ul>
+<div id="jur-legdiv-4" class="showLegRel hidden popover-content"></div>
+</div>
+<div class="pull-right docactions">
+<ul>
+<li class="tooltips lineaj" title="Ver resoluciones del Caso" data-placement="bottom">
+<a href="#" onclick="showLineaJur('11812246','20260803'); return false;"><img alt="Ver resoluciones del Caso" src="/search/img/lineaj.png"></a>
+</li>
+<li class="social tooltips" title="compartir en Facebook" data-placement="bottom">
+<a href="#" class="fb-button" aria-label="Icono compartir en Facebook" data-href="https://www.poderjudicial.es/search/TS/openDocument/3b7ff56ce68f2ea2a0a8778d75e36f0d/20260803" data-title="ROJ: STS 3373/2026"><i class="fa fa-facebook-square" aria-hidden="true"></i></a>
+</li>
+<li class="social tooltips twitter" title="compartir en Twitter" data-placement="bottom">
+<a href="#" class="twtr-button" aria-label="Icono compartir en Twitter. Pulse para compartir en Twitter" data-href="https://www.poderjudicial.es/search/TS/openDocument/3b7ff56ce68f2ea2a0a8778d75e36f0d/20260803" data-title="ROJ: STS 3373/2026">
+<svg class="social_twitter" viewBox="0 0 26 26" aria-hidden="true">
+<g>
+<path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path>
+</g>
+</svg>
+</a>
+</li>
+<li class="social tooltips" title="copiar enlace" data-placement="bottom">
+<a href="#" class="cp-button" aria-label="Icono copiar enlace al portapapeles" data-clipboard-text="https://www.poderjudicial.es/search/TS/openDocument/3b7ff56ce68f2ea2a0a8778d75e36f0d/20260803"><i class="fa fa-clipboard" aria-hidden="true"></i></a>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="row searchresult doc" id="jurisprudenciaresults_content-11802546" data-ref="11802546" data-db="TS" data-fechares="20260715" data-alertdoc="">
+<div class="col-xs-12 col-sm-11 content">
+<div class="title">
+<a href="#" data-link="https://www.poderjudicial.es/search/TS/openDocument/9ba047e1cab25e86a0a8778d75e36f0d/20260723" onclick="markOpenedDoc($(this));openDocumentNewWindow(this);return false;" class="tooltips new-button hidden-xs" title="Abrir el documento en nueva ventana" data-placement="top" aria-label="Icono Abrir el documento en nueva ventana" data-databasematch="TS" data-reference="11802546" data-statsqueryid="320795975" data-links="cl&aacute;usula de conciencia" data-optimize="20260723" data-start="5" data-lang="1"><i class="fa fa-external-link" aria-hidden="true"></i></a><span class="separator hidden-xs">&nbsp;</span><a href="https://www.poderjudicial.es/search/TS/openDocument/9ba047e1cab25e86a0a8778d75e36f0d/20260723" id="ref-11802546" onclick="markOpenedDoc($(this));openDocumentFromHref(this);return false;" data-databasematch="TS" data-reference="11802546" data-statsqueryid="320795975" data-links="cl&aacute;usula de conciencia" data-optimize="20260723" data-roj="STS 3171/2026" data-fechares="20260715" data-alertdoc="" data-start="5" data-lang="1" data-langiso="es">STS, a 15 de julio de 2026 - ROJ: STS 3171/2026</a>
+</div>
+<div class="metadatos">
+<ul>
+<li>
+<b>ECLI:ES:TS:2026:3171</b>
+</li>
+<li>
+<b>Sala de lo Civil</b>
+</li>
+<li>N&ordm; de Resoluci&oacute;n: <b>1158/2026</b>
+</li>
+<li>Municipio: <b>Madrid</b>
+</li>
+<li>Ponente: <b>RAFAEL SARAZ&Aacute; JIMENA</b>
+</li>
+<li>N&ordm; Recurso: <b>4492/2023</b>
+</li>
+</ul>
+</div>
+<div class="summary" id="jur-summary-5">
+									RESUMEN: <b>Tarjeta de crédito revolving. Abusividad de <font color=red>cláusula</font> que fija el interés remuneratorio, evaluada conjuntamente con las que establecen el sistema de amortización revolving. Reiteración doctrina de las SSTS del pleno 154 y 155/2025, 30 de marzo. Estimación.</b>
+</div>
+<div id="resultLineaJur-11802546" class="resultlineajur" style="display: none;">
+<div class="lineajurheader">
+<h4>Resoluciones del Caso</h4>
+</div>
+<div class="lineajurcontent cuerpo"></div>
+</div>
+</div>
+<div class="col-sm-1">
+<div class="info pull-right">
+<ul></ul>
+</div>
+</div>
+<div class="col-xs-12 actions">
+<div class="pull-left docactions">
+<ul>
+<li id="jur-leglink-5" class="hidden-xs hidden legislacion" data-toggle="popover" data-a="jur-legdiv-5" data-placement="bottom" data-pos="5">
+<a href="#" onclick="return false;" class="tooltips" title="Legislaci&oacute;n relacionada" data-placement="top">
+								Legislaci&oacute;n <i class="fa fa-angle-down" aria-hidden="true"></i></a>
+</li>
+</ul>
+<div id="jur-legdiv-5" class="showLegRel hidden popover-content"></div>
+</div>
+<div class="pull-right docactions">
+<ul>
+<li class="tooltips lineaj" title="Ver resoluciones del Caso" data-placement="bottom">
+<a href="#" onclick="showLineaJur('11802546','20260723'); return false;"><img alt="Ver resoluciones del Caso" src="/search/img/lineaj.png"></a>
+</li>
+<li class="social tooltips" title="compartir en Facebook" data-placement="bottom">
+<a href="#" class="fb-button" aria-label="Icono compartir en Facebook" data-href="https://www.poderjudicial.es/search/TS/openDocument/9ba047e1cab25e86a0a8778d75e36f0d/20260723" data-title="ROJ: STS 3171/2026"><i class="fa fa-facebook-square" aria-hidden="true"></i></a>
+</li>
+<li class="social tooltips twitter" title="compartir en Twitter" data-placement="bottom">
+<a href="#" class="twtr-button" aria-label="Icono compartir en Twitter. Pulse para compartir en Twitter" data-href="https://www.poderjudicial.es/search/TS/openDocument/9ba047e1cab25e86a0a8778d75e36f0d/20260723" data-title="ROJ: STS 3171/2026">
+<svg class="social_twitter" viewBox="0 0 26 26" aria-hidden="true">
+<g>
+<path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path>
+</g>
+</svg>
+</a>
+</li>
+<li class="social tooltips" title="copiar enlace" data-placement="bottom">
+<a href="#" class="cp-button" aria-label="Icono copiar enlace al portapapeles" data-clipboard-text="https://www.poderjudicial.es/search/TS/openDocument/9ba047e1cab25e86a0a8778d75e36f0d/20260723"><i class="fa fa-clipboard" aria-hidden="true"></i></a>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="row searchresult doc" id="jurisprudenciaresults_content-11794960" data-ref="11794960" data-db="TS" data-fechares="20260710" data-alertdoc="">
+<div class="col-xs-12 col-sm-11 content">
+<div class="title">
+<a href="#" data-link="https://www.poderjudicial.es/search/TS/openDocument/229732925735c937a0a8778d75e36f0d/20260716" onclick="markOpenedDoc($(this));openDocumentNewWindow(this);return false;" class="tooltips new-button hidden-xs" title="Abrir el documento en nueva ventana" data-placement="top" aria-label="Icono Abrir el documento en nueva ventana" data-databasematch="TS" data-reference="11794960" data-statsqueryid="320795975" data-links="cl&aacute;usula de conciencia" data-optimize="20260716" data-start="6" data-lang="1"><i class="fa fa-external-link" aria-hidden="true"></i></a><span class="separator hidden-xs">&nbsp;</span><a href="https://www.poderjudicial.es/search/TS/openDocument/229732925735c937a0a8778d75e36f0d/20260716" id="ref-11794960" onclick="markOpenedDoc($(this));openDocumentFromHref(this);return false;" data-databasematch="TS" data-reference="11794960" data-statsqueryid="320795975" data-links="cl&aacute;usula de conciencia" data-optimize="20260716" data-roj="STS 3021/2026" data-fechares="20260710" data-alertdoc="" data-start="6" data-lang="1" data-langiso="es">STS, a 10 de julio de 2026 - ROJ: STS 3021/2026</a>
+</div>
+<div class="metadatos">
+<ul>
+<li>
+<b>ECLI:ES:TS:2026:3021</b>
+</li>
+<li>
+<b>Sala de lo Civil</b>
+</li>
+<li>N&ordm; de Resoluci&oacute;n: <b>1127/2026</b>
+</li>
+<li>Municipio: <b>Madrid</b>
+</li>
+<li>Ponente: <b>FERNANDO CERD&Aacute; ALBERO</b>
+</li>
+<li>N&ordm; Recurso: <b>4762/2022</b>
+</li>
+</ul>
+</div>
+<div class="summary" id="jur-summary-6">
+									RESUMEN: <b>Seguro de responsabilidad civil de administradores y directivos. Interpretación de la <font color=red>cláusula</font> de exclusión de cobertura de gastos de defensa por reclamaciones referidas a la ampliación de capital de Banco Popular de mayo de 2016.</b>
+</div>
+<div id="resultLineaJur-11794960" class="resultlineajur" style="display: none;">
+<div class="lineajurheader">
+<h4>Resoluciones del Caso</h4>
+</div>
+<div class="lineajurcontent cuerpo"></div>
+</div>
+</div>
+<div class="col-sm-1">
+<div class="info pull-right">
+<ul></ul>
+</div>
+</div>
+<div class="col-xs-12 actions">
+<div class="pull-left docactions">
+<ul>
+<li id="jur-leglink-6" class="hidden-xs hidden legislacion" data-toggle="popover" data-a="jur-legdiv-6" data-placement="bottom" data-pos="6">
+<a href="#" onclick="return false;" class="tooltips" title="Legislaci&oacute;n relacionada" data-placement="top">
+								Legislaci&oacute;n <i class="fa fa-angle-down" aria-hidden="true"></i></a>
+</li>
+</ul>
+<div id="jur-legdiv-6" class="showLegRel hidden popover-content"></div>
+</div>
+<div class="pull-right docactions">
+<ul>
+<li class="tooltips lineaj" title="Ver resoluciones del Caso" data-placement="bottom">
+<a href="#" onclick="showLineaJur('11794960','20260716'); return false;"><img alt="Ver resoluciones del Caso" src="/search/img/lineaj.png"></a>
+</li>
+<li class="social tooltips" title="compartir en Facebook" data-placement="bottom">
+<a href="#" class="fb-button" aria-label="Icono compartir en Facebook" data-href="https://www.poderjudicial.es/search/TS/openDocument/229732925735c937a0a8778d75e36f0d/20260716" data-title="ROJ: STS 3021/2026"><i class="fa fa-facebook-square" aria-hidden="true"></i></a>
+</li>
+<li class="social tooltips twitter" title="compartir en Twitter" data-placement="bottom">
+<a href="#" class="twtr-button" aria-label="Icono compartir en Twitter. Pulse para compartir en Twitter" data-href="https://www.poderjudicial.es/search/TS/openDocument/229732925735c937a0a8778d75e36f0d/20260716" data-title="ROJ: STS 3021/2026">
+<svg class="social_twitter" viewBox="0 0 26 26" aria-hidden="true">
+<g>
+<path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path>
+</g>
+</svg>
+</a>
+</li>
+<li class="social tooltips" title="copiar enlace" data-placement="bottom">
+<a href="#" class="cp-button" aria-label="Icono copiar enlace al portapapeles" data-clipboard-text="https://www.poderjudicial.es/search/TS/openDocument/229732925735c937a0a8778d75e36f0d/20260716"><i class="fa fa-clipboard" aria-hidden="true"></i></a>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="row searchresult doc" id="jurisprudenciaresults_content-11794942" data-ref="11794942" data-db="TS" data-fechares="20260710" data-alertdoc="">
+<div class="col-xs-12 col-sm-11 content">
+<div class="title">
+<a href="#" data-link="https://www.poderjudicial.es/search/TS/openDocument/2a6647279e2ce21da0a8778d75e36f0d/20260716" onclick="markOpenedDoc($(this));openDocumentNewWindow(this);return false;" class="tooltips new-button hidden-xs" title="Abrir el documento en nueva ventana" data-placement="top" aria-label="Icono Abrir el documento en nueva ventana" data-databasematch="TS" data-reference="11794942" data-statsqueryid="320795975" data-links="cl&aacute;usula de conciencia" data-optimize="20260716" data-start="7" data-lang="1"><i class="fa fa-external-link" aria-hidden="true"></i></a><span class="separator hidden-xs">&nbsp;</span><a href="https://www.poderjudicial.es/search/TS/openDocument/2a6647279e2ce21da0a8778d75e36f0d/20260716" id="ref-11794942" onclick="markOpenedDoc($(this));openDocumentFromHref(this);return false;" data-databasematch="TS" data-reference="11794942" data-statsqueryid="320795975" data-links="cl&aacute;usula de conciencia" data-optimize="20260716" data-roj="STS 3000/2026" data-fechares="20260710" data-alertdoc="" data-start="7" data-lang="1" data-langiso="es">STS, a 10 de julio de 2026 - ROJ: STS 3000/2026</a>
+</div>
+<div class="metadatos">
+<ul>
+<li>
+<b>ECLI:ES:TS:2026:3000</b>
+</li>
+<li>
+<b>Sala de lo Civil</b>
+</li>
+<li>N&ordm; de Resoluci&oacute;n: <b>1128/2026</b>
+</li>
+<li>Municipio: <b>Madrid</b>
+</li>
+<li>Ponente: <b>FERNANDO CERD&Aacute; ALBERO</b>
+</li>
+<li>N&ordm; Recurso: <b>2313/2023</b>
+</li>
+</ul>
+</div>
+<div class="summary" id="jur-summary-7">
+									RESUMEN: <b>Seguro de responsabilidad civil de administradores y directivos. Exclusión de la cobertura aseguradora de reclamaciones referidas a la ampliación de capital de Banco Popular realizada en mayo de 2016. Interpretación literal del contrato de seguro.</b>
+</div>
+<div id="resultLineaJur-11794942" class="resultlineajur" style="display: none;">
+<div class="lineajurheader">
+<h4>Resoluciones del Caso</h4>
+</div>
+<div class="lineajurcontent cuerpo"></div>
+</div>
+</div>
+<div class="col-sm-1">
+<div class="info pull-right">
+<ul></ul>
+</div>
+</div>
+<div class="col-xs-12 actions">
+<div class="pull-left docactions">
+<ul>
+<li id="jur-leglink-7" class="hidden-xs hidden legislacion" data-toggle="popover" data-a="jur-legdiv-7" data-placement="bottom" data-pos="7">
+<a href="#" onclick="return false;" class="tooltips" title="Legislaci&oacute;n relacionada" data-placement="top">
+								Legislaci&oacute;n <i class="fa fa-angle-down" aria-hidden="true"></i></a>
+</li>
+</ul>
+<div id="jur-legdiv-7" class="showLegRel hidden popover-content"></div>
+</div>
+<div class="pull-right docactions">
+<ul>
+<li class="tooltips lineaj" title="Ver resoluciones del Caso" data-placement="bottom">
+<a href="#" onclick="showLineaJur('11794942','20260716'); return false;"><img alt="Ver resoluciones del Caso" src="/search/img/lineaj.png"></a>
+</li>
+<li class="social tooltips" title="compartir en Facebook" data-placement="bottom">
+<a href="#" class="fb-button" aria-label="Icono compartir en Facebook" data-href="https://www.poderjudicial.es/search/TS/openDocument/2a6647279e2ce21da0a8778d75e36f0d/20260716" data-title="ROJ: STS 3000/2026"><i class="fa fa-facebook-square" aria-hidden="true"></i></a>
+</li>
+<li class="social tooltips twitter" title="compartir en Twitter" data-placement="bottom">
+<a href="#" class="twtr-button" aria-label="Icono compartir en Twitter. Pulse para compartir en Twitter" data-href="https://www.poderjudicial.es/search/TS/openDocument/2a6647279e2ce21da0a8778d75e36f0d/20260716" data-title="ROJ: STS 3000/2026">
+<svg class="social_twitter" viewBox="0 0 26 26" aria-hidden="true">
+<g>
+<path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path>
+</g>
+</svg>
+</a>
+</li>
+<li class="social tooltips" title="copiar enlace" data-placement="bottom">
+<a href="#" class="cp-button" aria-label="Icono copiar enlace al portapapeles" data-clipboard-text="https://www.poderjudicial.es/search/TS/openDocument/2a6647279e2ce21da0a8778d75e36f0d/20260716"><i class="fa fa-clipboard" aria-hidden="true"></i></a>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="row searchresult doc" id="jurisprudenciaresults_content-11794951" data-ref="11794951" data-db="TS" data-fechares="20260707" data-alertdoc="">
+<div class="col-xs-12 col-sm-12 content">
+<div class="title">
+<a href="#" data-link="https://www.poderjudicial.es/search/TS/openDocument/af83c59a302e74d6a0a8778d75e36f0d/20260716" onclick="markOpenedDoc($(this));openDocumentNewWindow(this);return false;" class="tooltips new-button hidden-xs" title="Abrir el documento en nueva ventana" data-placement="top" aria-label="Icono Abrir el documento en nueva ventana" data-databasematch="TS" data-reference="11794951" data-statsqueryid="320795975" data-links="cl&aacute;usula de conciencia" data-optimize="20260716" data-start="8" data-lang="1"><i class="fa fa-external-link" aria-hidden="true"></i></a><span class="separator hidden-xs">&nbsp;</span><a href="https://www.poderjudicial.es/search/TS/openDocument/af83c59a302e74d6a0a8778d75e36f0d/20260716" id="ref-11794951" onclick="markOpenedDoc($(this));openDocumentFromHref(this);return false;" data-databasematch="TS" data-reference="11794951" data-statsqueryid="320795975" data-links="cl&aacute;usula de conciencia" data-optimize="20260716" data-roj="STS 3011/2026" data-fechares="20260707" data-alertdoc="" data-start="8" data-lang="1" data-langiso="es">STS, a 07 de julio de 2026 - ROJ: STS 3011/2026</a>
+</div>
+<div class="metadatos">
+<ul>
+<li>
+<b>ECLI:ES:TS:2026:3011</b>
+</li>
+<li>
+<b>Sala de lo Civil</b>
+</li>
+<li>N&ordm; de Resoluci&oacute;n: <b>1103/2026</b>
+</li>
+<li>Municipio: <b>Madrid</b>
+</li>
+<li>Ponente: <b>RAFAEL SARAZ&Aacute; JIMENA</b>
+</li>
+<li>N&ordm; Recurso: <b>5047/2021</b>
+</li>
+</ul>
+</div>
+<div class="summary" id="jur-summary-8">
+									RESUMEN: <b>Nulidad de <font color=red>cláusula</font> suelo. Acuerdo posterior de supresión de <font color=red>cláusula</font> suelo y establecimiento de tipo fijo, validez; inexistencia de renuncia. Reiteración de jurisprudencia.</b>
+</div>
+</div>
+<div class="">
+<div class="info pull-right">
+<ul></ul>
+</div>
+</div>
+<div class="col-xs-12 actions">
+<div class="pull-left docactions">
+<ul>
+<li id="jur-leglink-8" class="hidden-xs hidden legislacion" data-toggle="popover" data-a="jur-legdiv-8" data-placement="bottom" data-pos="8">
+<a href="#" onclick="return false;" class="tooltips" title="Legislaci&oacute;n relacionada" data-placement="top">
+								Legislaci&oacute;n <i class="fa fa-angle-down" aria-hidden="true"></i></a>
+</li>
+</ul>
+<div id="jur-legdiv-8" class="showLegRel hidden popover-content"></div>
+</div>
+<div class="pull-right docactions">
+<ul>
+<li class="social tooltips" title="compartir en Facebook" data-placement="bottom">
+<a href="#" class="fb-button" aria-label="Icono compartir en Facebook" data-href="https://www.poderjudicial.es/search/TS/openDocument/af83c59a302e74d6a0a8778d75e36f0d/20260716" data-title="ROJ: STS 3011/2026"><i class="fa fa-facebook-square" aria-hidden="true"></i></a>
+</li>
+<li class="social tooltips twitter" title="compartir en Twitter" data-placement="bottom">
+<a href="#" class="twtr-button" aria-label="Icono compartir en Twitter. Pulse para compartir en Twitter" data-href="https://www.poderjudicial.es/search/TS/openDocument/af83c59a302e74d6a0a8778d75e36f0d/20260716" data-title="ROJ: STS 3011/2026">
+<svg class="social_twitter" viewBox="0 0 26 26" aria-hidden="true">
+<g>
+<path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path>
+</g>
+</svg>
+</a>
+</li>
+<li class="social tooltips" title="copiar enlace" data-placement="bottom">
+<a href="#" class="cp-button" aria-label="Icono copiar enlace al portapapeles" data-clipboard-text="https://www.poderjudicial.es/search/TS/openDocument/af83c59a302e74d6a0a8778d75e36f0d/20260716"><i class="fa fa-clipboard" aria-hidden="true"></i></a>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="row searchresult doc" id="jurisprudenciaresults_content-11794914" data-ref="11794914" data-db="TS" data-fechares="20260702" data-alertdoc="">
+<div class="col-xs-12 col-sm-11 content">
+<div class="title">
+<a href="#" data-link="https://www.poderjudicial.es/search/TS/openDocument/a04ad554944cf7f1a0a8778d75e36f0d/20260716" onclick="markOpenedDoc($(this));openDocumentNewWindow(this);return false;" class="tooltips new-button hidden-xs" title="Abrir el documento en nueva ventana" data-placement="top" aria-label="Icono Abrir el documento en nueva ventana" data-databasematch="TS" data-reference="11794914" data-statsqueryid="320795975" data-links="cl&aacute;usula de conciencia" data-optimize="20260716" data-start="9" data-lang="1"><i class="fa fa-external-link" aria-hidden="true"></i></a><span class="separator hidden-xs">&nbsp;</span><a href="https://www.poderjudicial.es/search/TS/openDocument/a04ad554944cf7f1a0a8778d75e36f0d/20260716" id="ref-11794914" onclick="markOpenedDoc($(this));openDocumentFromHref(this);return false;" data-databasematch="TS" data-reference="11794914" data-statsqueryid="320795975" data-links="cl&aacute;usula de conciencia" data-optimize="20260716" data-roj="STS 2971/2026" data-fechares="20260702" data-alertdoc="" data-start="9" data-lang="1" data-langiso="es">STS, a 02 de julio de 2026 - ROJ: STS 2971/2026</a>
+</div>
+<div class="metadatos">
+<ul>
+<li>
+<b>ECLI:ES:TS:2026:2971</b>
+</li>
+<li>
+<b>Sala de lo Civil</b>
+</li>
+<li>N&ordm; de Resoluci&oacute;n: <b>1074/2026</b>
+</li>
+<li>Municipio: <b>Madrid</b>
+</li>
+<li>Ponente: <b>MANUEL ALMENAR BELENGUER</b>
+</li>
+<li>N&ordm; Recurso: <b>1413/2024</b>
+</li>
+</ul>
+</div>
+<div class="summary" id="jur-summary-9">
+									RESUMEN: <b>Contrato de arrendamiento para uso distinto de vivienda (restaurante de alto standig). Incongruencia de la sentencia de apelación.</b>
+</div>
+<div id="resultLineaJur-11794914" class="resultlineajur" style="display: none;">
+<div class="lineajurheader">
+<h4>Resoluciones del Caso</h4>
+</div>
+<div class="lineajurcontent cuerpo"></div>
+</div>
+</div>
+<div class="col-sm-1">
+<div class="info pull-right">
+<ul></ul>
+</div>
+</div>
+<div class="col-xs-12 actions">
+<div class="pull-left docactions">
+<ul>
+<li id="jur-leglink-9" class="hidden-xs hidden legislacion" data-toggle="popover" data-a="jur-legdiv-9" data-placement="bottom" data-pos="9">
+<a href="#" onclick="return false;" class="tooltips" title="Legislaci&oacute;n relacionada" data-placement="top">
+								Legislaci&oacute;n <i class="fa fa-angle-down" aria-hidden="true"></i></a>
+</li>
+</ul>
+<div id="jur-legdiv-9" class="showLegRel hidden popover-content"></div>
+</div>
+<div class="pull-right docactions">
+<ul>
+<li class="tooltips lineaj" title="Ver resoluciones del Caso" data-placement="bottom">
+<a href="#" onclick="showLineaJur('11794914','20260716'); return false;"><img alt="Ver resoluciones del Caso" src="/search/img/lineaj.png"></a>
+</li>
+<li class="social tooltips" title="compartir en Facebook" data-placement="bottom">
+<a href="#" class="fb-button" aria-label="Icono compartir en Facebook" data-href="https://www.poderjudicial.es/search/TS/openDocument/a04ad554944cf7f1a0a8778d75e36f0d/20260716" data-title="ROJ: STS 2971/2026"><i class="fa fa-facebook-square" aria-hidden="true"></i></a>
+</li>
+<li class="social tooltips twitter" title="compartir en Twitter" data-placement="bottom">
+<a href="#" class="twtr-button" aria-label="Icono compartir en Twitter. Pulse para compartir en Twitter" data-href="https://www.poderjudicial.es/search/TS/openDocument/a04ad554944cf7f1a0a8778d75e36f0d/20260716" data-title="ROJ: STS 2971/2026">
+<svg class="social_twitter" viewBox="0 0 26 26" aria-hidden="true">
+<g>
+<path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path>
+</g>
+</svg>
+</a>
+</li>
+<li class="social tooltips" title="copiar enlace" data-placement="bottom">
+<a href="#" class="cp-button" aria-label="Icono copiar enlace al portapapeles" data-clipboard-text="https://www.poderjudicial.es/search/TS/openDocument/a04ad554944cf7f1a0a8778d75e36f0d/20260716"><i class="fa fa-clipboard" aria-hidden="true"></i></a>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="row searchresult doc" id="jurisprudenciaresults_content-11814738" data-ref="11814738" data-db="TS" data-fechares="20260702" data-alertdoc="">
+<div class="col-xs-12 col-sm-12 content">
+<div class="title">
+<a href="#" data-link="https://www.poderjudicial.es/search/TS/openDocument/4843f318ae5be49aa0a8778d75e36f0d/20260805" onclick="markOpenedDoc($(this));openDocumentNewWindow(this);return false;" class="tooltips new-button hidden-xs" title="Abrir el documento en nueva ventana" data-placement="top" aria-label="Icono Abrir el documento en nueva ventana" data-databasematch="TS" data-reference="11814738" data-statsqueryid="320795975" data-links="cl&aacute;usula de conciencia" data-optimize="20260805" data-start="10" data-lang="1"><i class="fa fa-external-link" aria-hidden="true"></i></a><span class="separator hidden-xs">&nbsp;</span><a href="https://www.poderjudicial.es/search/TS/openDocument/4843f318ae5be49aa0a8778d75e36f0d/20260805" id="ref-11814738" onclick="markOpenedDoc($(this));openDocumentFromHref(this);return false;" data-databasematch="TS" data-reference="11814738" data-statsqueryid="320795975" data-links="cl&aacute;usula de conciencia" data-optimize="20260805" data-roj="ATS 7665/2026" data-fechares="20260702" data-alertdoc="" data-start="10" data-lang="1" data-langiso="es">ATS, a 02 de julio de 2026 - ROJ: ATS 7665/2026</a>
+</div>
+<div class="metadatos">
+<ul>
+<li>
+<b>ECLI:ES:TS:2026:7665A</b>
+</li>
+<li>
+<b>Sala de lo Penal</b>
+</li>
+<li>Municipio: <b>Madrid</b>
+</li>
+<li>Ponente: <b>EDUARDO DE PORRES ORTIZ DE URBINA</b>
+</li>
+<li>N&ordm; Recurso: <b>10199/2026</b>
+</li>
+</ul>
+</div>
+<div class="summary" id="jur-summary-10">
+                                    RESUMEN: <b>RECURSO LEY 41/2015. SENTENCIA DICTADA EN APELACIÓN POR EL T.S.J. Delito: continuado de robo con fuerza en casa habitada (arts. 74, 237, 238.2, 240, 241.1, 2 y 3 CP); robo con intimidación en tentativa (arts. 16 y 242.1 CP); amenazas no condicionales (art. 169.2º CP); quebrantamiento de medida cautelar (art. 468.2 CP); incendio (art. 351, párrafo 1º, inciso 1º, CP). Motivos: vulneración de derechos fundamentales (art. 852 LECrim): derecho a la presunción de inocencia (art. 24.2 CE); vulneración del principio acusatorio, derecho de defensa (arts. 24.1 y 24.2 CE). Infracción de ley (art. 849.1 LECrim): eximente de alteración psíquica (art. 20.1 CP); eximente de intoxicación plena (art. 20.2 CP); eximente incompleta (arts. 21.1, 20.1, 20.2 CP); atenuante cualificada (arts. 21.7, 20.1 y 2, 21.1 CP); amenazas menos graves o leves (arts. 169 y 171 CP</b>
+</div>
+</div>
+<div class="">
+<div class="info pull-right">
+<ul></ul>
+</div>
+</div>
+<div class="col-xs-12 actions">
+<div class="pull-left docactions">
+<ul>
+<li id="jur-leglink-10" class="hidden-xs hidden legislacion" data-toggle="popover" data-a="jur-legdiv-10" data-placement="bottom" data-pos="10">
+<a href="#" onclick="return false;" class="tooltips" title="Legislaci&oacute;n relacionada" data-placement="top">
+								Legislaci&oacute;n <i class="fa fa-angle-down" aria-hidden="true"></i></a>
+</li>
+</ul>
+<div id="jur-legdiv-10" class="showLegRel hidden popover-content"></div>
+</div>
+<div class="pull-right docactions">
+<ul>
+<li class="social tooltips" title="compartir en Facebook" data-placement="bottom">
+<a href="#" class="fb-button" aria-label="Icono compartir en Facebook" data-href="https://www.poderjudicial.es/search/TS/openDocument/4843f318ae5be49aa0a8778d75e36f0d/20260805" data-title="ROJ: ATS 7665/2026"><i class="fa fa-facebook-square" aria-hidden="true"></i></a>
+</li>
+<li class="social tooltips twitter" title="compartir en Twitter" data-placement="bottom">
+<a href="#" class="twtr-button" aria-label="Icono compartir en Twitter. Pulse para compartir en Twitter" data-href="https://www.poderjudicial.es/search/TS/openDocument/4843f318ae5be49aa0a8778d75e36f0d/20260805" data-title="ROJ: ATS 7665/2026">
+<svg class="social_twitter" viewBox="0 0 26 26" aria-hidden="true">
+<g>
+<path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path>
+</g>
+</svg>
+</a>
+</li>
+<li class="social tooltips" title="copiar enlace" data-placement="bottom">
+<a href="#" class="cp-button" aria-label="Icono copiar enlace al portapapeles" data-clipboard-text="https://www.poderjudicial.es/search/TS/openDocument/4843f318ae5be49aa0a8778d75e36f0d/20260805"><i class="fa fa-clipboard" aria-hidden="true"></i></a>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="row searchresult doc" id="jurisprudenciaresults_content-11786457" data-ref="11786457" data-db="TS" data-fechares="20260630" data-alertdoc="">
+<div class="col-xs-12 col-sm-12 content">
+<div class="title">
+<a href="#" data-link="https://www.poderjudicial.es/search/TS/openDocument/eefeefb83d014738a0a8778d75e36f0d/20260709" onclick="markOpenedDoc($(this));openDocumentNewWindow(this);return false;" class="tooltips new-button hidden-xs" title="Abrir el documento en nueva ventana" data-placement="top" aria-label="Icono Abrir el documento en nueva ventana" data-databasematch="TS" data-reference="11786457" data-statsqueryid="320795975" data-links="cl&aacute;usula de conciencia" data-optimize="20260709" data-start="11" data-lang="1"><i class="fa fa-external-link" aria-hidden="true"></i></a><span class="separator hidden-xs">&nbsp;</span><a href="https://www.poderjudicial.es/search/TS/openDocument/eefeefb83d014738a0a8778d75e36f0d/20260709" id="ref-11786457" onclick="markOpenedDoc($(this));openDocumentFromHref(this);return false;" data-databasematch="TS" data-reference="11786457" data-statsqueryid="320795975" data-links="cl&aacute;usula de conciencia" data-optimize="20260709" data-roj="STS 2885/2026" data-fechares="20260630" data-alertdoc="" data-start="11" data-lang="1" data-langiso="es">STS, a 30 de junio de 2026 - ROJ: STS 2885/2026</a>
+</div>
+<div class="metadatos">
+<ul>
+<li>
+<b>ECLI:ES:TS:2026:2885</b>
+</li>
+<li>
+<b>Sala de lo Civil</b>
+</li>
+<li>N&ordm; de Resoluci&oacute;n: <b>1045/2026</b>
+</li>
+<li>Municipio: <b>Madrid</b>
+</li>
+<li>Ponente: <b>PEDRO JOSE VELA TORRES</b>
+</li>
+<li>N&ordm; Recurso: <b>4234/2021</b>
+</li>
+</ul>
+</div>
+<div class="summary" id="jur-summary-11">
+									RESUMEN: <b>Contrato de arrendamiento financiero con un derivado implícito consistente en una permuta financiera de intereses. Acción de nulidad por error en el consentimiento. Congruencia. Inicio del plazo de caducidad: reiteración de jurisprudencia</b>
+</div>
+</div>
+<div class="">
+<div class="info pull-right">
+<ul></ul>
+</div>
+</div>
+<div class="col-xs-12 actions">
+<div class="pull-left docactions">
+<ul>
+<li id="jur-leglink-11" class="hidden-xs hidden legislacion" data-toggle="popover" data-a="jur-legdiv-11" data-placement="bottom" data-pos="11">
+<a href="#" onclick="return false;" class="tooltips" title="Legislaci&oacute;n relacionada" data-placement="top">
+								Legislaci&oacute;n <i class="fa fa-angle-down" aria-hidden="true"></i></a>
+</li>
+</ul>
+<div id="jur-legdiv-11" class="showLegRel hidden popover-content"></div>
+</div>
+<div class="pull-right docactions">
+<ul>
+<li class="social tooltips" title="compartir en Facebook" data-placement="bottom">
+<a href="#" class="fb-button" aria-label="Icono compartir en Facebook" data-href="https://www.poderjudicial.es/search/TS/openDocument/eefeefb83d014738a0a8778d75e36f0d/20260709" data-title="ROJ: STS 2885/2026"><i class="fa fa-facebook-square" aria-hidden="true"></i></a>
+</li>
+<li class="social tooltips twitter" title="compartir en Twitter" data-placement="bottom">
+<a href="#" class="twtr-button" aria-label="Icono compartir en Twitter. Pulse para compartir en Twitter" data-href="https://www.poderjudicial.es/search/TS/openDocument/eefeefb83d014738a0a8778d75e36f0d/20260709" data-title="ROJ: STS 2885/2026">
+<svg class="social_twitter" viewBox="0 0 26 26" aria-hidden="true">
+<g>
+<path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path>
+</g>
+</svg>
+</a>
+</li>
+<li class="social tooltips" title="copiar enlace" data-placement="bottom">
+<a href="#" class="cp-button" aria-label="Icono copiar enlace al portapapeles" data-clipboard-text="https://www.poderjudicial.es/search/TS/openDocument/eefeefb83d014738a0a8778d75e36f0d/20260709"><i class="fa fa-clipboard" aria-hidden="true"></i></a>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="row searchresult doc" id="jurisprudenciaresults_content-11767153" data-ref="11767153" data-db="TS" data-fechares="20260622" data-alertdoc="">
+<div class="col-xs-12 col-sm-11 content">
+<div class="title">
+<a href="#" data-link="https://www.poderjudicial.es/search/TS/openDocument/1c4f8fbbe1884f3aa0a8778d75e36f0d/20260623" onclick="markOpenedDoc($(this));openDocumentNewWindow(this);return false;" class="tooltips new-button hidden-xs" title="Abrir el documento en nueva ventana" data-placement="top" aria-label="Icono Abrir el documento en nueva ventana" data-databasematch="TS" data-reference="11767153" data-statsqueryid="320795975" data-links="cl&aacute;usula de conciencia" data-optimize="20260623" data-start="12" data-lang="1"><i class="fa fa-external-link" aria-hidden="true"></i></a><span class="separator hidden-xs">&nbsp;</span><a href="https://www.poderjudicial.es/search/TS/openDocument/1c4f8fbbe1884f3aa0a8778d75e36f0d/20260623" id="ref-11767153" onclick="markOpenedDoc($(this));openDocumentFromHref(this);return false;" data-databasematch="TS" data-reference="11767153" data-statsqueryid="320795975" data-links="cl&aacute;usula de conciencia" data-optimize="20260623" data-roj="STS 2553/2026" data-fechares="20260622" data-alertdoc="" data-start="12" data-lang="1" data-langiso="es">STS, a 22 de junio de 2026 - ROJ: STS 2553/2026</a>
+</div>
+<div class="metadatos">
+<ul>
+<li>
+<b>ECLI:ES:TS:2026:2553</b>
+</li>
+<li>
+<b>Sala de lo Penal</b>
+</li>
+<li>N&ordm; de Resoluci&oacute;n: <b>418/2026</b>
+</li>
+<li>Municipio: <b>Madrid</b>
+</li>
+<li>Ponente: <b>ANDRES MARTINEZ ARRIETA</b>
+</li>
+<li>N&ordm; Recurso: <b>20775/2020</b>
+</li>
+</ul>
+</div>
+<div class="summary" id="summ-actualidad-12">
+<b>Delitos de organización criminal, cohecho, malversación y tráfico de influencias.</b>
+</div>
+<div class="summary" id="summ-juridico-12">
+<b>"""II. DERECHO PROCESAL PENAL.1. Proceso penal.1.1. Principios procesales. 1.1.4. Derecho a un proceso con todas las garantías. Principio de contradicción", III. DERECHO PENAL SUSTANTIVO. 1. Parte General. 1.2. Atenuantes", III. DERECHO PENAL SUSTANTIVO. 1. Parte General. 1.8. Comiso", 2. Parte Especial. 2.14. Delitos contra la Administración Pública. Prevaricación, cohecho y malversación</b>
+</div>
+<div id="resultLineaJur-11767153" class="resultlineajur" style="display: none;">
+<div class="lineajurheader">
+<h4>Resoluciones del Caso</h4>
+</div>
+<div class="lineajurcontent cuerpo"></div>
+</div>
+</div>
+<div class="col-sm-1">
+<div class="info pull-right">
+<ul>
+<li class="tooltips interesjuridico" data-placement="top" title="Pinche para ver/ocultar el resumen de inter&eacute;s TS">
+<a href="#" class="marca" data-summaryid="summ-juridico-12"><img alt="Pinche para ver/ocultar el resumen de inter&eacute;s TS" src="/search/img/j/b_interes_j.png"></a>
+</li>
+<li class="tooltips actualidad" title="Pinche para ver/ocultar el resumen de actualidad" data-placement="top">
+<a href="#" class="marca" data-summaryid="summ-actualidad-12"><img alt="Pinche para ver/ocultar el resumen de actualidad" src="/search/img/j/b_actual.png"></a>
+</li>
+</ul>
+</div>
+</div>
+<div class="col-xs-12 actions">
+<div class="pull-left docactions">
+<ul>
+<li id="jur-leglink-12" class="hidden-xs hidden legislacion" data-toggle="popover" data-a="jur-legdiv-12" data-placement="bottom" data-pos="12">
+<a href="#" onclick="return false;" class="tooltips" title="Legislaci&oacute;n relacionada" data-placement="top">
+								Legislaci&oacute;n <i class="fa fa-angle-down" aria-hidden="true"></i></a>
+</li>
+</ul>
+<div id="jur-legdiv-12" class="showLegRel hidden popover-content"></div>
+</div>
+<div class="pull-right docactions">
+<ul>
+<li class="tooltips lineaj" title="Ver resoluciones del Caso" data-placement="bottom">
+<a href="#" onclick="showLineaJur('11767153','20260623'); return false;"><img alt="Ver resoluciones del Caso" src="/search/img/lineaj.png"></a>
+</li>
+<li class="social tooltips" title="compartir en Facebook" data-placement="bottom">
+<a href="#" class="fb-button" aria-label="Icono compartir en Facebook" data-href="https://www.poderjudicial.es/search/TS/openDocument/1c4f8fbbe1884f3aa0a8778d75e36f0d/20260623" data-title="ROJ: STS 2553/2026"><i class="fa fa-facebook-square" aria-hidden="true"></i></a>
+</li>
+<li class="social tooltips twitter" title="compartir en Twitter" data-placement="bottom">
+<a href="#" class="twtr-button" aria-label="Icono compartir en Twitter. Pulse para compartir en Twitter" data-href="https://www.poderjudicial.es/search/TS/openDocument/1c4f8fbbe1884f3aa0a8778d75e36f0d/20260623" data-title="ROJ: STS 2553/2026">
+<svg class="social_twitter" viewBox="0 0 26 26" aria-hidden="true">
+<g>
+<path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path>
+</g>
+</svg>
+</a>
+</li>
+<li class="social tooltips" title="copiar enlace" data-placement="bottom">
+<a href="#" class="cp-button" aria-label="Icono copiar enlace al portapapeles" data-clipboard-text="https://www.poderjudicial.es/search/TS/openDocument/1c4f8fbbe1884f3aa0a8778d75e36f0d/20260623"><i class="fa fa-clipboard" aria-hidden="true"></i></a>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="row searchresult doc" id="jurisprudenciaresults_content-11778905" data-ref="11778905" data-db="TS" data-fechares="20260619" data-alertdoc="">
+<div class="col-xs-12 col-sm-12 content">
+<div class="title">
+<a href="#" data-link="https://www.poderjudicial.es/search/TS/openDocument/76127b2a39ae6c69a0a8778d75e36f0d/20260702" onclick="markOpenedDoc($(this));openDocumentNewWindow(this);return false;" class="tooltips new-button hidden-xs" title="Abrir el documento en nueva ventana" data-placement="top" aria-label="Icono Abrir el documento en nueva ventana" data-databasematch="TS" data-reference="11778905" data-statsqueryid="320795975" data-links="cl&aacute;usula de conciencia" data-optimize="20260702" data-start="13" data-lang="1"><i class="fa fa-external-link" aria-hidden="true"></i></a><span class="separator hidden-xs">&nbsp;</span><a href="https://www.poderjudicial.es/search/TS/openDocument/76127b2a39ae6c69a0a8778d75e36f0d/20260702" id="ref-11778905" onclick="markOpenedDoc($(this));openDocumentFromHref(this);return false;" data-databasematch="TS" data-reference="11778905" data-statsqueryid="320795975" data-links="cl&aacute;usula de conciencia" data-optimize="20260702" data-roj="STS 2855/2026" data-fechares="20260619" data-alertdoc="" data-start="13" data-lang="1" data-langiso="es">STS, a 19 de junio de 2026 - ROJ: STS 2855/2026</a>
+</div>
+<div class="metadatos">
+<ul>
+<li>
+<b>ECLI:ES:TS:2026:2855</b>
+</li>
+<li>
+<b>Sala de lo Penal</b>
+</li>
+<li>N&ordm; de Resoluci&oacute;n: <b>419/2026</b>
+</li>
+<li>Municipio: <b>Madrid</b>
+</li>
+<li>Ponente: <b>PABLO LLARENA CONDE</b>
+</li>
+<li>N&ordm; Recurso: <b>5438/2023</b>
+</li>
+</ul>
+</div>
+<div class="summary" id="jur-summary-13">
+                                    RESUMEN: <b>PRINCIPIO ACUSATORIO Y CORRELACIÓN ENTRE ACUSACIÓN Y SENTENCIA. Modificación del título de intervención -autoría frente a cooperación necesaria-, condena por delitos supuestamente no acusados, continuidad delictiva y adecuación entre pretensión punitiva y pena impuesta. LICITUD DE LAS GRABACIONES Y PROTECCIÓN DEL ENTORNO DIGITAL. Grabación efectuada por su interlocutor. Aportación hecha por particular. Conexión de antijuridicidad con diligencias posteriores. La sentencia acepta la relevancia constitucional del acceso a dispositivos digitales, pero considera que existió cobertura judicial para el volcado y que no quedó acreditada manipulación invalidante. PREVARICACIÓN ADMINISTRATIVA EN CONTRATACIÓN PÚBLICA. Alcance del artículo 404 del Código Penal en supuestos de contratación irregular, especialmente en el fraccionamiento artificioso de contratos menores para eludir publicidad, concurrencia y procedimiento de adjudicación. Puede haber prevaricación aunque la acusada no dicte formalmente la resolución final, atendiendo a su intervención funcional, decisiva y consciente en la generación de la apariencia de legalidad del expediente. Autoría directa y cooperación necesaria. MALVERSACIÓN DE CAUDALES PÚBLICOS Y REFORMA DE LA LO 14/2022. La facturación por servicios inexistentes o con sobrecostes, abonada con fondos públicos y dirigida a beneficiar a terceros, encaja en la apropiación o consentimiento de apropiación de patrimonio público, no en una mera irregularidad administrativa ni en una simple aplicación pública distinta. FALSEDAD DOCUMENTAL OFICIAL Y MERCANTIL. Falsedad en documento oficial por documentos creados para su incorporación a expedientes públicos. Diferencia entre documento mercantil, documento privado, documento oficial por destino y falsedad ideológica cometida por particulares; la autoría mediata o funcional en la falsedad; y la posibilidad de apreciar delitos continuados diferenciados cuando existen bloques documentales y finalidades autónomas. RELACIÓN ENTRE FALSEDAD DOCUMENTAL, MALVERSACIÓN Y BLANQUEO</b>
+</div>
+</div>
+<div class="">
+<div class="info pull-right">
+<ul></ul>
+</div>
+</div>
+<div class="col-xs-12 actions">
+<div class="pull-left docactions">
+<ul>
+<li id="jur-leglink-13" class="hidden-xs hidden legislacion" data-toggle="popover" data-a="jur-legdiv-13" data-placement="bottom" data-pos="13">
+<a href="#" onclick="return false;" class="tooltips" title="Legislaci&oacute;n relacionada" data-placement="top">
+								Legislaci&oacute;n <i class="fa fa-angle-down" aria-hidden="true"></i></a>
+</li>
+</ul>
+<div id="jur-legdiv-13" class="showLegRel hidden popover-content"></div>
+</div>
+<div class="pull-right docactions">
+<ul>
+<li class="social tooltips" title="compartir en Facebook" data-placement="bottom">
+<a href="#" class="fb-button" aria-label="Icono compartir en Facebook" data-href="https://www.poderjudicial.es/search/TS/openDocument/76127b2a39ae6c69a0a8778d75e36f0d/20260702" data-title="ROJ: STS 2855/2026"><i class="fa fa-facebook-square" aria-hidden="true"></i></a>
+</li>
+<li class="social tooltips twitter" title="compartir en Twitter" data-placement="bottom">
+<a href="#" class="twtr-button" aria-label="Icono compartir en Twitter. Pulse para compartir en Twitter" data-href="https://www.poderjudicial.es/search/TS/openDocument/76127b2a39ae6c69a0a8778d75e36f0d/20260702" data-title="ROJ: STS 2855/2026">
+<svg class="social_twitter" viewBox="0 0 26 26" aria-hidden="true">
+<g>
+<path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path>
+</g>
+</svg>
+</a>
+</li>
+<li class="social tooltips" title="copiar enlace" data-placement="bottom">
+<a href="#" class="cp-button" aria-label="Icono copiar enlace al portapapeles" data-clipboard-text="https://www.poderjudicial.es/search/TS/openDocument/76127b2a39ae6c69a0a8778d75e36f0d/20260702"><i class="fa fa-clipboard" aria-hidden="true"></i></a>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="row searchresult doc" id="jurisprudenciaresults_content-11770147" data-ref="11770147" data-db="TS" data-fechares="20260617" data-alertdoc="">
+<div class="col-xs-12 col-sm-11 content">
+<div class="title">
+<a href="#" data-link="https://www.poderjudicial.es/search/TS/openDocument/5d9cb0a1330d0767a0a8778d75e36f0d/20260625" onclick="markOpenedDoc($(this));openDocumentNewWindow(this);return false;" class="tooltips new-button hidden-xs" title="Abrir el documento en nueva ventana" data-placement="top" aria-label="Icono Abrir el documento en nueva ventana" data-databasematch="TS" data-reference="11770147" data-statsqueryid="320795975" data-links="cl&aacute;usula de conciencia" data-optimize="20260625" data-start="14" data-lang="1"><i class="fa fa-external-link" aria-hidden="true"></i></a><span class="separator hidden-xs">&nbsp;</span><a href="https://www.poderjudicial.es/search/TS/openDocument/5d9cb0a1330d0767a0a8778d75e36f0d/20260625" id="ref-11770147" onclick="markOpenedDoc($(this));openDocumentFromHref(this);return false;" data-databasematch="TS" data-reference="11770147" data-statsqueryid="320795975" data-links="cl&aacute;usula de conciencia" data-optimize="20260625" data-roj="STS 2624/2026" data-fechares="20260617" data-alertdoc="" data-start="14" data-lang="1" data-langiso="es">STS, a 17 de junio de 2026 - ROJ: STS 2624/2026</a>
+</div>
+<div class="metadatos">
+<ul>
+<li>
+<b>ECLI:ES:TS:2026:2624</b>
+</li>
+<li>
+<b>Sala de lo Penal</b>
+</li>
+<li>N&ordm; de Resoluci&oacute;n: <b>408/2026</b>
+</li>
+<li>Municipio: <b>Madrid</b>
+</li>
+<li>Ponente: <b>SUSANA POLO GARCIA</b>
+</li>
+<li>N&ordm; Recurso: <b>5015/2023</b>
+</li>
+</ul>
+</div>
+<div class="summary" id="jur-summary-14">
+									RESUMEN: <b>Hurto intentado. Cuota de la multa. Desistimiento.</b>
+</div>
+<div id="resultLineaJur-11770147" class="resultlineajur" style="display: none;">
+<div class="lineajurheader">
+<h4>Resoluciones del Caso</h4>
+</div>
+<div class="lineajurcontent cuerpo"></div>
+</div>
+</div>
+<div class="col-sm-1">
+<div class="info pull-right">
+<ul></ul>
+</div>
+</div>
+<div class="col-xs-12 actions">
+<div class="pull-left docactions">
+<ul>
+<li id="jur-leglink-14" class="hidden-xs hidden legislacion" data-toggle="popover" data-a="jur-legdiv-14" data-placement="bottom" data-pos="14">
+<a href="#" onclick="return false;" class="tooltips" title="Legislaci&oacute;n relacionada" data-placement="top">
+								Legislaci&oacute;n <i class="fa fa-angle-down" aria-hidden="true"></i></a>
+</li>
+</ul>
+<div id="jur-legdiv-14" class="showLegRel hidden popover-content"></div>
+</div>
+<div class="pull-right docactions">
+<ul>
+<li class="tooltips lineaj" title="Ver resoluciones del Caso" data-placement="bottom">
+<a href="#" onclick="showLineaJur('11770147','20260625'); return false;"><img alt="Ver resoluciones del Caso" src="/search/img/lineaj.png"></a>
+</li>
+<li class="social tooltips" title="compartir en Facebook" data-placement="bottom">
+<a href="#" class="fb-button" aria-label="Icono compartir en Facebook" data-href="https://www.poderjudicial.es/search/TS/openDocument/5d9cb0a1330d0767a0a8778d75e36f0d/20260625" data-title="ROJ: STS 2624/2026"><i class="fa fa-facebook-square" aria-hidden="true"></i></a>
+</li>
+<li class="social tooltips twitter" title="compartir en Twitter" data-placement="bottom">
+<a href="#" class="twtr-button" aria-label="Icono compartir en Twitter. Pulse para compartir en Twitter" data-href="https://www.poderjudicial.es/search/TS/openDocument/5d9cb0a1330d0767a0a8778d75e36f0d/20260625" data-title="ROJ: STS 2624/2026">
+<svg class="social_twitter" viewBox="0 0 26 26" aria-hidden="true">
+<g>
+<path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path>
+</g>
+</svg>
+</a>
+</li>
+<li class="social tooltips" title="copiar enlace" data-placement="bottom">
+<a href="#" class="cp-button" aria-label="Icono copiar enlace al portapapeles" data-clipboard-text="https://www.poderjudicial.es/search/TS/openDocument/5d9cb0a1330d0767a0a8778d75e36f0d/20260625"><i class="fa fa-clipboard" aria-hidden="true"></i></a>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="row searchresult doc" id="jurisprudenciaresults_content-11770129" data-ref="11770129" data-db="TS" data-fechares="20260616" data-alertdoc="">
+<div class="col-xs-12 col-sm-11 content">
+<div class="title">
+<a href="#" data-link="https://www.poderjudicial.es/search/TS/openDocument/e6d6428c738695c2a0a8778d75e36f0d/20260625" onclick="markOpenedDoc($(this));openDocumentNewWindow(this);return false;" class="tooltips new-button hidden-xs" title="Abrir el documento en nueva ventana" data-placement="top" aria-label="Icono Abrir el documento en nueva ventana" data-databasematch="TS" data-reference="11770129" data-statsqueryid="320795975" data-links="cl&aacute;usula de conciencia" data-optimize="20260625" data-start="15" data-lang="1"><i class="fa fa-external-link" aria-hidden="true"></i></a><span class="separator hidden-xs">&nbsp;</span><a href="https://www.poderjudicial.es/search/TS/openDocument/e6d6428c738695c2a0a8778d75e36f0d/20260625" id="ref-11770129" onclick="markOpenedDoc($(this));openDocumentFromHref(this);return false;" data-databasematch="TS" data-reference="11770129" data-statsqueryid="320795975" data-links="cl&aacute;usula de conciencia" data-optimize="20260625" data-roj="STS 2643/2026" data-fechares="20260616" data-alertdoc="" data-start="15" data-lang="1" data-langiso="es">STS, a 16 de junio de 2026 - ROJ: STS 2643/2026</a>
+</div>
+<div class="metadatos">
+<ul>
+<li>
+<b>ECLI:ES:TS:2026:2643</b>
+</li>
+<li>
+<b>Sala de lo Civil</b>
+</li>
+<li>N&ordm; de Resoluci&oacute;n: <b>921/2026</b>
+</li>
+<li>Municipio: <b>Madrid</b>
+</li>
+<li>Ponente: <b>FERNANDO CERD&Aacute; ALBERO</b>
+</li>
+<li>N&ordm; Recurso: <b>4045/2022</b>
+</li>
+</ul>
+</div>
+<div class="summary" id="jur-summary-15">
+									RESUMEN: <b>Reclamación frente a aseguradora por gastos de defensa. Interpretación literal de <font color=red>cláusula</font> excluyente.</b>
+</div>
+<div id="resultLineaJur-11770129" class="resultlineajur" style="display: none;">
+<div class="lineajurheader">
+<h4>Resoluciones del Caso</h4>
+</div>
+<div class="lineajurcontent cuerpo"></div>
+</div>
+</div>
+<div class="col-sm-1">
+<div class="info pull-right">
+<ul></ul>
+</div>
+</div>
+<div class="col-xs-12 actions">
+<div class="pull-left docactions">
+<ul>
+<li id="jur-leglink-15" class="hidden-xs hidden legislacion" data-toggle="popover" data-a="jur-legdiv-15" data-placement="bottom" data-pos="15">
+<a href="#" onclick="return false;" class="tooltips" title="Legislaci&oacute;n relacionada" data-placement="top">
+								Legislaci&oacute;n <i class="fa fa-angle-down" aria-hidden="true"></i></a>
+</li>
+</ul>
+<div id="jur-legdiv-15" class="showLegRel hidden popover-content"></div>
+</div>
+<div class="pull-right docactions">
+<ul>
+<li class="tooltips lineaj" title="Ver resoluciones del Caso" data-placement="bottom">
+<a href="#" onclick="showLineaJur('11770129','20260625'); return false;"><img alt="Ver resoluciones del Caso" src="/search/img/lineaj.png"></a>
+</li>
+<li class="social tooltips" title="compartir en Facebook" data-placement="bottom">
+<a href="#" class="fb-button" aria-label="Icono compartir en Facebook" data-href="https://www.poderjudicial.es/search/TS/openDocument/e6d6428c738695c2a0a8778d75e36f0d/20260625" data-title="ROJ: STS 2643/2026"><i class="fa fa-facebook-square" aria-hidden="true"></i></a>
+</li>
+<li class="social tooltips twitter" title="compartir en Twitter" data-placement="bottom">
+<a href="#" class="twtr-button" aria-label="Icono compartir en Twitter. Pulse para compartir en Twitter" data-href="https://www.poderjudicial.es/search/TS/openDocument/e6d6428c738695c2a0a8778d75e36f0d/20260625" data-title="ROJ: STS 2643/2026">
+<svg class="social_twitter" viewBox="0 0 26 26" aria-hidden="true">
+<g>
+<path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path>
+</g>
+</svg>
+</a>
+</li>
+<li class="social tooltips" title="copiar enlace" data-placement="bottom">
+<a href="#" class="cp-button" aria-label="Icono copiar enlace al portapapeles" data-clipboard-text="https://www.poderjudicial.es/search/TS/openDocument/e6d6428c738695c2a0a8778d75e36f0d/20260625"><i class="fa fa-clipboard" aria-hidden="true"></i></a>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="row searchresult doc" id="jurisprudenciaresults_content-11770269" data-ref="11770269" data-db="TS" data-fechares="20260611" data-alertdoc="">
+<div class="col-xs-12 col-sm-11 content">
+<div class="title">
+<a href="#" data-link="https://www.poderjudicial.es/search/TS/openDocument/b0695bdee7e3cc35a0a8778d75e36f0d/20260625" onclick="markOpenedDoc($(this));openDocumentNewWindow(this);return false;" class="tooltips new-button hidden-xs" title="Abrir el documento en nueva ventana" data-placement="top" aria-label="Icono Abrir el documento en nueva ventana" data-databasematch="TS" data-reference="11770269" data-statsqueryid="320795975" data-links="cl&aacute;usula de conciencia" data-optimize="20260625" data-start="16" data-lang="1"><i class="fa fa-external-link" aria-hidden="true"></i></a><span class="separator hidden-xs">&nbsp;</span><a href="https://www.poderjudicial.es/search/TS/openDocument/b0695bdee7e3cc35a0a8778d75e36f0d/20260625" id="ref-11770269" onclick="markOpenedDoc($(this));openDocumentFromHref(this);return false;" data-databasematch="TS" data-reference="11770269" data-statsqueryid="320795975" data-links="cl&aacute;usula de conciencia" data-optimize="20260625" data-roj="STS 2652/2026" data-fechares="20260611" data-alertdoc="" data-start="16" data-lang="1" data-langiso="es">STS, a 11 de junio de 2026 - ROJ: STS 2652/2026</a>
+</div>
+<div class="metadatos">
+<ul>
+<li>
+<b>ECLI:ES:TS:2026:2652</b>
+</li>
+<li>
+<b>Sala de lo Social</b>
+</li>
+<li>N&ordm; de Resoluci&oacute;n: <b>540/2026</b>
+</li>
+<li>Municipio: <b>Madrid</b>
+</li>
+<li>Ponente: <b>LUISA MARIA GOMEZ GARRIDO</b>
+</li>
+<li>N&ordm; Recurso: <b>151/2025</b>
+</li>
+</ul>
+</div>
+<div class="summary" id="jur-summary-16">
+									RESUMEN: <b>Conflicto colectivo. Los tres días de libre disposición del III Convenio colectivo del sector de la sanidad concertada de Cataluña deben retribuirse con los pluses de sábados, domingos, festivos y festivos especiales salvo para personal de enfermería.</b>
+</div>
+<div id="resultLineaJur-11770269" class="resultlineajur" style="display: none;">
+<div class="lineajurheader">
+<h4>Resoluciones del Caso</h4>
+</div>
+<div class="lineajurcontent cuerpo"></div>
+</div>
+</div>
+<div class="col-sm-1">
+<div class="info pull-right">
+<ul></ul>
+</div>
+</div>
+<div class="col-xs-12 actions">
+<div class="pull-left docactions">
+<ul>
+<li id="jur-leglink-16" class="hidden-xs hidden legislacion" data-toggle="popover" data-a="jur-legdiv-16" data-placement="bottom" data-pos="16">
+<a href="#" onclick="return false;" class="tooltips" title="Legislaci&oacute;n relacionada" data-placement="top">
+								Legislaci&oacute;n <i class="fa fa-angle-down" aria-hidden="true"></i></a>
+</li>
+</ul>
+<div id="jur-legdiv-16" class="showLegRel hidden popover-content"></div>
+</div>
+<div class="pull-right docactions">
+<ul>
+<li class="tooltips lineaj" title="Ver resoluciones del Caso" data-placement="bottom">
+<a href="#" onclick="showLineaJur('11770269','20260625'); return false;"><img alt="Ver resoluciones del Caso" src="/search/img/lineaj.png"></a>
+</li>
+<li class="social tooltips" title="compartir en Facebook" data-placement="bottom">
+<a href="#" class="fb-button" aria-label="Icono compartir en Facebook" data-href="https://www.poderjudicial.es/search/TS/openDocument/b0695bdee7e3cc35a0a8778d75e36f0d/20260625" data-title="ROJ: STS 2652/2026"><i class="fa fa-facebook-square" aria-hidden="true"></i></a>
+</li>
+<li class="social tooltips twitter" title="compartir en Twitter" data-placement="bottom">
+<a href="#" class="twtr-button" aria-label="Icono compartir en Twitter. Pulse para compartir en Twitter" data-href="https://www.poderjudicial.es/search/TS/openDocument/b0695bdee7e3cc35a0a8778d75e36f0d/20260625" data-title="ROJ: STS 2652/2026">
+<svg class="social_twitter" viewBox="0 0 26 26" aria-hidden="true">
+<g>
+<path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path>
+</g>
+</svg>
+</a>
+</li>
+<li class="social tooltips" title="copiar enlace" data-placement="bottom">
+<a href="#" class="cp-button" aria-label="Icono copiar enlace al portapapeles" data-clipboard-text="https://www.poderjudicial.es/search/TS/openDocument/b0695bdee7e3cc35a0a8778d75e36f0d/20260625"><i class="fa fa-clipboard" aria-hidden="true"></i></a>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="row searchresult doc" id="jurisprudenciaresults_content-11770125" data-ref="11770125" data-db="TS" data-fechares="20260610" data-alertdoc="">
+<div class="col-xs-12 col-sm-11 content">
+<div class="title">
+<a href="#" data-link="https://www.poderjudicial.es/search/TS/openDocument/aa76414308af3b05a0a8778d75e36f0d/20260625" onclick="markOpenedDoc($(this));openDocumentNewWindow(this);return false;" class="tooltips new-button hidden-xs" title="Abrir el documento en nueva ventana" data-placement="top" aria-label="Icono Abrir el documento en nueva ventana" data-databasematch="TS" data-reference="11770125" data-statsqueryid="320795975" data-links="cl&aacute;usula de conciencia" data-optimize="20260625" data-start="17" data-lang="1"><i class="fa fa-external-link" aria-hidden="true"></i></a><span class="separator hidden-xs">&nbsp;</span><a href="https://www.poderjudicial.es/search/TS/openDocument/aa76414308af3b05a0a8778d75e36f0d/20260625" id="ref-11770125" onclick="markOpenedDoc($(this));openDocumentFromHref(this);return false;" data-databasematch="TS" data-reference="11770125" data-statsqueryid="320795975" data-links="cl&aacute;usula de conciencia" data-optimize="20260625" data-roj="STS 2631/2026" data-fechares="20260610" data-alertdoc="" data-start="17" data-lang="1" data-langiso="es">STS, a 10 de junio de 2026 - ROJ: STS 2631/2026</a>
+</div>
+<div class="metadatos">
+<ul>
+<li>
+<b>ECLI:ES:TS:2026:2631</b>
+</li>
+<li>
+<b>Sala de lo Civil</b>
+</li>
+<li>N&ordm; de Resoluci&oacute;n: <b>890/2026</b>
+</li>
+<li>Municipio: <b>Madrid</b>
+</li>
+<li>Ponente: <b>NURIA AUXILIADORA ORELLANA CANO</b>
+</li>
+<li>N&ordm; Recurso: <b>4068/2022</b>
+</li>
+</ul>
+</div>
+<div class="summary" id="jur-summary-17">
+									RESUMEN: <b>Contrato de agencia. Indemnización por clientela.</b>
+</div>
+<div id="resultLineaJur-11770125" class="resultlineajur" style="display: none;">
+<div class="lineajurheader">
+<h4>Resoluciones del Caso</h4>
+</div>
+<div class="lineajurcontent cuerpo"></div>
+</div>
+</div>
+<div class="col-sm-1">
+<div class="info pull-right">
+<ul></ul>
+</div>
+</div>
+<div class="col-xs-12 actions">
+<div class="pull-left docactions">
+<ul>
+<li id="jur-leglink-17" class="hidden-xs hidden legislacion" data-toggle="popover" data-a="jur-legdiv-17" data-placement="bottom" data-pos="17">
+<a href="#" onclick="return false;" class="tooltips" title="Legislaci&oacute;n relacionada" data-placement="top">
+								Legislaci&oacute;n <i class="fa fa-angle-down" aria-hidden="true"></i></a>
+</li>
+</ul>
+<div id="jur-legdiv-17" class="showLegRel hidden popover-content"></div>
+</div>
+<div class="pull-right docactions">
+<ul>
+<li class="tooltips lineaj" title="Ver resoluciones del Caso" data-placement="bottom">
+<a href="#" onclick="showLineaJur('11770125','20260625'); return false;"><img alt="Ver resoluciones del Caso" src="/search/img/lineaj.png"></a>
+</li>
+<li class="social tooltips" title="compartir en Facebook" data-placement="bottom">
+<a href="#" class="fb-button" aria-label="Icono compartir en Facebook" data-href="https://www.poderjudicial.es/search/TS/openDocument/aa76414308af3b05a0a8778d75e36f0d/20260625" data-title="ROJ: STS 2631/2026"><i class="fa fa-facebook-square" aria-hidden="true"></i></a>
+</li>
+<li class="social tooltips twitter" title="compartir en Twitter" data-placement="bottom">
+<a href="#" class="twtr-button" aria-label="Icono compartir en Twitter. Pulse para compartir en Twitter" data-href="https://www.poderjudicial.es/search/TS/openDocument/aa76414308af3b05a0a8778d75e36f0d/20260625" data-title="ROJ: STS 2631/2026">
+<svg class="social_twitter" viewBox="0 0 26 26" aria-hidden="true">
+<g>
+<path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path>
+</g>
+</svg>
+</a>
+</li>
+<li class="social tooltips" title="copiar enlace" data-placement="bottom">
+<a href="#" class="cp-button" aria-label="Icono copiar enlace al portapapeles" data-clipboard-text="https://www.poderjudicial.es/search/TS/openDocument/aa76414308af3b05a0a8778d75e36f0d/20260625"><i class="fa fa-clipboard" aria-hidden="true"></i></a>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="row searchresult doc" id="jurisprudenciaresults_content-11770141" data-ref="11770141" data-db="TS" data-fechares="20260610" data-alertdoc="">
+<div class="col-xs-12 col-sm-11 content">
+<div class="title">
+<a href="#" data-link="https://www.poderjudicial.es/search/TS/openDocument/5b6869851a10a176a0a8778d75e36f0d/20260625" onclick="markOpenedDoc($(this));openDocumentNewWindow(this);return false;" class="tooltips new-button hidden-xs" title="Abrir el documento en nueva ventana" data-placement="top" aria-label="Icono Abrir el documento en nueva ventana" data-databasematch="TS" data-reference="11770141" data-statsqueryid="320795975" data-links="cl&aacute;usula de conciencia" data-optimize="20260625" data-start="18" data-lang="1"><i class="fa fa-external-link" aria-hidden="true"></i></a><span class="separator hidden-xs">&nbsp;</span><a href="https://www.poderjudicial.es/search/TS/openDocument/5b6869851a10a176a0a8778d75e36f0d/20260625" id="ref-11770141" onclick="markOpenedDoc($(this));openDocumentFromHref(this);return false;" data-databasematch="TS" data-reference="11770141" data-statsqueryid="320795975" data-links="cl&aacute;usula de conciencia" data-optimize="20260625" data-roj="STS 2581/2026" data-fechares="20260610" data-alertdoc="" data-start="18" data-lang="1" data-langiso="es">STS, a 10 de junio de 2026 - ROJ: STS 2581/2026</a>
+</div>
+<div class="metadatos">
+<ul>
+<li>
+<b>ECLI:ES:TS:2026:2581</b>
+</li>
+<li>
+<b>Sala de lo Penal</b>
+</li>
+<li>N&ordm; de Resoluci&oacute;n: <b>383/2026</b>
+</li>
+<li>Municipio: <b>Madrid</b>
+</li>
+<li>Ponente: <b>LEOPOLDO PUENTE SEGURA</b>
+</li>
+<li>N&ordm; Recurso: <b>6857/2023</b>
+</li>
+</ul>
+</div>
+<div class="summary" id="jur-summary-18">
+									RESUMEN: <b>Delito de frustración de la ejecución.</b>
+</div>
+<div id="resultLineaJur-11770141" class="resultlineajur" style="display: none;">
+<div class="lineajurheader">
+<h4>Resoluciones del Caso</h4>
+</div>
+<div class="lineajurcontent cuerpo"></div>
+</div>
+</div>
+<div class="col-sm-1">
+<div class="info pull-right">
+<ul></ul>
+</div>
+</div>
+<div class="col-xs-12 actions">
+<div class="pull-left docactions">
+<ul>
+<li id="jur-leglink-18" class="hidden-xs hidden legislacion" data-toggle="popover" data-a="jur-legdiv-18" data-placement="bottom" data-pos="18">
+<a href="#" onclick="return false;" class="tooltips" title="Legislaci&oacute;n relacionada" data-placement="top">
+								Legislaci&oacute;n <i class="fa fa-angle-down" aria-hidden="true"></i></a>
+</li>
+</ul>
+<div id="jur-legdiv-18" class="showLegRel hidden popover-content"></div>
+</div>
+<div class="pull-right docactions">
+<ul>
+<li class="tooltips lineaj" title="Ver resoluciones del Caso" data-placement="bottom">
+<a href="#" onclick="showLineaJur('11770141','20260625'); return false;"><img alt="Ver resoluciones del Caso" src="/search/img/lineaj.png"></a>
+</li>
+<li class="social tooltips" title="compartir en Facebook" data-placement="bottom">
+<a href="#" class="fb-button" aria-label="Icono compartir en Facebook" data-href="https://www.poderjudicial.es/search/TS/openDocument/5b6869851a10a176a0a8778d75e36f0d/20260625" data-title="ROJ: STS 2581/2026"><i class="fa fa-facebook-square" aria-hidden="true"></i></a>
+</li>
+<li class="social tooltips twitter" title="compartir en Twitter" data-placement="bottom">
+<a href="#" class="twtr-button" aria-label="Icono compartir en Twitter. Pulse para compartir en Twitter" data-href="https://www.poderjudicial.es/search/TS/openDocument/5b6869851a10a176a0a8778d75e36f0d/20260625" data-title="ROJ: STS 2581/2026">
+<svg class="social_twitter" viewBox="0 0 26 26" aria-hidden="true">
+<g>
+<path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path>
+</g>
+</svg>
+</a>
+</li>
+<li class="social tooltips" title="copiar enlace" data-placement="bottom">
+<a href="#" class="cp-button" aria-label="Icono copiar enlace al portapapeles" data-clipboard-text="https://www.poderjudicial.es/search/TS/openDocument/5b6869851a10a176a0a8778d75e36f0d/20260625"><i class="fa fa-clipboard" aria-hidden="true"></i></a>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="row searchresult doc" id="jurisprudenciaresults_content-11770136" data-ref="11770136" data-db="TS" data-fechares="20260604" data-alertdoc="">
+<div class="col-xs-12 col-sm-12 content">
+<div class="title">
+<a href="#" data-link="https://www.poderjudicial.es/search/TS/openDocument/1b8ce87f898f6b24a0a8778d75e36f0d/20260625" onclick="markOpenedDoc($(this));openDocumentNewWindow(this);return false;" class="tooltips new-button hidden-xs" title="Abrir el documento en nueva ventana" data-placement="top" aria-label="Icono Abrir el documento en nueva ventana" data-databasematch="TS" data-reference="11770136" data-statsqueryid="320795975" data-links="cl&aacute;usula de conciencia" data-optimize="20260625" data-start="19" data-lang="1"><i class="fa fa-external-link" aria-hidden="true"></i></a><span class="separator hidden-xs">&nbsp;</span><a href="https://www.poderjudicial.es/search/TS/openDocument/1b8ce87f898f6b24a0a8778d75e36f0d/20260625" id="ref-11770136" onclick="markOpenedDoc($(this));openDocumentFromHref(this);return false;" data-databasematch="TS" data-reference="11770136" data-statsqueryid="320795975" data-links="cl&aacute;usula de conciencia" data-optimize="20260625" data-roj="STS 2564/2026" data-fechares="20260604" data-alertdoc="" data-start="19" data-lang="1" data-langiso="es">STS, a 04 de junio de 2026 - ROJ: STS 2564/2026</a>
+</div>
+<div class="metadatos">
+<ul>
+<li>
+<b>ECLI:ES:TS:2026:2564</b>
+</li>
+<li>
+<b>Sala de lo Penal</b>
+</li>
+<li>N&ordm; de Resoluci&oacute;n: <b>394/2026</b>
+</li>
+<li>Municipio: <b>Madrid</b>
+</li>
+<li>Ponente: <b>JAVIER HERNANDEZ GARCIA</b>
+</li>
+<li>N&ordm; Recurso: <b>8013/2023</b>
+</li>
+</ul>
+</div>
+<div class="summary" id="jur-summary-19">
+									RESUMEN: <b>Falsedad documental. Falsedades inocuas. Consumación.</b>
+</div>
+</div>
+<div class="">
+<div class="info pull-right">
+<ul></ul>
+</div>
+</div>
+<div class="col-xs-12 actions">
+<div class="pull-left docactions">
+<ul>
+<li id="jur-leglink-19" class="hidden-xs hidden legislacion" data-toggle="popover" data-a="jur-legdiv-19" data-placement="bottom" data-pos="19">
+<a href="#" onclick="return false;" class="tooltips" title="Legislaci&oacute;n relacionada" data-placement="top">
+								Legislaci&oacute;n <i class="fa fa-angle-down" aria-hidden="true"></i></a>
+</li>
+</ul>
+<div id="jur-legdiv-19" class="showLegRel hidden popover-content"></div>
+</div>
+<div class="pull-right docactions">
+<ul>
+<li class="social tooltips" title="compartir en Facebook" data-placement="bottom">
+<a href="#" class="fb-button" aria-label="Icono compartir en Facebook" data-href="https://www.poderjudicial.es/search/TS/openDocument/1b8ce87f898f6b24a0a8778d75e36f0d/20260625" data-title="ROJ: STS 2564/2026"><i class="fa fa-facebook-square" aria-hidden="true"></i></a>
+</li>
+<li class="social tooltips twitter" title="compartir en Twitter" data-placement="bottom">
+<a href="#" class="twtr-button" aria-label="Icono compartir en Twitter. Pulse para compartir en Twitter" data-href="https://www.poderjudicial.es/search/TS/openDocument/1b8ce87f898f6b24a0a8778d75e36f0d/20260625" data-title="ROJ: STS 2564/2026">
+<svg class="social_twitter" viewBox="0 0 26 26" aria-hidden="true">
+<g>
+<path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path>
+</g>
+</svg>
+</a>
+</li>
+<li class="social tooltips" title="copiar enlace" data-placement="bottom">
+<a href="#" class="cp-button" aria-label="Icono copiar enlace al portapapeles" data-clipboard-text="https://www.poderjudicial.es/search/TS/openDocument/1b8ce87f898f6b24a0a8778d75e36f0d/20260625"><i class="fa fa-clipboard" aria-hidden="true"></i></a>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="row searchresult doc" id="jurisprudenciaresults_content-11775899" data-ref="11775899" data-db="TS" data-fechares="20260527" data-alertdoc="">
+<div class="col-xs-12 col-sm-12 content">
+<div class="title">
+<a href="#" data-link="https://www.poderjudicial.es/search/TS/openDocument/7a9a5358257e76e4a0a8778d75e36f0d/20260630" onclick="markOpenedDoc($(this));openDocumentNewWindow(this);return false;" class="tooltips new-button hidden-xs" title="Abrir el documento en nueva ventana" data-placement="top" aria-label="Icono Abrir el documento en nueva ventana" data-databasematch="TS" data-reference="11775899" data-statsqueryid="320795975" data-links="cl&aacute;usula de conciencia" data-optimize="20260630" data-start="20" data-lang="1"><i class="fa fa-external-link" aria-hidden="true"></i></a><span class="separator hidden-xs">&nbsp;</span><a href="https://www.poderjudicial.es/search/TS/openDocument/7a9a5358257e76e4a0a8778d75e36f0d/20260630" id="ref-11775899" onclick="markOpenedDoc($(this));openDocumentFromHref(this);return false;" data-databasematch="TS" data-reference="11775899" data-statsqueryid="320795975" data-links="cl&aacute;usula de conciencia" data-optimize="20260630" data-roj="STS 2705/2026" data-fechares="20260527" data-alertdoc="" data-start="20" data-lang="1" data-langiso="es">STS, a 27 de mayo de 2026 - ROJ: STS 2705/2026</a>
+</div>
+<div class="metadatos">
+<ul>
+<li>
+<b>ECLI:ES:TS:2026:2705</b>
+</li>
+<li>
+<b>Sala de lo Penal</b>
+</li>
+<li>N&ordm; de Resoluci&oacute;n: <b>366/2026</b>
+</li>
+<li>Municipio: <b>Madrid</b>
+</li>
+<li>Ponente: <b>VICENTE MAGRO SERVET</b>
+</li>
+<li>N&ordm; Recurso: <b>10326/2025</b>
+</li>
+</ul>
+</div>
+<div class="summary" id="jur-summary-20">
+                                    RESUMEN: <b>Sentencia condenatoria ya revisada por el TSJ validando la condena dictada por la AP de un elevado número de condenados pertenecientes a una organización criminal destinada al narcotráfico funcionando con una estructura dividida en varios grupos de actuación bajo un mismo patrón organizativo y con distribución de roles. Las condenas se imponen por delitos contra la salud pública en su modalidad de sustancias que causan grave daño a la salud, en cantidad de notoria importancia, con pertenencia a organización y jefatura previsto y penado en los artículos 368,369.1.5º y 369 bis del Código Penal, delito de blanqueo de capitales procedentes del tráfico de drogas, previsto y penado en el artículo 301.1 del Código Penal, en relación con los artículos 368, 369 y 369 bis del Código Penal, delito de tenencia ilícita de armas sometidas a modificaciones sustanciales de sus características de fabricación, previsto y penado en el artículo 563 del Código Penal en relación con el artículo 3, Categoria 1.a) de la Sección Tercera del Reglamento de Armas. Al plantearse muchos recursos con muchos motivos semejantes es preciso llevar a cabo varias precisiones en el siguiente decálogo que exponemos para centrar el debate: 1.- Respecto de los motivos interpuestos por presunción de inocencia hay que recordar que ya hay sentencia dictada por el TSJ que ha realizado un muy adecuado proceso de revisión del análisis de la racionalidad de la valoración probatoria examinando con suma precisión, detalle, y extensión los motivos planteados en sede de apelación. 2.- No cabe en sede de casación plantear el motivo de presunción de inocencia bajo la pretensión de &quot;sustituir&quot; la valoración llevada a cabo por dos tribunales por la propia de la exposición de cada recurrente que enfocan de forma particular la prueba que se ha practicado en el plenario, lo que determina una mera disensión o divergencia valorativa de cada recurrente que ha formulado este motivo exponiendo una crítica sobre la valoración llevada a cabo en cada uno de los delitos objeto de condena sobre los que se plantea este motivo en cuanto al delito contra la salud pública con sus agravantes de organización judicial y notoria importancia, delito de blanqueo de capitales y tenencia y depósito de armas. 3.- Los motivos que se articulan por infracción de ley ex art. 849.1 LECRIM no respetan los hechos probados en modo alguno, cuando la extensa redacción de estos en más de 100 páginas determinan la correcta subsunción de los hechos probados en cada uno de los tipos penales objeto de condena. Y, además, no se pueden introducir cuestiones de valoración de prueba en motivo por error iuris, cuando ésta queda al margen en su planteamiento en los motivos por la vía del art. 849.1 LECRIM. 4.- No pueden articularse varios motivos con ocasión del mismo motivo. En sede procesal de recurso está vetada la posibilidad de la técnica del submotivo aprovechando el mismo motivo. Los motivos no pueden mezclarse cuando se presenta un motivo, ya que ello no está admitido en sede de recurso al tener que articularse los motivos por separado. 5.- La queja respecto de las medidas de injerencia adoptadas se desestiman, ante la correcta argumentación de los tribunales con respecto a la redacción de cada uno de los autos de intervención telefónica o entrada y registro respetando las exigencias de la previa investigación policial ponderada y adecuada que hace huir del alegado carácter &quot;prospectivo&quot; de la investigación judicial, al contar con la suficiente investigación previa que ha contado también con fuentes de información obtenidas de confidentes anónimos que son admitidos cuando los agentes policiales confirmen con la investigación oportuna antes de acudir al juez a instar por oficio policial la medida de injerencia. 6.- Fueron correctos y proporcionados los autos de declaración de secreto y sus prórrogas ante la investigación que se estaba llevando a cabo por razones obvias con muchos investigados que, además, adoptaban múltiples medidas de autoprotección y seguridad para evitar seguimientos policiales ante la dimensión del operativo delictivo de tráfico de drogas que la organización criminal llevaba a cabo con el posterior blanqueo de capitales llevado a cabo por personas cercanas a los autores del delito del art. 368 y 369 CP y en algunos casos, también por alguno de los autores de este delito, lo que determinó en algunos casos la condena por ambos delitos y en otros por la vía del art. 301.1 CP. No hubo en modo alguno carácter &quot;prospectivo&quot; en la investigación. 7.- Fue correcto el auto de sobreseimiento provisional dictado por el instructor ante las dificultades existentes para conseguir datos que permitieran avanzar en la investigación, optando el instructor por el dictado del auto de SP del art. 641 LECRIM a la espera de nuevos datos que aparecieran en la investigación por las dificultades existentes en la investigación policial, pese al distinto parecer de los recurrentes que plantearon el motivo entendiendo que, con ello, se pretendía &quot;huir&quot; del encorsetamiento de los plazos del art. 324 LECRIM en la instrucción, pero la realidad es que podría haber dictado los autos de prórroga por 18 meses, pero que ante las dificultades existentes optó por el auto del art. 641 LECRIM al no poder avanzar en la investigación hasta que aparecieran nuevos datos de relevancia que permitieran su reapertura, como así ocurrió. No puede, por ello, articularse una especie de presunción de fraude procesal por dictarse un auto de SP a la espera de que aparecieran nuevos datos cuando es vía adecuada, proporcional y legítima en cualquier instrucción y ser competencia del instructor dictar la resolución que proceda en vista al desarrollo de la investigación. En este caso la suspensión provisional se alzó cuando aparecieron esos datos que los agentes aportaron. No se archivó en falso, sino que se dictó el auto de SP y, evidentemente, cuando los agentes policiales encontraron nuevos datos los aportaron y dieron viabilidad a la reapertura. Lo que es fraude procesal es dejar abierta la causa cuando las diligencias existentes no determinan en modo alguno que se pueda imputar responsabilidad alguna concreta basada en datos relevantes sobre la comisión de un hecho delictivo &quot;hasta que se encuentren&quot;. 8.- No hubo el pretendido fraude de ley que plantean los recurrentes, sino una instrucción ajustada a unas circunstancias especiales de una investigación complicada con múltiples investigados y en donde se acabó por esperar a que aparecieran datos relevantes que permitieran ser más exactos en el proceder delictivo de autores y hechos concretos ante las excelentes medidas de autoprotección adoptadas. Ni resultó un fraude procesal el auto de SP y que los agentes pudieran aportar, cuando existieran, datos que avalaran proseguir en la investigación, ya que lo contrario, - y esto es importante- sí que hubiera provocad alegar el carácter prospectivo de la investigación si se hubiera procedido a dictar medidas de injerencia si se hubieran dictado los autos de intervención telefónica o entrada y registro, o de escuchas en vehículos por el instructor sin tener datos de relevancia en una investigación previa que no fueran meras sospechas, sino más concluyentes para poder avalar una medida de injerencia. Es lo que llevó a cabo el juez instructor en este caso. Estas situaciones son repetidas cuando en casos de organizaciones o grupos criminales, sobre todo, en delitos de tráfico de drogas, se adoptan seris medidas de autoprotección y seguridad (como aquí existían en algunos casos donde los investigados ni tan siquiera utilizaban teléfono móvil) que impiden o dificultan el desarrollo de las investigaciones policiales que les hacen llegar a un auténtico &quot;punto muerto&quot;. La prueba en estos casos está basada en prueba indiciaria, sobre todo en investigaciones en tráfico de drogas en donde no se puede contar en muchos casos con prueba directa hasta que los avances de la investigación y con las medidas de injerencia adoptadas contados con la &quot;suficiencia&quot; de las investigaciones policiales previas (como en este caso ha ocurrido) se acaban localizando datos concretos físicos que se aportan a la investigación, pero su arranque comienza con indicios que se van sumando y que con la prueba directa ex post configuran prueba suficiente que el órgano de enjuiciamiento puede utilizar para la &quot;valoración conjunta de la prueba practicada&quot;. 9.- No cabía actuar por &quot;sospechas&quot; aunque hubiera personas concretas determinadas hacia las que se dirigía la investigación. Pese a que los recurrentes entienden que no eran sospechas las existentes al inicio de investigación y que había indicios concretos para seguir la misma adelante y no dictar el auto de SP, sino el de prórroga de las actuaciones ex art. 324 LECRIM, ambos tribunales y esta Sala discrepamos de ello, ya que el proceder del instructor fue correcto al entender que debía haber una mayor solidez en las investigaciones y comprobaciones más directas que superaran las dificultades que provocaban los investigados ante la actuación policial. Con meras &quot;sospechas&quot;, pese a que otro sea el parecer de los recurrentes, no se hubieran podido dictar medidas de injerencia, y, por ello, el instructor optó por el dictado del auto de SP, y este proceder no es, por ello, ficticio o fraudulento. 10.- La cuestión capital estaba determinada: a.- Era cierto que los agentes policiales iniciaron una investigación ante las noticias del funcionamiento de una organización criminal que operaba a gran escala. b.- Es cierto que las medidas de autoprotección adoptadas por los investigados dificultaban la investigación policial. c.- Es cierto que los investigados movían grandes cantidades de droga, pero el objetivo policial era localizar todo el operativo, y no solo a una parte de la organización y conseguir identificar a todos los intervinientes y los delitos que se estaban cometiendo, porque nótese que después de una ardua investigación se consigue detectar que se estaba perpetrando un delito contra la salud pública cometido en el seno de una organización criminal y en cantidad de notoria importancia, delito de blanqueo de capitales y tenencia y depósito de armas como elementos de base descubierta tras todo el operativo. d.- La actuación del juez instructor fue correcta para escapar del carácter prospectivo de l investigación y cuando comprueba que se exigía &quot;algo más&quot; de lo actuado para evitar que si se iban a dictar medidas de injerencia se pudiera poner en entredicho el dictado de estos autos por suficiencia del oficio policial se optó por dictar el auto de SP hasta una mayor concreción de lo que eran meras sospechas para pasar a un estadio de mayor relevancia en la obtención de la información del operativo llevado a cabo y personas identificadas, pero de la organización completa y no de alguno de ellos, que es lo que más tarde llevó a la existencia de una macrocausa ante la dimensión que alcanzó la investigación y el volumen de los detenidos que había actuado desde sus propias parcelas en sus papeles o roles dentro de la organización criminal, y, también, fuera de ella. e.- No se investigó o instruyó a personas sobre las que no recayese una mínima sospecha de participación en los hechos que se estaban investigados</b>
+</div>
+</div>
+<div class="">
+<div class="info pull-right">
+<ul></ul>
+</div>
+</div>
+<div class="col-xs-12 actions">
+<div class="pull-left docactions">
+<ul>
+<li id="jur-leglink-20" class="hidden-xs hidden legislacion" data-toggle="popover" data-a="jur-legdiv-20" data-placement="bottom" data-pos="20">
+<a href="#" onclick="return false;" class="tooltips" title="Legislaci&oacute;n relacionada" data-placement="top">
+								Legislaci&oacute;n <i class="fa fa-angle-down" aria-hidden="true"></i></a>
+</li>
+</ul>
+<div id="jur-legdiv-20" class="showLegRel hidden popover-content"></div>
+</div>
+<div class="pull-right docactions">
+<ul>
+<li class="social tooltips" title="compartir en Facebook" data-placement="bottom">
+<a href="#" class="fb-button" aria-label="Icono compartir en Facebook" data-href="https://www.poderjudicial.es/search/TS/openDocument/7a9a5358257e76e4a0a8778d75e36f0d/20260630" data-title="ROJ: STS 2705/2026"><i class="fa fa-facebook-square" aria-hidden="true"></i></a>
+</li>
+<li class="social tooltips twitter" title="compartir en Twitter" data-placement="bottom">
+<a href="#" class="twtr-button" aria-label="Icono compartir en Twitter. Pulse para compartir en Twitter" data-href="https://www.poderjudicial.es/search/TS/openDocument/7a9a5358257e76e4a0a8778d75e36f0d/20260630" data-title="ROJ: STS 2705/2026">
+<svg class="social_twitter" viewBox="0 0 26 26" aria-hidden="true">
+<g>
+<path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path>
+</g>
+</svg>
+</a>
+</li>
+<li class="social tooltips" title="copiar enlace" data-placement="bottom">
+<a href="#" class="cp-button" aria-label="Icono copiar enlace al portapapeles" data-clipboard-text="https://www.poderjudicial.es/search/TS/openDocument/7a9a5358257e76e4a0a8778d75e36f0d/20260630"><i class="fa fa-clipboard" aria-hidden="true"></i></a>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+<div class="bottompagination row">
+<form id="bottomfrmFilterjurisprudencia" name="frmFilterjurisprudencia" action="#" class="searchform" onsubmit="goToPage('jurisprudencia',$(this).find('.slectnavgoto input').val());">
+<div id="jurisprudenciaresults_bottompagination" class="pull-right searchpagination searchform bottom"></div>
+</form>
+</div>
+</div>

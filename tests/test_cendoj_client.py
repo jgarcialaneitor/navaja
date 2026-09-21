@@ -11,7 +11,7 @@ import os
 from datetime import date
 from pathlib import Path
 from typing import Any
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, urlparse
 
 import httpx
 import pytest
@@ -33,6 +33,7 @@ from navaja.cendoj import (
     TipoResolucion,
     detect_refusal,
 )
+from navaja.documents import parse_document_url
 
 FIXTURE = Path(__file__).parent / "fixtures" / "search_clausulas_abusivas.html"
 HTML = FIXTURE.read_text(encoding="utf-8")
@@ -41,10 +42,12 @@ INVALID_FIXTURE = Path(__file__).parent / "fixtures" / "search_invalid_request.h
 GATE_FIXTURE = Path(__file__).parent / "fixtures" / "search_mass_download_gate.html"
 NO_RESULTS_FIXTURE = Path(__file__).parent / "fixtures" / "search_no_results.html"
 CLAMPED_FIXTURE = Path(__file__).parent / "fixtures" / "search_clamped_page.html"
+TS_COLECCION_FIXTURE = Path(__file__).parent / "fixtures" / "search_ts_coleccion.html"
 INVALID_HTML = INVALID_FIXTURE.read_text(encoding="utf-8")
 GATE_HTML = GATE_FIXTURE.read_text(encoding="utf-8")
 NO_RESULTS_HTML = NO_RESULTS_FIXTURE.read_text(encoding="utf-8")
 CLAMPED_HTML = CLAMPED_FIXTURE.read_text(encoding="utf-8")
+TS_COLECCION_HTML = TS_COLECCION_FIXTURE.read_text(encoding="utf-8")
 
 
 def _client_capturing(sent: list[httpx.Request]) -> CendojClient:
@@ -371,6 +374,66 @@ def test_search_errors_are_search_error_subclasses():
     assert issubclass(SearchGatedError, SearchError)
 
 
+def test_supreme_court_result_urls_are_accepted_by_the_url_validator():
+    """Offline guard for the search-to-download contract.
+
+    A Coleccion.TS search yields document URLs under ``/search/TS/``. The URL
+    validator once accepted only ``/search/AN/``, so ``iniciar_descargas``
+    refused every Supreme Court result. This runs on the default suite, from a
+    captured real response, so the regression cannot come back unnoticed when
+    the live test is deselected.
+    """
+    with _client_with_body(TS_COLECCION_HTML) as client:
+        page = client.search(
+            SearchFilters(texto="cláusula de conciencia", coleccion=Coleccion.TS),
+            records_per_page=20,
+        )
+
+    urls = [s.url_documento for s in page.sentencias if s.url_documento]
+    assert len(urls) == 20, "the captured Supreme Court response changed shape"
+    assert all("/search/TS/" in url for url in urls), (
+        "fixture no longer represents the Supreme Court path shape"
+    )
+
+    # Pin two known entries against literals, so a parser that returned
+    # plausible-but-wrong values could not satisfy this test.
+    first = parse_document_url(urls[0])
+    assert first.reference == "ee62f935e8a3d299a0a8778d75e36f0d"
+    assert first.optimize == "20260917"
+    assert first.access_to_pdf_url == (
+        "https://www.poderjudicial.es/search/contenidos.action"
+        "?action=accessToPDF&publicinterface=true&tab=AN"
+        "&reference=ee62f935e8a3d299a0a8778d75e36f0d"
+        "&encode=true&optimize=20260917&databasematch=AN"
+    )
+
+    second = parse_document_url(urls[1])
+    assert second.reference == "0064f3b31d94b1eea0a8778d75e36f0d"
+    assert second.optimize == "20260917"
+
+    # Every remaining URL must round-trip against its own path segments,
+    # split independently of the validator's regex.
+    for url in urls:
+        ref = parse_document_url(url)
+        _, collection, _, reference, optimize = urlparse(url).path.strip("/").split("/")
+        assert collection == "TS"
+        assert ref.reference == reference
+        assert ref.optimize == optimize
+
+
+def test_url_validator_error_message_names_every_accepted_collection():
+    """The rejection message must describe what is actually accepted."""
+    with pytest.raises(ValueError) as excinfo:
+        parse_document_url(
+            "https://www.poderjudicial.es/search/XX/openDocument/"
+            "aabbccddeeff00112233445566778899/20260911"
+        )
+
+    message = str(excinfo.value)
+    assert "AN" in message
+    assert "TS" in message
+
+
 @pytest.mark.live
 @pytest.mark.skipif(
     not os.environ.get("NAVAJA_LIVE"),
@@ -383,6 +446,42 @@ def test_live_search_smoke():
     assert page.sentencias, "the live search returned no results"
     assert page.sentencias[0].roj
     assert page.sentencias[0].url_documento
+
+
+@pytest.mark.live
+@pytest.mark.skipif(
+    not os.environ.get("NAVAJA_LIVE"),
+    reason="live test: set NAVAJA_LIVE=1 to hit the real CENDOJ site",
+)
+def test_live_supreme_court_urls_are_parseable():
+    """Regression: every Supreme Court URL the search yields must be accepted.
+
+    The Coleccion.TS search returns document URLs under ``/search/TS/``. The
+    URL validator used to accept only ``/search/AN/``, so ``iniciar_descargas``
+    refused whole batches of Supreme Court results. The search endpoint needs
+    no captcha, so this regression is checked against the real site; the
+    captcha-gated fetch itself cannot be automated here.
+    """
+    with CendojClient() as client:
+        page = client.search(
+            SearchFilters(texto="cláusula de conciencia", coleccion=Coleccion.TS),
+            records_per_page=20,
+        )
+
+    assert page.sentencias, "the live Supreme Court search returned no results"
+
+    ts_urls = [s.url_documento for s in page.sentencias if s.url_documento]
+    assert ts_urls, "no document URLs in the live Supreme Court results"
+    assert any("/search/TS/" in url for url in ts_urls), (
+        "expected at least one /search/TS/ URL; the site's path shape changed"
+    )
+
+    for url in ts_urls:
+        ref = parse_document_url(url)
+        _, collection, _, reference, optimize = urlparse(url).path.strip("/").split("/")
+        assert collection in {"AN", "TS"}
+        assert ref.reference == reference
+        assert ref.optimize == optimize
 
 
 # --- Location vocabulary tests ------------------------------------------------
