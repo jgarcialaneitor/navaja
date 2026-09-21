@@ -33,6 +33,7 @@ from navaja.cendoj import (
     TipoResolucion,
     detect_refusal,
 )
+from navaja.documents import parse_document_url
 
 FIXTURE = Path(__file__).parent / "fixtures" / "search_clausulas_abusivas.html"
 HTML = FIXTURE.read_text(encoding="utf-8")
@@ -383,6 +384,40 @@ def test_live_search_smoke():
     assert page.sentencias, "the live search returned no results"
     assert page.sentencias[0].roj
     assert page.sentencias[0].url_documento
+
+
+@pytest.mark.live
+@pytest.mark.skipif(
+    not os.environ.get("NAVAJA_LIVE"),
+    reason="live test: set NAVAJA_LIVE=1 to hit the real CENDOJ site",
+)
+def test_live_supreme_court_urls_are_parseable():
+    """Regression: every Supreme Court URL the search yields must be accepted.
+
+    The Coleccion.TS search returns document URLs under ``/search/TS/``. The
+    URL validator used to accept only ``/search/AN/``, so ``iniciar_descargas``
+    refused whole batches of Supreme Court results. The search endpoint needs
+    no captcha, so this regression is checked against the real site; the
+    captcha-gated fetch itself cannot be automated here.
+    """
+    with CendojClient() as client:
+        page = client.search(
+            SearchFilters(texto="cláusula de conciencia", coleccion=Coleccion.TS),
+            records_per_page=20,
+        )
+
+    assert page.sentencias, "the live Supreme Court search returned no results"
+
+    ts_urls = [s.url_documento for s in page.sentencias if s.url_documento]
+    assert ts_urls, "no document URLs in the live Supreme Court results"
+    assert any("/search/TS/" in url for url in ts_urls), (
+        "expected at least one /search/TS/ URL; the site's path shape changed"
+    )
+
+    for url in ts_urls:
+        ref = parse_document_url(url)
+        assert ref.reference in url
+        assert ref.optimize in url
 
 
 # --- Location vocabulary tests ------------------------------------------------
