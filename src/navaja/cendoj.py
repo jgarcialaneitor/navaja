@@ -18,6 +18,8 @@ Endpoint map (established by read-only reconnaissance):
 from __future__ import annotations
 
 import re
+import sys
+import threading
 from dataclasses import dataclass
 from datetime import date
 from enum import StrEnum
@@ -604,6 +606,7 @@ class CendojClient:
             },
         )
         self._session_ready = False
+        self._session_lock = threading.Lock()
 
     def __enter__(self) -> "CendojClient":
         return self
@@ -618,9 +621,12 @@ class CendojClient:
         """Fetch the search form once, so the ``JSESSIONID`` cookie is set."""
         if self._session_ready:
             return
-        response = self._client.get(INDEX_URL)
-        response.raise_for_status()
-        self._session_ready = True
+        with self._session_lock:
+            if self._session_ready:
+                return
+            response = self._client.get(INDEX_URL)
+            response.raise_for_status()
+            self._session_ready = True
 
     def search(
         self,
@@ -830,9 +836,9 @@ class CendojClient:
         ref = parse_document_url(url)
 
         if prompt is None:
-            print(f"Fetching full text for {url}")
+            print(f"Fetching full text for {url}", file=sys.stderr, flush=True)
         else:
-            print(prompt)
+            print(prompt, file=sys.stderr, flush=True)
 
         response = self._client.get(
             ref.access_to_pdf_url,
