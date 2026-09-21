@@ -35,6 +35,7 @@ from navaja import (
 )
 from navaja.cendoj import _coerce_enum
 from navaja.captcha import (
+    CaptchaBusyError,
     CaptchaTimeoutError,
     default_captcha_token_path,
     is_shared_captcha_server_running,
@@ -352,7 +353,7 @@ def listar_localizaciones(
 @server.tool()
 def ver_texto_completo(
     url: str,
-    espera_segundos: int = 300,
+    espera_segundos: int = 120,
 ) -> dict:
     """Fetch the full text of a single CENDOJ resolution.
 
@@ -365,7 +366,11 @@ def ver_texto_completo(
 
     Args:
         url: a CENDOJ ``openDocument`` URL.
-        espera_segundos: how long to wait for the human answer.
+        espera_segundos: how long to wait for the human answer, in seconds.
+            The default is ``120``, well below this deployment's MCP client
+            request timeout (``330`` seconds in the default Pi configuration),
+            so the server has time to return a structured error before the
+            client kills the call.
 
     Returns:
         A dict with ``ok``, ``attempts``, ``requests``, ``content_type`` and
@@ -385,13 +390,14 @@ def ver_texto_completo(
         ``pdf_save_reason="resolve_failed"``.
 
         On failure ``ok`` is ``False`` and the dict also carries ``error`` and
-        ``error_code`` (``captcha_timeout``, ``captcha_rejected``,
-        ``full_text_error`` or ``invalid_url``). The same PDF keys are always
-        present so callers never have to probe for them, and on these error
-        paths ``pdf_save_reason`` is ``not_attempted`` because no response was
-        fetched and no save was attempted. When a captcha timeout occurs,
-        ``captcha_url`` contains the form URL so the caller can retry at the
-        same address. The captcha answer itself is never returned.
+        ``error_code`` (``captcha_timeout``, ``captcha_busy``,
+        ``captcha_rejected``, ``full_text_error`` or ``invalid_url``). The same
+        PDF keys are always present so callers never have to probe for them,
+        and on these error paths ``pdf_save_reason`` is ``not_attempted``
+        because no response was fetched and no save was attempted. When a
+        captcha timeout or ``captcha_busy`` occurs, ``captcha_url`` contains
+        the real form URL so the caller can open it without reading stderr.
+        The captcha answer itself is never returned.
     """
     try:
         ref = parse_document_url(url)
@@ -421,6 +427,8 @@ def ver_texto_completo(
 
     client = _get_client()
 
+    captcha_url = f"http://{host}:{port}/{token}/"
+
     try:
         # The stdio transport owns stdout. Redirect any stray print from the
         # underlying client (prompts and the captcha form URL) to stderr.
@@ -447,7 +455,23 @@ def ver_texto_completo(
         }
         if hasattr(exc, "url"):
             payload["captcha_url"] = exc.url
+        else:
+            payload["captcha_url"] = captcha_url
         return payload
+    except CaptchaBusyError as exc:
+        return {
+            "ok": False,
+            "error": str(exc),
+            "error_code": "captcha_busy",
+            "attempts": None,
+            "requests": None,
+            "content_type": None,
+            "text": None,
+            "pdf_path": None,
+            "pdf_save_reason": "not_attempted",
+            "pdf_save_error": None,
+            "captcha_url": captcha_url,
+        }
     except FullTextError as exc:
         return {
             "ok": False,
@@ -482,31 +506,48 @@ def ver_texto_completo(
 
 @server.tool()
 def estado_servidor() -> dict:
-    """Return runtime server configuration without leaking secrets.
+    """Return runtime server configuration.
 
     Returns the configured captcha host and port, whether a stable token has
-    been set, whether the captcha listener is currently bound, and a masked
-    version of the form URL. The token value itself is never exposed.
+    been set, whether the captcha listener is currently bound, and the real,
+    usable captcha form URL.
+
+    The form URL is part of the API surface: a caller can obtain it from this
+    tool before running any blocking fetch, hand it to the human, and the human
+    opens it once and leaves it open. While no challenge is pending the idle
+    page refreshes itself every 5 seconds and turns into the captcha form
+    automatically when a challenge arrives. The token in the URL gates access
+    to the HTTP form, rather than being hidden from the caller; anyone with
+    local access can already read it from the persisted token file.
+
+    This call is not side-effect free: when no stable token is configured and
+    no token file exists, resolving the token generates and persists one.
+    Because of that, ``stable_token_set`` describes the configuration state as
+    it was before this call.
     """
     host, _host_reason = resolve_captcha_host()
     port = _captcha_port()
     port_str = str(port)
 
+    # Compute before resolving the token: resolution creates and persists a
+    # token when none exists, which would make this flag vacuously true.
     env_token_set = bool(os.environ.get("NAVAJA_CAPTCHA_TOKEN", "").strip())
     stable_token_set = env_token_set
     if not stable_token_set:
         # A persisted token also gives a stable URL even without the env var.
         stable_token_set = default_captcha_token_path().exists()
 
+    token, _token_reason = resolve_captcha_token()
+
     captcha_listening = is_shared_captcha_server_running(host, port)
-    captcha_url_masked = f"http://{host}:{port}/<token>/"
+    captcha_url = f"http://{host}:{port}/{token}/"
 
     return {
         "host": host,
         "port": port_str,
         "stable_token_set": stable_token_set,
         "captcha_listening": captcha_listening,
-        "captcha_url_masked": captcha_url_masked,
+        "captcha_url": captcha_url,
     }
 
 

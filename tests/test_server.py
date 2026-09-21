@@ -12,6 +12,7 @@ import contextlib
 import io
 import os
 import socket
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -30,9 +31,11 @@ from navaja import (
 from navaja.captcha import (
     CaptchaAnswer,
     CaptchaTimeoutError,
+    start_shared_captcha_server,
     stop_shared_captcha_server,
 )
 from navaja import server as navaja_server
+import navaja.captcha
 from navaja.cendoj import CONTENIDOS_URL, INDEX_URL, LOCALIZACIONES_URL, SEARCH_URL
 from navaja.documents import PdfSaveResult
 from navaja.server import (
@@ -547,7 +550,7 @@ def test_shared_client_is_created_once_across_two_calls(monkeypatch):
     assert len(index_gets) == 1, "the JSESSIONID bootstrap must happen only once"
 
 
-def test_estado_servidor_does_not_leak_token(monkeypatch):
+def test_estado_servidor_returns_real_captcha_url(monkeypatch):
     monkeypatch.setenv("NAVAJA_CAPTCHA_HOST", "100.64.0.1")
     monkeypatch.setenv("NAVAJA_CAPTCHA_PORT", "1234")
     monkeypatch.setenv("NAVAJA_CAPTCHA_TOKEN", "super-secret-token-value")
@@ -558,9 +561,31 @@ def test_estado_servidor_does_not_leak_token(monkeypatch):
     assert result["port"] == "1234"
     assert result["stable_token_set"] is True
     assert result["captcha_listening"] is False
-    assert result["captcha_url_masked"] == "http://100.64.0.1:1234/<token>/"
-    assert "super-secret-token-value" not in str(result)
-    assert "<token>" in result["captcha_url_masked"]
+    assert result["captcha_url"] == "http://100.64.0.1:1234/super-secret-token-value/"
+    assert "super-secret-token-value" in result["captcha_url"]
+    assert "<token>" not in result["captcha_url"]
+
+
+def test_estado_servidor_stable_token_set_reports_pre_call_state(monkeypatch, tmp_path):
+    """stable_token_set reports the configuration state before the call.
+
+    Resolving a missing token creates and persists one, so the flag must be
+    computed from the environment and file state before resolution.
+    """
+    port = _free_port()
+    monkeypatch.setenv("NAVAJA_CAPTCHA_HOST", "127.0.0.1")
+    monkeypatch.setenv("NAVAJA_CAPTCHA_PORT", str(port))
+    monkeypatch.delenv("NAVAJA_CAPTCHA_TOKEN", raising=False)
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path))
+
+    result1 = estado_servidor()
+    assert result1["stable_token_set"] is False
+    assert result1["captcha_url"].startswith(f"http://127.0.0.1:{port}/")
+    assert (tmp_path / "navaja" / "captcha-token").exists()
+
+    result2 = estado_servidor()
+    assert result2["stable_token_set"] is True
+    assert result2["captcha_url"] == result1["captcha_url"]
 
 
 def test_stable_token_path_reaches_serve_captcha(monkeypatch):
@@ -626,7 +651,7 @@ def test_ver_texto_completo_timeout_returns_structured_failure(monkeypatch):
     assert result["captcha_url"] == "http://127.0.0.1:8765/test-token/"
 
 
-def test_ver_texto_completo_timeout_without_url_omits_key(monkeypatch):
+def test_ver_texto_completo_timeout_without_url_falls_back_to_resolved_url(monkeypatch):
     sent: list[httpx.Request] = []
     SpyClient = _spy_client_class(_fulltext_transport, sent)
     monkeypatch.setattr("navaja.server.CendojClient", SpyClient)
@@ -639,10 +664,75 @@ def test_ver_texto_completo_timeout_without_url_omits_key(monkeypatch):
     )
 
     result = ver_texto_completo(DOC_URL, espera_segundos=1)
+    expected_url = estado_servidor()["captcha_url"]
 
     assert result["ok"] is False
     assert result["error_code"] == "captcha_timeout"
-    assert "captcha_url" not in result
+    assert result["captcha_url"] == expected_url
+
+
+def test_ver_texto_completo_busy_returns_structured_failure(monkeypatch):
+    port = _free_port()
+    token = "busy-test-token-12345"
+    monkeypatch.setenv("NAVAJA_CAPTCHA_HOST", "127.0.0.1")
+    monkeypatch.setenv("NAVAJA_CAPTCHA_PORT", str(port))
+    monkeypatch.setenv("NAVAJA_CAPTCHA_TOKEN", token)
+
+    sent: list[httpx.Request] = []
+    SpyClient = _spy_client_class(_fulltext_transport, sent)
+    monkeypatch.setattr("navaja.server.CendojClient", SpyClient)
+
+    url = start_shared_captcha_server("127.0.0.1", port, token)
+    server_obj = navaja.captcha._captcha_servers[("127.0.0.1", port)]
+    registered = threading.Event()
+
+    def register_challenge():
+        try:
+            server_obj.challenge(
+                b"fake-png",
+                timeout=10.0,
+                on_registered=lambda: registered.set(),
+            )
+        except CaptchaTimeoutError:
+            pass
+
+    challenge_thread = threading.Thread(target=register_challenge, daemon=True)
+    challenge_thread.start()
+    assert registered.wait(timeout=2.0), "pending challenge was not registered"
+
+    try:
+        result = ver_texto_completo(DOC_URL, espera_segundos=1)
+    finally:
+        server_obj.finish(None)
+        challenge_thread.join(timeout=2.0)
+
+    assert result["ok"] is False
+    assert result["error_code"] == "captcha_busy"
+    assert "already pending" in result["error"].lower()
+    assert result["captcha_url"] == url
+    assert result["attempts"] is None
+    assert result["requests"] is None
+    assert result["content_type"] is None
+    assert result["text"] is None
+    assert result["pdf_save_reason"] == "not_attempted"
+
+
+def test_ver_texto_completo_default_wait_is_120(monkeypatch):
+    captured: dict[str, Any] = {}
+
+    class TimeoutClient(CendojClient):
+        def fetch_full_text(self, url, *, host, port, timeout, token):
+            captured["timeout"] = timeout
+            exc = CaptchaTimeoutError("timed out")
+            exc.url = "http://127.0.0.1:8765/test-token/"
+            raise exc
+
+    monkeypatch.setattr("navaja.server.CendojClient", TimeoutClient)
+
+    result = ver_texto_completo(DOC_URL)
+
+    assert captured["timeout"] == 120.0
+    assert result["error_code"] == "captcha_timeout"
 
 
 def test_ver_texto_completo_rejected_after_max_attempts_returns_structured_failure(
@@ -903,16 +993,17 @@ def test_ver_texto_completo_error_path_and_non_pdf_success_have_distinct_reasons
 
 def test_lifespan_starts_and_stops_listener(monkeypatch, capsys):
     port = _free_port()
+    token = "valid-token-123456"
     monkeypatch.setenv("NAVAJA_CAPTCHA_HOST", "127.0.0.1")
     monkeypatch.setenv("NAVAJA_CAPTCHA_PORT", str(port))
-    monkeypatch.setenv("NAVAJA_CAPTCHA_TOKEN", "valid-token-123456")
+    monkeypatch.setenv("NAVAJA_CAPTCHA_TOKEN", token)
 
     async def run() -> None:
         async with _captcha_lifespan(server):
             assert not _port_is_free("127.0.0.1", port)
             result = estado_servidor()
             assert result["captcha_listening"] is True
-            assert result["captcha_url_masked"] == f"http://127.0.0.1:{port}/<token>/"
+            assert result["captcha_url"] == f"http://127.0.0.1:{port}/{token}/"
 
     asyncio.run(run())
 
@@ -982,7 +1073,7 @@ def test_lifespan_does_not_crash_on_occupied_port(monkeypatch, capsys):
     assert capsys.readouterr().out == ""
 
 
-def test_lifespan_url_masked_contains_no_token_part(monkeypatch, capsys):
+def test_lifespan_url_contains_real_token(monkeypatch, capsys):
     port = _free_port()
     token = "my-session-token-12345"
     monkeypatch.setenv("NAVAJA_CAPTCHA_HOST", "127.0.0.1")
@@ -993,10 +1084,10 @@ def test_lifespan_url_masked_contains_no_token_part(monkeypatch, capsys):
         async with _captcha_lifespan(server):
             result = estado_servidor()
             assert result["captcha_listening"] is True
-            masked = result["captcha_url_masked"]
-            assert token not in masked
-            assert "<token>" in masked
-            assert masked == f"http://127.0.0.1:{port}/<token>/"
+            url = result["captcha_url"]
+            assert token in url
+            assert "<token>" not in url
+            assert url == f"http://127.0.0.1:{port}/{token}/"
 
     asyncio.run(run())
     assert capsys.readouterr().out == ""
