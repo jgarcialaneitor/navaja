@@ -11,7 +11,7 @@ import os
 from datetime import date
 from pathlib import Path
 from typing import Any
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, urlparse
 
 import httpx
 import pytest
@@ -390,15 +390,35 @@ def test_supreme_court_result_urls_are_accepted_by_the_url_validator():
         )
 
     urls = [s.url_documento for s in page.sentencias if s.url_documento]
-    assert urls, "the captured Supreme Court response yielded no document URLs"
+    assert len(urls) == 20, "the captured Supreme Court response changed shape"
     assert all("/search/TS/" in url for url in urls), (
         "fixture no longer represents the Supreme Court path shape"
     )
 
+    # Pin two known entries against literals, so a parser that returned
+    # plausible-but-wrong values could not satisfy this test.
+    first = parse_document_url(urls[0])
+    assert first.reference == "ee62f935e8a3d299a0a8778d75e36f0d"
+    assert first.optimize == "20260917"
+    assert first.access_to_pdf_url == (
+        "https://www.poderjudicial.es/search/contenidos.action"
+        "?action=accessToPDF&publicinterface=true&tab=AN"
+        "&reference=ee62f935e8a3d299a0a8778d75e36f0d"
+        "&encode=true&optimize=20260917&databasematch=AN"
+    )
+
+    second = parse_document_url(urls[1])
+    assert second.reference == "0064f3b31d94b1eea0a8778d75e36f0d"
+    assert second.optimize == "20260917"
+
+    # Every remaining URL must round-trip against its own path segments,
+    # split independently of the validator's regex.
     for url in urls:
         ref = parse_document_url(url)
-        assert ref.reference in url
-        assert ref.optimize in url
+        _, collection, _, reference, optimize = urlparse(url).path.strip("/").split("/")
+        assert collection == "TS"
+        assert ref.reference == reference
+        assert ref.optimize == optimize
 
 
 def test_url_validator_error_message_names_every_accepted_collection():
@@ -458,8 +478,10 @@ def test_live_supreme_court_urls_are_parseable():
 
     for url in ts_urls:
         ref = parse_document_url(url)
-        assert ref.reference in url
-        assert ref.optimize in url
+        _, collection, _, reference, optimize = urlparse(url).path.strip("/").split("/")
+        assert collection in {"AN", "TS"}
+        assert ref.reference == reference
+        assert ref.optimize == optimize
 
 
 # --- Location vocabulary tests ------------------------------------------------
