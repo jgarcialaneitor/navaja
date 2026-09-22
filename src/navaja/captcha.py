@@ -10,7 +10,10 @@ from __future__ import annotations
 import atexit
 import contextlib
 import errno
-import fcntl
+try:
+    import fcntl  # POSIX only; absent on Windows.
+except ImportError:
+    fcntl = None
 import html
 import os
 import re
@@ -62,7 +65,13 @@ def _validate_token(token: str | None) -> None:
 
 
 def _interface_ipv4(name: str) -> str | None:
-    """Return the IPv4 address assigned to interface ``name``, or ``None``."""
+    """Return the IPv4 address assigned to interface ``name``, or ``None``.
+
+    Platforms without ``fcntl`` (e.g. Windows) skip the ioctl and return
+    ``None`` so the caller can fall back to loopback.
+    """
+    if fcntl is None:
+        return None
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         # SIOCGIFADDR on Linux.

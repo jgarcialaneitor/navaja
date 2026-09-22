@@ -386,7 +386,8 @@ def save_pdf(
 
     try:
         name_max = os.pathconf(dest, "PC_NAME_MAX")
-    except (ValueError, OSError):
+    except (ValueError, OSError, AttributeError):
+        # os.pathconf is POSIX-only; AttributeError covers Windows.
         name_max = 255
 
     filename, name_reason = _filename_from_content_type(content_type, ref, name_max)
