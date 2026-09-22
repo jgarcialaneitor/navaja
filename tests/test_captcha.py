@@ -788,8 +788,11 @@ def test_resolve_token_generates_and_persists(monkeypatch, tmp_path):
     token, reason = resolve_captcha_token(token_path=path)
     assert path.exists()
     assert path.read_text(encoding="utf-8") == token
-    assert stat.S_IMODE(path.stat().st_mode) == 0o600
-    assert stat.S_IMODE(path.parent.stat().st_mode) == 0o700
+    # File modes are POSIX-specific: Windows reports regular files as 0o666
+    # and ignores mkdir(mode=...).
+    if os.name != "nt":
+        assert stat.S_IMODE(path.stat().st_mode) == 0o600
+        assert stat.S_IMODE(path.parent.stat().st_mode) == 0o700
     assert re.fullmatch(r"[A-Za-z0-9_-]{32,}", token)
     assert "generated" in reason
 

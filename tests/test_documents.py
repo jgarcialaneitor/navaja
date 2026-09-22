@@ -423,7 +423,13 @@ def test_resolve_pdf_destination_uses_local_share_default(monkeypatch, tmp_path)
     monkeypatch.delenv("XDG_DATA_HOME", raising=False)
     home = tmp_path / "home"
     home.mkdir()
-    monkeypatch.setenv("HOME", str(home))
+    if os.name == "nt":
+        # Windows Path.home() reads USERPROFILE (and HOMEDRIVE/HOMEPATH).
+        monkeypatch.setenv("USERPROFILE", str(home))
+        monkeypatch.delenv("HOMEDRIVE", raising=False)
+        monkeypatch.delenv("HOMEPATH", raising=False)
+    else:
+        monkeypatch.setenv("HOME", str(home))
     path, reason = resolve_pdf_destination()
     assert path == home / ".local" / "share" / "navaja" / "pdfs"
     assert reason == "XDG default"
@@ -584,7 +590,8 @@ def test_save_pdf_skips_non_pdf_content_type(tmp_path):
 
 def test_save_pdf_degrades_when_pathconf_unavailable(monkeypatch, tmp_path):
     """Simulate Windows: os.pathconf is absent, but PDF save still works."""
-    monkeypatch.delattr(os, "pathconf")
+    if hasattr(os, "pathconf"):
+        monkeypatch.delattr(os, "pathconf")
     ref = _make_document_ref()
     result = save_pdf(
         PDF_BYTES,
@@ -602,7 +609,8 @@ def test_save_pdf_surfaces_name_too_long(tmp_path):
     name_len = 300
     try:
         max_name = os.pathconf(tmp_path, "PC_NAME_MAX")
-    except (ValueError, OSError):
+    except (AttributeError, ValueError, OSError):
+        # os.pathconf is POSIX-only; fall back to the value the code assumes.
         max_name = 255
     if max_name >= name_len:
         pytest.skip("filesystem supports names of this length")
@@ -623,6 +631,10 @@ def test_save_pdf_surfaces_name_too_long(tmp_path):
     assert result.path.read_bytes() == PDF_BYTES
 
 
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="Windows reports PermissionError instead of EISDIR for a directory collision",
+)
 def test_save_pdf_surfaces_directory_collision(tmp_path):
     ref = _make_document_ref()
     filename = "SAP_ML_110_2026.pdf"
@@ -639,8 +651,37 @@ def test_save_pdf_surfaces_directory_collision(tmp_path):
     assert result.error is not None
 
 
-def test_save_pdf_surfaces_unreadable_collision(tmp_path):
-    if os.geteuid() == 0:
+def test_save_pdf_surfaces_unreadable_collision(monkeypatch, tmp_path):
+    if hasattr(os, "geteuid") and os.geteuid() == 0:
+        pytest.skip("root bypasses file permissions")
+
+    def _raise_permission_error(self):
+        raise PermissionError(13, "Permission denied")
+
+    monkeypatch.setattr("pathlib.Path.read_bytes", _raise_permission_error)
+
+    ref = _make_document_ref()
+    filename = "existing.pdf"
+    target = tmp_path / filename
+    target.write_bytes(b"locked content")
+    result = save_pdf(
+        PDF_BYTES,
+        f'application/pdf; name="{filename}"',
+        ref,
+        tmp_path,
+    )
+    assert result.ok is False
+    assert result.reason == "write_failed"
+    assert result.path is None
+    assert result.error is not None
+
+
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="POSIX file permissions are required to deny read access on disk",
+)
+def test_save_pdf_surfaces_unreadable_collision_with_posix_permissions(tmp_path):
+    if hasattr(os, "geteuid") and os.geteuid() == 0:
         pytest.skip("root bypasses file permissions")
 
     ref = _make_document_ref()
