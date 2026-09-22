@@ -384,11 +384,13 @@ def save_pdf(
             error=f"Could not create destination directory {dest}: {exc}",
         )
 
-    try:
-        name_max = os.pathconf(dest, "PC_NAME_MAX")
-    except (ValueError, OSError, AttributeError):
-        # os.pathconf is POSIX-only; AttributeError covers Windows.
-        name_max = 255
+    # os.pathconf is POSIX-only: on Windows the limit stays at the default.
+    name_max = 255
+    if hasattr(os, "pathconf"):
+        try:
+            name_max = os.pathconf(dest, "PC_NAME_MAX")
+        except (ValueError, OSError):
+            name_max = 255
 
     filename, name_reason = _filename_from_content_type(content_type, ref, name_max)
     candidate = dest / filename

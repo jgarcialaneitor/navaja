@@ -175,15 +175,23 @@ def _persist_token(token: str, path: Path) -> None:
 
     The parent directory is created with mode ``0700``. The token is written
     to a temporary file in the same directory, the temporary file is chmodded
-    to ``0600``, and then it is moved into place with ``os.replace`` so a
-    concurrent run cannot observe a partially written file.
+    to ``0600`` on POSIX, and then it is moved into place with ``os.replace``
+    so a concurrent run cannot observe a partially written file.
+
+    The ``0600`` permission guarantee is POSIX-only. On platforms without
+    ``os.fchmod`` (e.g. Windows) the call is replaced by a best-effort
+    ``os.chmod`` on the temporary path, which only toggles the read-only bit.
     """
     path = Path(path)
     path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     fd, temp_path = tempfile.mkstemp(dir=path.parent, prefix=".captcha-token-")
     try:
         os.write(fd, token.encode("utf-8"))
-        os.fchmod(fd, 0o600)
+        if hasattr(os, "fchmod"):
+            os.fchmod(fd, 0o600)
+        else:
+            # Windows has no os.fchmod; chmod only toggles the read-only bit.
+            os.chmod(temp_path, 0o600)
     except Exception:
         with contextlib.suppress(OSError):
             os.close(fd)
@@ -690,7 +698,8 @@ def _get_or_create_captcha_server(
         try:
             server = CaptchaServer((host, port), token=token)
         except OSError as exc:
-            if exc.errno == errno.EADDRINUSE:
+            winerror = getattr(exc, "winerror", None)
+            if exc.errno == errno.EADDRINUSE or winerror in (10013, 10048):
                 raise RuntimeError(
                     f"captcha server cannot bind to {host!r} port {port}: "
                     "address already in use"
