@@ -349,7 +349,23 @@ class CaptchaServer(HTTPServer):
         self._closed = False
         self._lock = threading.Lock()
         self._thread = None
+        if os.name == "nt":
+            self.allow_reuse_address = False
         super().__init__(server_address, _Handler)
+
+    def server_bind(self) -> None:
+        """Bind the socket, requesting exclusive address use on Windows.
+
+        ``SO_EXCLUSIVEADDRUSE`` prevents another process from silently
+        sharing the same listening port. It is only available on Windows, so
+        the option is set only when the platform defines it and only before
+        delegating to the parent bind.
+        """
+        if os.name == "nt" and hasattr(socket, "SO_EXCLUSIVEADDRUSE"):
+            self.socket.setsockopt(
+                socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1
+            )
+        super().server_bind()
 
     @property
     def url(self) -> str:
@@ -728,15 +744,21 @@ def _get_or_create_captcha_server(
         except OSError as exc:
             winerror = getattr(exc, "winerror", None)
             # Both Windows codes mean "address already in use" at this call
-            # site. HTTPServer binds with SO_REUSEADDR; on Windows, binding to
-            # an occupied address with that flag raises WSAEACCES (10013)
-            # instead of WSAEADDRINUSE (10048). This was measured on Windows
-            # CI, not assumed from the code name.
+            # site. The raw-socket Windows CI test raised WSAEACCES (10013)
+            # for an occupied address, while two real navaja processes on a
+            # real Windows machine succeeded in binding to the same port
+            # because HTTPServer's SO_REUSEADDR permits active-listener
+            # hijack on Windows. CaptchaServer now disables reuse and sets
+            # SO_EXCLUSIVEADDRUSE on Windows, so either code can be reported
+            # when another process holds the port.
             if exc.errno == errno.EADDRINUSE or winerror in (
                 _WSAEACCES,
                 _WSAEADDRINUSE,
             ):
-                reason = "address already in use"
+                reason = (
+                    "address already in use; another navaja instance is "
+                    "likely listening — kill it or set NAVAJA_CAPTCHA_PORT"
+                )
             else:
                 raise
             raise RuntimeError(
