@@ -67,21 +67,46 @@ Baseline: `367 passed, 2 skipped` on Linux at `beba70c`.
 
 ## Tasks
 
-- [ ] 1. Add `sala` to `Sentencia` next to `sede`, with a docstring that says what
+- [x] 1. Add `sala` to `Sentencia` next to `sede`, with a docstring that says what
       it is and that it is only present for Tribunal Supremo rulings; `as_dict()`
       picks it up from `__slots__`.
-- [ ] 2. Capture the bold unlabelled `Sala ...` entry in `_parse_metadatos` and
+- [x] 2. Capture the bold unlabelled `Sala ...` entry in `_parse_metadatos` and
       pass it through in `_parse_search_page`.
-- [ ] 3. Test against the real fixtures: the chamber is populated for every STS/ATS
+- [x] 3. Test against the real fixtures: the chamber is populated for every STS/ATS
       in both fixtures, the three observed values are covered, and the provincial
       `SAP` result has `sala is None`.
-- [ ] 4. Update the contract test that pins `set(payload)` and assert the new key.
-- [ ] 5. Correct the `sede` docstring and the README paragraph that presents
+- [x] 4. Update the contract test that pins `set(payload)` and assert the new key.
+- [x] 5. Correct the `sede` docstring and the README paragraph that presents
       `Sede: Madrid` as the missing piece, and document `sala`.
-- [ ] 6. Reconcile task 11 of `odd/tasks/cendoj-mcp.md` with issue #14: its framing
+- [x] 6. Reconcile task 11 of `odd/tasks/cendoj-mcp.md` with issue #14: its framing
       is superseded by the measurement above.
 - [ ] 7. Verify on Linux and push so both CI jobs measure it.
 
 ## Evidence
 
-Recorded as tasks close.
+- Tasks 1-5 implemented by the `gentle-ai-worker` subagent, then verified
+  read-only by the `gentle-ai-verify` subagent against `main`. The verifier
+  reproduced every claim: `54 passed` for the focused file and
+  `371 passed, 2 skipped` for the full suite, the fixture distribution exactly,
+  and confirmed no existing assertion was removed or relaxed.
+- The `cendoj.py` diff is 4 added lines: a 3-line guard in `_parse_metadatos` and
+  the `sala=meta.get("sala")` pass-through. `_parse_title` and every `sede` path
+  are byte-for-byte identical to `main`.
+- `as_dict()` needed no special-casing: it iterates `__slots__`, so `Sentencia()`
+  now returns 15 keys with `sala` next to `sede`. The contract test still asserts
+  full set equality, not a subset.
+- The ECLI entry is also bold and unlabelled, so the guard was falsified against
+  it: the ECLI branch runs first and `ECLI:...` never reaches the chamber guard.
+  A labelled `Órgano : Sala de lo Civil` correctly does **not** populate `sala`,
+  because the guard requires an empty label.
+- **Known limitation, unproven against live HTML.** The guard is
+  `value.startswith("Sala ")`: case-sensitive, and prefix-based. Neither fixture
+  contains a counterexample, but a lowercase or differently-shaped bare entry
+  would be silently discarded, and a bare non-chamber value starting with
+  `Sala ` would be mis-captured. Only two fixtures were measured; the live site
+  was not.
+- The one assertion tightened after the writer's pass: `test_ecli_is_parsed_separately_from_sala`
+  originally ended with `assert not sentencia.ecli.startswith("Sala ")`, which is
+  a tautology after asserting `ecli.startswith("ECLI:")` and cannot catch drift.
+  It now asserts the direction that could actually drift: `sala` never holds an
+  ECLI.
