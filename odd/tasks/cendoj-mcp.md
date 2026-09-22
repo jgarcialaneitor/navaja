@@ -82,12 +82,17 @@ Out of scope, deliberately:
       without `gc.collect()`, successful answer releases the port, handler
       exception still releases the port, and occupied-port bind error is
       actionable. Verified: `96 passed, 1 skipped` (`uv run pytest`).
-- [ ] 11. Fix the search-result parser gap for Tribunal Supremo rulings:
-      `Sentencia.sede` is `None` for STS/ATS rulings because `_parse_title`
-      expects the `"<TIPO> <SEDE>, a <fecha>"` shape used by SAP titles. The
-      Supreme Court title does not include the seat in that position, but the
-      full-text PDF already carries `Sede`, so the gap is fillable from the
-      document as well as from the title.
+- [x] 11. Superseded by issue #14 and `odd/tasks/cendoj-sala-field.md`, done in
+      the `feat/cendoj-sala-field` branch. The original framing was: `Sentencia.sede`
+      is `None` for STS/ATS rulings because `_parse_title` expects the
+      `"<TIPO> <SEDE>, a <fecha>"` shape used by SAP titles, and the full-text PDF
+      carries `Sede`, so the gap was assumed fillable from the document. Measured
+      before acting: the results page already publishes the location as
+      `Municipio: Madrid`, and the datum the parser actually dropped is the
+      **chamber** (`<li><b>Sala de lo Civil</b></li>`), which the search page
+      carries, so no captcha-gated fetch is needed to read it. `sede` staying
+      `None` for `STS`/`ATS` is intended and is now documented in `models.py` and
+      the README; the chamber is exposed as `Sentencia.sala`.
 
 ## Evidence
 

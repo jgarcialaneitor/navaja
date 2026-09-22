@@ -38,7 +38,18 @@ class Sentencia:
     """Resolution type token, e.g. ``"SAP"``, ``"STS"``, ``"ATS"``."""
 
     sede: str | None = None
-    """Court seat as printed in the result title, e.g. ``"Navarra"``."""
+    """Court seat as printed in the result title, e.g. ``"Navarra"``.
+
+    ``None`` for Tribunal Supremo rulings is intended: neither the title nor
+    the ROJ carries a seat code for ``STS``/``ATS`` results.
+    """
+
+    sala: str | None = None
+    """Court chamber, e.g. ``"Sala de lo Civil"``.
+
+    Only present for Tribunal Supremo rulings (``STS``/``ATS``); ``None``
+    otherwise.
+    """
 
     fecha_resolucion: date | None = None
     """Date the resolution was issued."""

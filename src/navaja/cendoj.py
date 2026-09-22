@@ -153,6 +153,9 @@ def _parse_metadatos(block: Tag) -> dict[str, Any]:
         raw = _clean(item.get_text(" "))
         label = raw[: -len(value)] if value and raw.endswith(value) else raw
         label = _normalize_label(label)
+        if not label and value and value.startswith("Sala "):
+            found["sala"] = value
+            continue
         for needle, field_name in _META_MATCHERS:
             if needle in label:
                 if field_name == "fecha_resolucion":
@@ -215,6 +218,7 @@ def parse_search_page(
                 ecli=meta.get("ecli"),
                 tipo=tipo,
                 sede=sede,
+                sala=meta.get("sala"),
                 fecha_resolucion=fecha or compact_date,
                 num_resolucion=meta.get("num_resolucion"),
                 municipio=meta.get("municipio"),
