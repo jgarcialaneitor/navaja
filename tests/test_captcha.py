@@ -341,17 +341,18 @@ def test_bind_to_occupied_port_raises_clear_error():
 
 
 @pytest.mark.parametrize(
-    "winerror,reason",
-    [
-        # 10013 is reported by Windows for an occupied address when
-        # SO_REUSEADDR is set, so it is surfaced as "address already in use".
-        (10013, "address already in use"),
-        (10048, "address already in use"),
-    ],
+    "winerror",
+    [10013, 10048],
     ids=["WSAEACCES", "WSAEADDRINUSE"],
 )
-def test_bind_refusal_on_windows_raises_clear_error(monkeypatch, winerror, reason):
-    """A Windows-style bind refusal is reported as address already in use."""
+def test_bind_refusal_on_windows_raises_clear_error(monkeypatch, winerror):
+    """A Windows-style bind refusal is reported as address already in use.
+
+    10013 is what Windows reports for an occupied address when SO_REUSEADDR is
+    set, which is how HTTPServer binds, so it means the same thing at this call
+    site as 10048. That was measured on the Windows CI rather than inferred from
+    the code name.
+    """
 
     def raising_server(*args, **kwargs):
         exc = OSError("simulated bind refusal")
@@ -361,7 +362,7 @@ def test_bind_refusal_on_windows_raises_clear_error(monkeypatch, winerror, reaso
     monkeypatch.setattr("navaja.captcha.CaptchaServer", raising_server)
     with pytest.raises(
         RuntimeError,
-        match=rf"^captcha server cannot bind to '127\.0\.0\.1' port 12345: {re.escape(reason)}$",
+        match=r"^captcha server cannot bind to '127\.0\.0\.1' port 12345: address already in use$",
     ):
         serve_captcha(TINY_PNG, host="127.0.0.1", port=12345, timeout=0.1)
 
