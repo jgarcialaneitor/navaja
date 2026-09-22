@@ -48,34 +48,59 @@ Baseline: `371 passed, 2 skipped` on Linux at `87d2277`.
 
 ## Tasks
 
-- [ ] 1. In `CaptchaServer.__init__`, set instance-level
+- [x] 1. In `CaptchaServer.__init__`, set instance-level
       `allow_reuse_address = False` when `os.name == "nt"` (POSIX keeps the
       inherited `True`), and override `server_bind` to set
       `SO_EXCLUSIVEADDRUSE` before `super().server_bind()` when the platform
       exposes it. POSIX behaviour must be byte-identical.
-- [ ] 2. Correct the stale comment in `_get_or_create_captcha_server` and the
+- [x] 2. Correct the stale comment in `_get_or_create_captcha_server` and the
       docstring of `test_bind_refusal_on_windows_raises_clear_error`: they
       state Windows raises `WSAEACCES` for an occupied address *with
       `SO_REUSEADDR` set*; the real machine measured a successful hijack
       instead. Record what was actually measured. Keep both winerror codes in
       the mapping.
-- [ ] 3. Enrich the mapped `RuntimeError` with a recovery hint (another navaja
+- [x] 3. Enrich the mapped `RuntimeError` with a recovery hint (another navaja
       instance is likely holding the port; kill it or set
       `NAVAJA_CAPTCHA_PORT`), and update the exact-match assertion in the
       existing simulated-refusal test.
-- [ ] 4. Regression test: two listeners on the same `(host, port)` — the
+- [x] 4. Regression test: two listeners on the same `(host, port)` — the
       second must raise the mapped `RuntimeError` on **both** platforms. On
       Windows this fails before the fix (both sockets carry `SO_REUSEADDR`
       and the hijack succeeds); on POSIX it passes before and after.
-- [ ] 5. Simulated-Windows unit tests following the suite's existing
+- [x] 5. Simulated-Windows unit tests following the suite's existing
       simulation style: the instance attribute is `False` on `nt` and the
       inherited `True` elsewhere, and `server_bind` sets
       `SO_EXCLUSIVEADDRUSE` before binding when the platform defines it.
-- [ ] 6. README (in Spanish): one short note in the captcha section on what a
+- [x] 6. README (in Spanish): one short note in the captcha section on what a
       second instance now reports and the recovery path.
-- [ ] 7. Verify on Linux, reconcile the ficha, and record follow-up issue
+- [x] 7. Verify on Linux, reconcile the ficha, and record follow-up issue
       numbers for the deferred proposals.
 
 ## Evidence
 
-Recorded as tasks close.
+- Tasks 1-6 implemented by the `gentle-ai-worker` subagent, then verified
+  read-only against `main` by the `gentle-ai-verify` subagent: counts
+  reproduced exactly (66 focused, 376/2 full), the fix is two surgical hunks
+  in `captcha.py`, the Windows-only guards are correct for this CPython
+  (`HTTPServer.allow_reuse_address` is class-level int `1`), and no assertion
+  was removed or relaxed beyond the two message pins.
+- **The verifier found two assertion gaps, both tightened before commit.**
+  First, the simulated-Windows test recorded only `setsockopt` calls, so a
+  reordering that set `SO_EXCLUSIVEADDRUSE` *after* the bind would still pass
+  — membership is not ordering. The spy now records `bind` as well and asserts
+  `exclusive_index < bind_index`; a control mutation that moved the flag after
+  the bind made the test fail (exit 1), and the code was restored byte-identical.
+  Second, two of the three message pins were prefix-only; they now pin the
+  **complete** message, anchored, including the recovery tail.
+- The diff is small by design: 2 hunks in `src/navaja/captcha.py` (the two
+  Windows guards + the corrected comment and message), 5 new tests plus 2
+  tightened ones in `tests/test_captcha.py`, 1 sentence in the README.
+- `367 -> 371 passed` became **371 -> 376 passed, 2 skipped** on Linux. The
+  2 skipped remain the opt-in `live` tests.
+- **What this candidate cannot verify locally: the real Windows behaviour.**
+  The regression test is designed to fail on Windows before the fix and pass
+  after it; both CI jobs are the instrument. The first real-machine exercise
+  of the challenge path will be the site's own decision, as measured in the
+  user's Windows run.
+- Follow-up issues for the deferred proposals of #17: pending numbers.
+
