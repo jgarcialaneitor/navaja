@@ -80,9 +80,20 @@ Baseline: `367 passed, 2 skipped` on Linux at `beba70c`.
       `Sede: Madrid` as the missing piece, and document `sala`.
 - [x] 6. Reconcile task 11 of `odd/tasks/cendoj-mcp.md` with issue #14: its framing
       is superseded by the measurement above.
-- [ ] 7. Verify on Linux and push so both CI jobs measure it.
+- [x] 7. Verify on Linux and push so both CI jobs measure it.
 
 ## Evidence
+
+- **CI measured both platforms** on run `35776970019` for PR #15
+  (`feat/cendoj-sala-field`):
+
+  | job | result |
+  | --- | --- |
+  | `test` (ubuntu-latest) | **371 passed, 2 skipped** (45.04s) |
+  | `test-windows` (windows-latest) | **369 passed, 4 skipped, 0 failures** (56.73s) |
+
+  The two extra Windows skips are the pre-existing POSIX-only tests, unchanged by
+  this work.
 
 - Tasks 1-5 implemented by the `gentle-ai-worker` subagent, then verified
   read-only by the `gentle-ai-verify` subagent against `main`. The verifier
