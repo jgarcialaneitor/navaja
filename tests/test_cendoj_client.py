@@ -333,6 +333,7 @@ def test_non_default_records_per_page_reaches_wire():
         (NO_RESULTS_HTML, None),
         (HTML, None),
     ],
+    ids=["invalid_request", "mass_download_gate", "no_results", "with_results"],
 )
 def test_detect_refusal_classifies_response(html, expected):
     assert detect_refusal(html) == expected
