@@ -582,6 +582,22 @@ def test_save_pdf_skips_non_pdf_content_type(tmp_path):
     assert len(list(tmp_path.iterdir())) == 0
 
 
+def test_save_pdf_degrades_when_pathconf_unavailable(monkeypatch, tmp_path):
+    """Simulate Windows: os.pathconf is absent, but PDF save still works."""
+    monkeypatch.delattr(os, "pathconf")
+    ref = _make_document_ref()
+    result = save_pdf(
+        PDF_BYTES,
+        'application/pdf; name="SAP_ML_110_2026.pdf"',
+        ref,
+        tmp_path,
+    )
+    assert result.ok is True
+    assert result.path == tmp_path / "SAP_ML_110_2026.pdf"
+    assert result.reason == "server_sent_name"
+    assert result.path.read_bytes() == PDF_BYTES
+
+
 def test_save_pdf_surfaces_name_too_long(tmp_path):
     name_len = 300
     try:

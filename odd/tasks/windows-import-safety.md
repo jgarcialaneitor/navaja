@@ -42,10 +42,20 @@ Baseline before this work: `.venv/bin/pytest` -> `343 passed, 2 skipped` in
 - [x] 2. Add tests proving the package imports and `resolve_captcha_host` still
       resolves when `fcntl` is absent, by hiding it from the import system the way
       Windows would (not by stubbing the call site only).
-- [ ] 3. Guard the POSIX-only `os.pathconf` name-limit probe in `documents.py`,
+- [x] 3. Guard the POSIX-only `os.pathconf` name-limit probe in `documents.py`,
       keeping `255` as the fallback, with a test that simulates its absence.
-- [ ] 4. Confirm the module docstrings state the degrade behaviour truthfully, and
+- [x] 4. Confirm the module docstrings state the degrade behaviour truthfully, and
       touch the README only if this change makes an existing claim wrong.
+
+## Follow-ups, not fixed here
+
+- The offline suite still cannot run on Windows: `tests/test_documents.py:588`
+  queries `os.pathconf` and `:627` calls `os.geteuid()`, both POSIX-only.
+- Nothing verifies the fix on a real Windows host. A Windows CI job would, even as
+  a bare import smoke step, and is deliberately out of scope here.
+- Issue #7's body points at `tests/test_documents.py` for
+  `test_url_validator_error_message_names_every_accepted_collection`; the test
+  actually lives in `tests/test_cendoj_client.py:424`.
 
 ## Evidence
 
@@ -60,3 +70,12 @@ Baseline before this work: `.venv/bin/pytest` -> `343 passed, 2 skipped` in
   subprocess test fail, so the guard is load-bearing. The two unit tests keep
   passing under that mutation, because they exercise the `fcntl is None`
   behaviour rather than the import guard itself.
+- Task 3: red observed as `AttributeError: module 'os' has no attribute
+  'pathconf'. Did you mean: 'fpathconf'?` at `documents.py:388`; mutation check
+  confirms that narrowing the except clause back to `(ValueError, OSError)` makes
+  the new test fail.
+- Task 4: `_interface_ipv4`'s docstring now states the degrade path;
+  `README.md` was not touched, because its resolution-order and fallback claims
+  were already true and this change is what makes them true on Windows.
+- Full suite at the end of the work: `347 passed, 2 skipped` (baseline before the
+  work: `343 passed, 2 skipped`).
