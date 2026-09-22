@@ -26,6 +26,7 @@ def test_max_results_imported_from_all_locations():
     assert from_package == 200
 
 FIXTURE = Path(__file__).parent / "fixtures" / "search_clausulas_abusivas.html"
+TS_FIXTURE = Path(__file__).parent / "fixtures" / "search_ts_coleccion.html"
 CLAMPED_FIXTURE = Path(__file__).parent / "fixtures" / "search_clamped_page.html"
 NO_RESULTS_FIXTURE = Path(__file__).parent / "fixtures" / "search_no_results.html"
 
@@ -33,6 +34,11 @@ NO_RESULTS_FIXTURE = Path(__file__).parent / "fixtures" / "search_no_results.htm
 @pytest.fixture(scope="module")
 def page():
     return parse_search_page(FIXTURE.read_text(encoding="utf-8"))
+
+
+@pytest.fixture(scope="module")
+def ts_page():
+    return parse_search_page(TS_FIXTURE.read_text(encoding="utf-8"))
 
 
 def test_parses_every_result_on_the_page(page):
@@ -52,11 +58,43 @@ def test_first_result_is_fully_populated(page):
     assert first.ecli == "ECLI:ES:APNA:2026:1461"
     assert first.tipo == "SAP"
     assert first.sede == "Navarra"
+    assert first.sala is None
     assert first.fecha_resolucion == date(2026, 9, 11)
     assert first.num_resolucion == "1097/2026"
     assert first.num_recurso == "1497/2024"
     assert first.municipio == "Pamplona/Iruña"
     assert first.ponente == "DANIEL RODRIGUEZ ANTUNEZ"
+
+
+def test_sala_is_populated_for_tribunal_supremo(ts_page, page):
+    for fixture_page in (ts_page, page):
+        for sentencia in fixture_page.sentencias:
+            if sentencia.tipo in ("STS", "ATS"):
+                assert sentencia.sala is not None, f"missing sala: {sentencia}"
+
+
+def test_sala_covers_all_observed_values(ts_page, page):
+    values = {s.sala for s in ts_page.sentencias}
+    values |= {s.sala for s in page.sentencias}
+    assert values == {"Sala de lo Civil", "Sala de lo Penal", "Sala de lo Social", None}
+
+
+def test_sala_is_none_for_provincial_result(page):
+    provincial = [s for s in page.sentencias if s.tipo == "SAP"]
+    assert len(provincial) == 1
+    assert provincial[0].roj == "SAP  NA 1461/2026"
+    assert provincial[0].sala is None
+
+
+def test_ecli_is_parsed_separately_from_sala(ts_page):
+    # Both entries are bold and unlabelled, so the risk is the ECLI landing in
+    # `sala` or the chamber landing in `ecli`. The `sala` side is the one that
+    # would drift silently, because an ECLI in `ecli` looks correct either way.
+    for sentencia in ts_page.sentencias:
+        assert sentencia.ecli is not None
+        assert sentencia.ecli.startswith("ECLI:")
+        assert sentencia.sala is not None
+        assert not sentencia.sala.startswith("ECLI")
 
 
 def test_automatic_summary_is_captured_and_unprefixed(page):
@@ -255,6 +293,7 @@ def test_materia_appears_in_as_dict_without_dropping_existing_keys(page):
         "ecli",
         "tipo",
         "sede",
+        "sala",
         "fecha_resolucion",
         "num_resolucion",
         "municipio",

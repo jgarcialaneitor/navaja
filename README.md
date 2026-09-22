@@ -44,6 +44,8 @@
 
 La búsqueda, los metadatos y los resúmenes automáticos salen directamente de la página pública de resultados. **Solo el paso de texto completo** puede disparar el captcha `Control Descargas masivas` del sitio.
 
+Cada resultado expone los metadatos propios de la página, incluidos `roj`, `ecli`, `sede`, `municipio`, `ponente` y `sala`. La `sala` (`Sala de lo Civil`, `Sala de lo Penal`, `Sala de lo Social`) solo aparece en resoluciones del Tribunal Supremo (`STS`/`ATS`); para el resto, `sala` vale `null`.
+
 ---
 
 ## 🔍 Filtros de búsqueda
@@ -444,6 +446,6 @@ Qué demuestra esto:
 - Funcionó **al primer intento**, usando solo el cuerpo POST del captcha que ya existía. No hicieron falta cookies extra, cabecera `Referer` ni baile de reintentos.
 - El flujo de formulario local + túnel SSH **funciona en un VPS sin pantalla**.
 - `pypdf` extrae texto limpio del PDF devuelto.
-- Los metadatos del PDF son **más ricos** que los que produce ahora el parser de resultados de búsqueda. El documento lleva `Órgano`, `Sede`, `Sección`, `Fecha`, `Nº de Recurso`, `Nº de Resolución`, `Procedimiento`, `Ponente`, `Tipo de Resolución` e `Id Cendoj`. En particular incluye `Sede: Madrid`, que el parser de búsqueda deja vacío para las resoluciones del Tribunal Supremo.
+- Los metadatos del PDF son **más ricos** que los que produce el parser de resultados de búsqueda. El documento lleva `Órgano`, `Sede`, `Sección`, `Fecha`, `Nº de Recurso`, `Nº de Resolución`, `Procedimiento`, `Ponente`, `Tipo de Resolución` e `Id Cendoj`. La página de resultados ya publica `Municipio: Madrid`; el dato que el parser descartaba era la `Sala de lo Civil`, que ahora se expone como `sala`. `sede` sigue valiendo `null` para el Tribunal Supremo porque ni el título ni el ROJ llevan código de sede en esas resoluciones.
 
 Esta verificación se hizo con `navaja-doc` directamente, no a través de un cliente MCP.
