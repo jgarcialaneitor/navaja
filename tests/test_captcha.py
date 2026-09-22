@@ -343,13 +343,15 @@ def test_bind_to_occupied_port_raises_clear_error():
 @pytest.mark.parametrize(
     "winerror,reason",
     [
-        (10013, "access to the requested address was denied"),
+        # 10013 is reported by Windows for an occupied address when
+        # SO_REUSEADDR is set, so it is surfaced as "address already in use".
+        (10013, "address already in use"),
         (10048, "address already in use"),
     ],
     ids=["WSAEACCES", "WSAEADDRINUSE"],
 )
 def test_bind_refusal_on_windows_raises_clear_error(monkeypatch, winerror, reason):
-    """A Windows-style bind refusal is reported with the exact Windows reason."""
+    """A Windows-style bind refusal is reported as address already in use."""
 
     def raising_server(*args, **kwargs):
         exc = OSError("simulated bind refusal")

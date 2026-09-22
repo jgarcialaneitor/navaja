@@ -727,10 +727,16 @@ def _get_or_create_captcha_server(
             server = CaptchaServer((host, port), token=token)
         except OSError as exc:
             winerror = getattr(exc, "winerror", None)
-            if exc.errno == errno.EADDRINUSE or winerror == _WSAEADDRINUSE:
+            # Both Windows codes mean "address already in use" at this call
+            # site. HTTPServer binds with SO_REUSEADDR; on Windows, binding to
+            # an occupied address with that flag raises WSAEACCES (10013)
+            # instead of WSAEADDRINUSE (10048). This was measured on Windows
+            # CI, not assumed from the code name.
+            if exc.errno == errno.EADDRINUSE or winerror in (
+                _WSAEACCES,
+                _WSAEADDRINUSE,
+            ):
                 reason = "address already in use"
-            elif winerror == _WSAEACCES:
-                reason = "access to the requested address was denied"
             else:
                 raise
             raise RuntimeError(
