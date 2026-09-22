@@ -340,6 +340,22 @@ def test_bind_to_occupied_port_raises_clear_error():
             serve_captcha(TINY_PNG, host="127.0.0.1", port=port, timeout=0.1)
 
 
+def test_bind_refusal_on_windows_raises_clear_error(monkeypatch):
+    """A Windows-style bind refusal is reported as address already in use."""
+
+    def raising_server(*args, **kwargs):
+        exc = OSError("simulated bind refusal")
+        exc.winerror = 10013
+        raise exc
+
+    monkeypatch.setattr("navaja.captcha.CaptchaServer", raising_server)
+    with pytest.raises(
+        RuntimeError,
+        match=r"cannot bind to '127\.0\.0\.1' port 12345",
+    ):
+        serve_captcha(TINY_PNG, host="127.0.0.1", port=12345, timeout=0.1)
+
+
 def _start_idle_listener(port: int, token: str) -> str:
     """Start the shared listener and let the only challenge time out.
 
@@ -793,6 +809,19 @@ def test_resolve_token_generates_and_persists(monkeypatch, tmp_path):
     if os.name != "nt":
         assert stat.S_IMODE(path.stat().st_mode) == 0o600
         assert stat.S_IMODE(path.parent.stat().st_mode) == 0o700
+    assert re.fullmatch(r"[A-Za-z0-9_-]{32,}", token)
+    assert "generated" in reason
+
+
+def test_resolve_token_persists_when_fchmod_unavailable(monkeypatch, tmp_path):
+    """Simulate Windows: os.fchmod is absent, but token generation still works."""
+    if hasattr(os, "fchmod"):
+        monkeypatch.delattr(os, "fchmod")
+    monkeypatch.delenv("NAVAJA_CAPTCHA_TOKEN", raising=False)
+    path = tmp_path / "captcha-token"
+    token, reason = resolve_captcha_token(token_path=path)
+    assert path.exists()
+    assert path.read_text(encoding="utf-8") == token
     assert re.fullmatch(r"[A-Za-z0-9_-]{32,}", token)
     assert "generated" in reason
 
