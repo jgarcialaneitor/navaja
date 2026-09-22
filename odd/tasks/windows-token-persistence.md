@@ -57,11 +57,10 @@ died at `os.fchmod` and never reached `os.replace`; fixing that exposed this.
       still persist the token, asserted against the full value.
 - [x] 3. Test the persistent case: a move that always fails must raise, and must
       leave no temporary file behind.
-- [x] 4. Fold in the two review findings from the previous candidate that are
-      already measured: the README test count is stale, and the Windows bind
-      message claims "address already in use" for `WSAEACCES`, which means more
-      than that. Name the two Windows error codes instead of leaving bare
-      integers.
+- [x] 4. Name the two Windows bind error codes as named constants instead of
+      leaving bare integers, keeping a single "address already in use" reason
+      text because the Windows CI measured that 10013 means an occupied address
+      at this HTTPServer/SO_REUSEADDR call site.
 - [x] 5. Verify on Linux, then push so the Windows job measures it.
 
 ## Evidence
@@ -80,12 +79,24 @@ unchanged: `-rs` reports only the two opt-in `live` tests.
   counting calls and compares the full token value; both litter checks enumerate
   the directory rather than guessing a filename.
 - **The reason text is now pinned**: the bind test is parametrized over
-  `10013`/`10048` with the full message anchored `^…$`, and swapping the two
-  expected reasons fails both cases. Before this, the assertion matched only the
-  generic prefix and would have passed against either reason.
-- The two folded review findings are closed: the README count is correct at the
-  observed number, and `WSAEACCES` no longer claims "address already in use" —
-  the two Windows codes are named constants and produce distinct text.
+  `10013`/`10048` with the full message anchored `^…$`. Before this, the
+  assertion matched only the generic prefix and would have passed against either
+  reason.
+- **The Windows bind message stayed unified**: both error codes produce the
+  same "address already in use" reason. The attempted split was reverted after
+  the Windows CI measured the call-site behaviour:
+  1. The bind message was split by error code so that `WSAEACCES` reported
+     "access to the requested address was denied".
+  2. The Windows CI then failed
+     `test_lifespan_does_not_crash_on_occupied_port`, whose assertion at
+     `tests/test_server.py:1076` requires the stderr to contain
+     `address already in use`. On Windows an occupied address arrives as
+     `WSAEACCES`, because `HTTPServer` binds with `SO_REUSEADDR`.
+  3. The split was reverted: both codes produce one reason text again, and the
+     reason 10013 belongs there is recorded as a comment in the source rather
+     than as a hedged message. The named constants were kept.
+  4. The finding that suggested splitting the message was right about the error
+     code in general and wrong about this call site; the measurement decided it.
 
 Deliberately **not** verified here: anything about Windows. The CI job on the
 pull request is the measurement, and it is the only thing that can say whether a
