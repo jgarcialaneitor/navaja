@@ -704,6 +704,88 @@ def test_save_pdf_surfaces_unreadable_collision_with_posix_permissions(tmp_path)
     assert result.error is not None
 
 
+def _make_header(roj_line: str) -> str:
+    return (
+        "JURISPRUDENCIA\n"
+        f"{roj_line}\n"
+        "Id Cendoj: 28079120012025100992\n"
+        "Órgano: Tribunal Supremo. Sala de lo Penal\n"
+    )
+
+
+@pytest.mark.parametrize(
+    "roj_line, expected",
+    [
+        ("Roj: STS 5365/2025 - ECLI:ES:TS:2025:5365", "STS_5365_2025.pdf"),
+        ("Roj: STS 1489/2021 - ECLI:ES:TS:2021:1489", "STS_1489_2021.pdf"),
+        ("Roj: STS 1301/2021 - ECLI:ES:TS:2021:1301", "STS_1301_2021.pdf"),
+        ("Roj: STS 4268/2024 - ECLI:ES:TS:2024:4268", "STS_4268_2024.pdf"),
+        ("Roj: STS 4209/2020 - ECLI:ES:TS:2020:4209", "STS_4209_2020.pdf"),
+        ("Roj: STSJ AND 2465/2024 - ECLI:ES:TSJAND:2024", "STSJ_AND_2465_2024.pdf"),
+        ("Roj: SAP ML 110/2026 - ECLI:ES:APML:2026:110", "SAP_ML_110_2026.pdf"),
+        ("Roj: STS 5365/2025", "STS_5365_2025.pdf"),
+    ],
+)
+def test_save_pdf_derives_name_from_roj_header(roj_line, expected, tmp_path):
+    ref = _make_document_ref()
+    header = _make_header(roj_line)
+    result = save_pdf(PDF_BYTES, None, ref, tmp_path, text=header)
+    assert result.ok is True
+    assert result.path == tmp_path / expected
+    assert result.reason == "missing_name"
+    assert result.path.read_bytes() == PDF_BYTES
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Some random text without any header.",
+        "[PDF extraction failed: stream ended]",
+        "JURISPRUDENCIA\nRoj: \nId Cendoj: 28079120012025100992\n",
+        "x\n" * 1100 + "JURISPRUDENCIA\nRoj: STS 5365/2025 - ECLI:ES:TS:2025:5365\n",
+    ],
+)
+def test_save_pdf_fallback_to_hash_when_roj_unusable(text, tmp_path):
+    ref = _make_document_ref()
+    result = save_pdf(PDF_BYTES, None, ref, tmp_path, text=text)
+    assert result.ok is True
+    assert result.path == tmp_path / f"{REFERENCE}_{OPTIMIZE}.pdf"
+    assert result.reason == "missing_name"
+
+
+def test_save_pdf_server_sent_name_wins_over_roj(tmp_path):
+    ref = _make_document_ref()
+    header = _make_header("Roj: STS 5365/2025 - ECLI:ES:TS:2025:5365")
+    result = save_pdf(
+        PDF_BYTES,
+        'application/pdf; name="STS_4209_2020.pdf"',
+        ref,
+        tmp_path,
+        text=header,
+    )
+    assert result.ok is True
+    assert result.path == tmp_path / "STS_4209_2020.pdf"
+    assert result.reason == "server_sent_name"
+
+
+def test_save_full_text_pdf_threads_text_to_filename(monkeypatch, tmp_path):
+    monkeypatch.setenv("NAVAJA_PDF_DIR", str(tmp_path))
+    ref = _make_document_ref()
+    header = _make_header("Roj: SAP ML 110/2026 - ECLI:ES:APML:2026:110")
+    result = FullTextResult(
+        ok=True,
+        content_type="application/pdf",
+        text=header,
+        pdf_bytes=PDF_BYTES,
+        attempts=1,
+        requests=2,
+    )
+    save_result = save_full_text_pdf(result, ref)
+    assert save_result.ok is True
+    assert save_result.path == tmp_path / "SAP_ML_110_2026.pdf"
+    assert save_result.reason == "missing_name"
+
+
 # --- Full-text PDF save decision ---
 
 

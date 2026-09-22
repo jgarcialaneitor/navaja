@@ -4,7 +4,7 @@
 
 **Servidor MCP para investigación personal de jurisprudencia en [CENDOJ](https://www.poderjudicial.es/search/indexAN.jsp)**
 
-[![Tests](https://img.shields.io/badge/tests-353%20passed-brightgreen)](#-desarrollo)
+[![Tests](https://img.shields.io/badge/tests-367%20passed-brightgreen)](#-desarrollo)
 [![Python](https://img.shields.io/badge/python-3.12+-blue)](#-desarrollo)
 [![MCP](https://img.shields.io/badge/MCP-7%20herramientas-8A2BE2)](#-qué-es-navaja)
 
@@ -269,7 +269,7 @@ El directorio de destino se resuelve en este orden:
 
 navaja crea el directorio cuando hace falta.
 
-El nombre del fichero se toma del parámetro `name=` que el servidor envía en la cabecera `Content-Type`, por ejemplo `name="STS_3679_2026.pdf"`. Ese valor se sanea hasta un nombre base seguro antes de llegar al sistema de ficheros. Si la cabecera no trae un nombre usable, o el nombre sería inseguro o demasiado largo, navaja recurre a un nombre determinista construido desde la URL del documento: `<referencia>_<optimize>.pdf`.
+El nombre del fichero se toma del parámetro `name=` que el servidor envía en la cabecera `Content-Type`, por ejemplo `name="STS_3679_2026.pdf"`. Ese valor se sanea hasta un nombre base seguro antes de llegar al sistema de ficheros. Si la cabecera no trae un nombre usable, o el nombre sería inseguro o demasiado largo, navaja intenta primero extraer el ROJ del propio texto de la resolución y usarlo como nombre; si tampoco puede, recurre al nombre determinista construido desde la URL del documento: `<referencia>_<optimize>.pdf`.
 
 El campo `pdf_save_reason` dice qué regla se aplicó (`server_sent_name`, `missing_name`, `unsafe_name`, `overlong_name`, `identical_bytes`, ...).
 
@@ -409,7 +409,7 @@ uv run pytest                          # determinista, contra fixtures guardados
 NAVAJA_LIVE=1 uv run pytest -m live    # opcional: golpea el sitio real
 ```
 
-**Suite actual: `353 passed, 2 skipped`.**
+**Suite actual: `367 passed, 2 skipped`.**
 
 Los tests **nunca** tocan el sitio real salvo que definas `NAVAJA_LIVE=1`.
 
