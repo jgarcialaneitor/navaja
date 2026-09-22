@@ -27,6 +27,7 @@ from navaja.captcha import (
     CaptchaBusyError,
     CaptchaServer,
     CaptchaTimeoutError,
+    _get_or_create_captcha_server,
     resolve_captcha_host,
     resolve_captcha_token,
     serve_captcha,
@@ -335,7 +336,11 @@ def test_bind_to_occupied_port_raises_clear_error():
         sock.listen(1)
         with pytest.raises(
             RuntimeError,
-            match=f"cannot bind to '127.0.0.1' port {port}",
+            match=(
+                rf"^captcha server cannot bind to '127\.0\.0\.1' port {port}: "
+                "address already in use; another navaja instance is likely "
+                "listening — kill it or set NAVAJA_CAPTCHA_PORT$"
+            ),
         ):
             serve_captcha(TINY_PNG, host="127.0.0.1", port=port, timeout=0.1)
 
@@ -348,10 +353,12 @@ def test_bind_to_occupied_port_raises_clear_error():
 def test_bind_refusal_on_windows_raises_clear_error(monkeypatch, winerror):
     """A Windows-style bind refusal is reported as address already in use.
 
-    10013 is what Windows reports for an occupied address when SO_REUSEADDR is
-    set, which is how HTTPServer binds, so it means the same thing at this call
-    site as 10048. That was measured on the Windows CI rather than inferred from
-    the code name.
+    The raw-socket Windows CI test raised WSAEACCES (10013) for an occupied
+    address, while two real navaja processes on a real Windows machine
+    succeeded in binding to the same port because HTTPServer's SO_REUSEADDR
+    permits active-listener hijack on Windows. CaptchaServer now disables
+    reuse and sets SO_EXCLUSIVEADDRUSE on Windows, so either code can be
+    reported when another process holds the port.
     """
 
     def raising_server(*args, **kwargs):
@@ -362,9 +369,126 @@ def test_bind_refusal_on_windows_raises_clear_error(monkeypatch, winerror):
     monkeypatch.setattr("navaja.captcha.CaptchaServer", raising_server)
     with pytest.raises(
         RuntimeError,
-        match=r"^captcha server cannot bind to '127\.0\.0\.1' port 12345: address already in use$",
+        match=(
+            r"^captcha server cannot bind to '127\.0\.0\.1' port 12345: "
+            r"address already in use; another navaja instance is likely listening — "
+            r"kill it or set NAVAJA_CAPTCHA_PORT$"
+        ),
     ):
         serve_captcha(TINY_PNG, host="127.0.0.1", port=12345, timeout=0.1)
+
+
+def test_second_captcha_server_on_same_address_raises_clear_error():
+    """A second listener on the same fixed port must fail loudly.
+
+    On POSIX this already fails because SO_REUSEADDR only reuses TIME_WAIT
+    sockets. On Windows it failed before the fix: both sockets carried
+    SO_REUSEADDR, so the second bind succeeded and connections were silently
+    routed to either process.
+    """
+    port = _free_port()
+    token = "conflict-token-0001"
+    first = CaptchaServer(("127.0.0.1", port), token=token)
+    try:
+        with pytest.raises(
+            RuntimeError,
+            match=(
+                rf"^captcha server cannot bind to '127\.0\.0\.1' port {port}: "
+                "address already in use; another navaja instance is likely "
+                "listening — kill it or set NAVAJA_CAPTCHA_PORT$"
+            ),
+        ):
+            _get_or_create_captcha_server("127.0.0.1", port, token)
+    finally:
+        first.stop()
+
+
+def test_captcha_server_disables_reuse_address_when_simulating_windows(monkeypatch):
+    """On Windows the instance must opt out of HTTPServer's SO_REUSEADDR default."""
+    monkeypatch.setattr("navaja.captcha.os.name", "nt")
+    port = _free_port()
+    server = CaptchaServer(("127.0.0.1", port), token="windows-reuse-token1")
+    try:
+        assert server.allow_reuse_address is False
+    finally:
+        server.stop()
+
+
+def test_captcha_server_keeps_reuse_address_on_posix():
+    """On POSIX the inherited SO_REUSEADDR default must remain enabled."""
+    if os.name == "nt":
+        return
+    port = _free_port()
+    server = CaptchaServer(("127.0.0.1", port), token="posix-reuse-token-01")
+    try:
+        assert server.allow_reuse_address == 1
+    finally:
+        server.stop()
+
+
+def test_captcha_server_sets_exclusive_addr_use_when_simulating_windows(monkeypatch):
+    """On Windows, server_bind sets SO_EXCLUSIVEADDRUSE before binding."""
+    monkeypatch.setattr("navaja.captcha.os.name", "nt")
+    monkeypatch.setattr(
+        "socket.SO_EXCLUSIVEADDRUSE", 9999, raising=False
+    )
+
+    port = _free_port()
+    calls: list[tuple[Any, ...]] = []
+    original_setsockopt = socket.socket.setsockopt
+    original_bind = socket.socket.bind
+
+    def spy_setsockopt(self, level, optname, value):
+        calls.append(("setsockopt", level, optname, value))
+        # The fake Windows-only option does not exist on Linux; swallow it.
+        if optname == 9999:
+            return 0
+        return original_setsockopt(self, level, optname, value)
+
+    def spy_bind(self, address):
+        calls.append(("bind", address))
+        return original_bind(self, address)
+
+    monkeypatch.setattr("socket.socket.setsockopt", spy_setsockopt)
+    monkeypatch.setattr("socket.socket.bind", spy_bind)
+
+    server = CaptchaServer(("127.0.0.1", port), token="exclusive-token-001")
+    try:
+        exclusive_index = calls.index(
+            ("setsockopt", socket.SOL_SOCKET, 9999, 1)
+        )
+        bind_index = calls.index(("bind", ("127.0.0.1", port)))
+        # Membership alone would also pass if the flag were set after the
+        # bind, where Windows would ignore it; the guarantee is the order.
+        assert exclusive_index < bind_index
+    finally:
+        server.stop()
+
+
+def test_captcha_server_skips_exclusive_addr_use_on_posix(monkeypatch):
+    """On POSIX, server_bind must not set the Windows-only exclusive option."""
+    if os.name == "nt":
+        return
+    monkeypatch.setattr(
+        "socket.SO_EXCLUSIVEADDRUSE", 9999, raising=False
+    )
+
+    calls: list[tuple[Any, ...]] = []
+    original_setsockopt = socket.socket.setsockopt
+
+    def spy_setsockopt(self, level, optname, value):
+        calls.append((level, optname, value))
+        return original_setsockopt(self, level, optname, value)
+
+    monkeypatch.setattr("socket.socket.setsockopt", spy_setsockopt)
+
+    port = _free_port()
+    server = CaptchaServer(("127.0.0.1", port), token="posix-exclusive-token1")
+    try:
+        assert (socket.SOL_SOCKET, 9999, 1) not in calls
+        assert server.allow_reuse_address == 1
+    finally:
+        server.stop()
 
 
 def _start_idle_listener(port: int, token: str) -> str:

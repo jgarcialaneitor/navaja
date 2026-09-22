@@ -333,6 +333,8 @@ Luego abre `http://127.0.0.1:8765/<token>/` en local.
 | `NAVAJA_MAX_CONCURRENTES` | `1` | Hilos de trabajo de la cola de descargas. Decisión de producto de este proyecto, no un límite publicado por el sitio. |
 | `NAVAJA_PDF_DIR` | `~/.local/share/navaja/pdfs` | Directorio donde se guardan los PDFs. Recurre a `$XDG_DATA_HOME/navaja/pdfs` si `XDG_DATA_HOME` está definida. |
 
+En Windows, si otra instancia de navaja ya está escuchando en el mismo puerto, el segundo proceso falla con *address already in use*; mata la instancia anterior o cambia `NAVAJA_CAPTCHA_PORT`.
+
 > [!CAUTION]
 > Si `NAVAJA_CAPTCHA_HOST` vale `0.0.0.0`, `::` o cadena vacía, **el servidor se niega a arrancar**. Ata una interfaz concreta.
 
