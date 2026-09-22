@@ -13,6 +13,8 @@ import re
 import secrets
 import socket
 import stat
+import subprocess
+import sys
 import threading
 import time
 from typing import Any
@@ -20,6 +22,7 @@ from typing import Any
 import httpx
 import pytest
 
+from navaja import captcha
 from navaja.captcha import (
     CaptchaBusyError,
     CaptchaServer,
@@ -715,6 +718,47 @@ def test_resolve_host_rejects_all_interfaces(bad_host, monkeypatch):
     monkeypatch.setenv("NAVAJA_CAPTCHA_HOST", bad_host)
     with pytest.raises(ValueError, match="refusing to bind"):
         resolve_captcha_host()
+
+
+def test_imports_without_fcntl_and_degrades_to_loopback():
+    """Simulate Windows: fcntl is absent, but the package still imports."""
+    script = """
+import sys
+
+class _FcntlBlocker:
+    def find_spec(self, fullname, path=None, target=None):
+        if fullname == "fcntl":
+            raise ModuleNotFoundError("No module named 'fcntl'")
+        return None
+
+sys.meta_path.insert(0, _FcntlBlocker())
+import navaja
+print(navaja.captcha.resolve_captcha_host())
+"""
+    env = os.environ.copy()
+    env.pop("NAVAJA_CAPTCHA_HOST", None)
+    completed = subprocess.run(
+        [sys.executable, "-c", script],
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert completed.stdout.strip() == repr(("127.0.0.1", "no tailscale0 interface found"))
+
+
+def test_interface_ipv4_short_circuits_without_fcntl(monkeypatch):
+    monkeypatch.delenv("NAVAJA_CAPTCHA_HOST", raising=False)
+    monkeypatch.setattr(captcha, "fcntl", None)
+    assert captcha._interface_ipv4("tailscale0") is None
+
+
+def test_resolve_host_falls_back_to_loopback_without_fcntl(monkeypatch):
+    monkeypatch.delenv("NAVAJA_CAPTCHA_HOST", raising=False)
+    monkeypatch.setattr(captcha, "fcntl", None)
+    host, reason = resolve_captcha_host()
+    assert host == "127.0.0.1"
+    assert reason == "no tailscale0 interface found"
 
 
 # --- Token resolution tests -------------------------------------------------
