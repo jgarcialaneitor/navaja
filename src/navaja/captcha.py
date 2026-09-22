@@ -23,12 +23,22 @@ import struct
 import sys
 import tempfile
 import threading
+import time
 from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
 
 _TOKEN_RE = re.compile(r"^[A-Za-z0-9_-]+\Z")
+
+# Windows sometimes refuses os.replace on a temp file whose handle was just
+# released (real-time virus scanners are the usual culprit). Retry briefly.
+_TOKEN_REPLACE_MAX_ATTEMPTS = 6
+_TOKEN_REPLACE_BACKOFF_SECONDS = 0.05  # worst case ~0.25 s, well under 0.5 s.
+
+# Windows socket error codes surfaced by CaptchaServer.bind as winerror.
+_WSAEACCES = 10013  # Permission denied / access denied.
+_WSAEADDRINUSE = 10048  # Address already in use.
 
 
 def _validate_host(host: str) -> str:
@@ -178,6 +188,11 @@ def _persist_token(token: str, path: Path) -> None:
     to ``0600`` on POSIX, and then it is moved into place with ``os.replace``
     so a concurrent run cannot observe a partially written file.
 
+    The move is retried a small, bounded number of times with a short backoff.
+    Windows may report ``PermissionError`` when another handle briefly holds
+    the just-written temporary file (real-time virus scanners are the classic
+    case); POSIX never needs the retry, but the same code path is harmless.
+
     The ``0600`` permission guarantee is POSIX-only. On platforms without
     ``os.fchmod`` (e.g. Windows) the call is replaced by a best-effort
     ``os.chmod`` on the temporary path, which only toggles the read-only bit.
@@ -199,7 +214,19 @@ def _persist_token(token: str, path: Path) -> None:
             Path(temp_path).unlink()
         raise
     os.close(fd)
-    os.replace(temp_path, path)
+
+    for attempt in range(1, _TOKEN_REPLACE_MAX_ATTEMPTS + 1):
+        try:
+            os.replace(temp_path, path)
+            break
+        except OSError as exc:
+            retryable = isinstance(exc, PermissionError) or exc.errno == errno.EACCES
+            if not retryable or attempt == _TOKEN_REPLACE_MAX_ATTEMPTS:
+                with contextlib.suppress(OSError):
+                    Path(temp_path).unlink()
+                raise
+            time.sleep(_TOKEN_REPLACE_BACKOFF_SECONDS)
+
     # Ensure the final inode has 0600 even if umask or filesystem quirks
     # interfered with the temp-file mode.
     os.chmod(path, 0o600)
@@ -682,7 +709,8 @@ def _get_or_create_captcha_server(
     Raises:
         ValueError: if a listener already exists for this address but with a
             different token.
-        RuntimeError: if the address is held by a foreign process.
+        RuntimeError: if the address cannot be bound (e.g. already in use or
+            access denied on Windows).
     """
     key = (host, port)
     with _captcha_server_lock:
@@ -699,12 +727,21 @@ def _get_or_create_captcha_server(
             server = CaptchaServer((host, port), token=token)
         except OSError as exc:
             winerror = getattr(exc, "winerror", None)
-            if exc.errno == errno.EADDRINUSE or winerror in (10013, 10048):
-                raise RuntimeError(
-                    f"captcha server cannot bind to {host!r} port {port}: "
-                    "address already in use"
-                ) from exc
-            raise
+            # Both Windows codes mean "address already in use" at this call
+            # site. HTTPServer binds with SO_REUSEADDR; on Windows, binding to
+            # an occupied address with that flag raises WSAEACCES (10013)
+            # instead of WSAEADDRINUSE (10048). This was measured on Windows
+            # CI, not assumed from the code name.
+            if exc.errno == errno.EADDRINUSE or winerror in (
+                _WSAEACCES,
+                _WSAEADDRINUSE,
+            ):
+                reason = "address already in use"
+            else:
+                raise
+            raise RuntimeError(
+                f"captcha server cannot bind to {host!r} port {port}: {reason}"
+            ) from exc
 
         _captcha_servers[key] = server
         server.start()
@@ -743,7 +780,8 @@ def start_shared_captcha_server(host: str, port: int, token: str) -> str:
     Raises:
         ValueError: if ``host`` or ``token`` fail validation, or if a
             listener already exists for this address with a different token.
-        RuntimeError: if the address is held by a foreign process.
+        RuntimeError: if the address cannot be bound (e.g. already in use or
+            access denied on Windows).
     """
     host = _validate_host(host)
     _validate_token(token)
@@ -804,8 +842,8 @@ def serve_captcha(
         ValueError: if ``host`` would bind all network interfaces, if
             ``token`` fails validation, or if the requested address already has
             a listener with a different token.
-        RuntimeError: if the requested address is already in use by a foreign
-            process.
+        RuntimeError: if the requested address cannot be bound (e.g. already
+            in use or access denied on Windows).
         CaptchaBusyError: if a challenge is already pending on this listener.
         CaptchaTimeoutError: if no answer is received within ``timeout``.
     """

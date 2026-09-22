@@ -340,18 +340,28 @@ def test_bind_to_occupied_port_raises_clear_error():
             serve_captcha(TINY_PNG, host="127.0.0.1", port=port, timeout=0.1)
 
 
-def test_bind_refusal_on_windows_raises_clear_error(monkeypatch):
+@pytest.mark.parametrize(
+    "winerror,reason",
+    [
+        # 10013 is reported by Windows for an occupied address when
+        # SO_REUSEADDR is set, so it is surfaced as "address already in use".
+        (10013, "address already in use"),
+        (10048, "address already in use"),
+    ],
+    ids=["WSAEACCES", "WSAEADDRINUSE"],
+)
+def test_bind_refusal_on_windows_raises_clear_error(monkeypatch, winerror, reason):
     """A Windows-style bind refusal is reported as address already in use."""
 
     def raising_server(*args, **kwargs):
         exc = OSError("simulated bind refusal")
-        exc.winerror = 10013
+        exc.winerror = winerror
         raise exc
 
     monkeypatch.setattr("navaja.captcha.CaptchaServer", raising_server)
     with pytest.raises(
         RuntimeError,
-        match=r"cannot bind to '127\.0\.0\.1' port 12345",
+        match=rf"^captcha server cannot bind to '127\.0\.0\.1' port 12345: {re.escape(reason)}$",
     ):
         serve_captcha(TINY_PNG, host="127.0.0.1", port=12345, timeout=0.1)
 
@@ -824,6 +834,51 @@ def test_resolve_token_persists_when_fchmod_unavailable(monkeypatch, tmp_path):
     assert path.read_text(encoding="utf-8") == token
     assert re.fullmatch(r"[A-Za-z0-9_-]{32,}", token)
     assert "generated" in reason
+
+
+def test_persist_token_retries_transient_move_failure(monkeypatch, tmp_path):
+    """The move retries on a Windows-style access-denied race and succeeds."""
+    calls: list[tuple[str, str]] = []
+    original_replace = os.replace
+
+    def flaky_replace(src: str, dst: str) -> None:
+        calls.append((src, dst))
+        if len(calls) == 1:
+            raise PermissionError(13, "Access is denied")
+        original_replace(src, dst)
+
+    monkeypatch.setattr("navaja.captcha.os.replace", flaky_replace)
+    path = tmp_path / "captcha-token"
+    token = "a-token-that-must-be-persisted-fully"
+    captcha._persist_token(token, path)
+
+    assert len(calls) >= 2
+    assert path.read_text(encoding="utf-8") == token
+    assert not any(
+        name.startswith(".captcha-token-") for name in os.listdir(path.parent)
+    )
+
+
+def test_persist_token_raises_after_exhausted_retries_and_cleans_up(
+    monkeypatch, tmp_path
+):
+    """A genuine move failure is propagated and the temp file is removed."""
+    calls: list[tuple[str, str]] = []
+
+    def always_fail(src: str, dst: str) -> None:
+        calls.append((src, dst))
+        raise PermissionError(13, "Access is denied")
+
+    monkeypatch.setattr("navaja.captcha.os.replace", always_fail)
+    path = tmp_path / "captcha-token"
+    token = "a-token-that-must-not-be-left-behind"
+    with pytest.raises(PermissionError):
+        captcha._persist_token(token, path)
+
+    assert len(calls) == captcha._TOKEN_REPLACE_MAX_ATTEMPTS
+    assert not any(
+        name.startswith(".captcha-token-") for name in os.listdir(path.parent)
+    )
 
 
 @pytest.mark.parametrize(
