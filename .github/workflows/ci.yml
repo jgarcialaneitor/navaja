@@ -33,3 +33,31 @@ jobs:
       # design and would make CI flaky and impolite to a public service.
       - name: Run tests
         run: uv run pytest
+
+  test-windows:
+    runs-on: windows-latest
+    # This job measures Windows compatibility while the platform debt from the
+    # audit is still being paid; it is not yet a blocking gate. Once it is
+    # green, remove continue-on-error so it gates merges like the Ubuntu job.
+    continue-on-error: true
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Sync dependencies
+        run: uv sync
+
+      # CI must never hit the real CENDOJ site: the live tests are opt-in by
+      # design and would make CI flaky and impolite to a public service.
+      - name: Run tests
+        run: uv run pytest
