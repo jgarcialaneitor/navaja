@@ -227,8 +227,66 @@ def _ensure_pdf_extension(name: str) -> str:
     return f"{name}.pdf"
 
 
+# Number of characters at the start of the extracted text that are
+# considered the header when looking for the ROJ. Judgments often cite
+# other judgments whose ``Roj:`` line appears later in the body, so a
+# first match anywhere could name the file after the cited document.
+_HEADER_WINDOW_SIZE = 2000
+
+# Maximum length of the ROJ identifier captured from the header. A
+# malformed document must not produce an absurd filename.
+_MAX_ROJ_LENGTH = 120
+
+_ROJ_RE = re.compile(
+    r"^Roj:[ \t]*(?P<roj>[^\n]{1," + str(_MAX_ROJ_LENGTH) + r"})$",
+    re.MULTILINE,
+)
+
+
+def _normalize_roj(roj: str) -> str:
+    """Turn a ROJ identifier into a safe filename stem.
+
+    Runs of characters that are not alphanumeric become a single
+    underscore, so ``STSJ AND 2465/2024`` becomes
+    ``STSJ_AND_2465_2024``.
+    """
+    return re.sub(r"[^A-Za-z0-9]+", "_", roj).strip("_")
+
+
+def _filename_from_text(text: str | None, ref: DocumentRef, name_max: int) -> str | None:
+    """Try to derive a filename from the ROJ in the document header.
+
+    Searches the first ``_HEADER_WINDOW_SIZE`` characters for a ``Roj:``
+    line, strips a trailing ``- ECLI:`` clause, and normalizes the result
+    into a safe filename stem. Returns ``None`` when there is no usable
+    ROJ or the normalized result is not a safe filename.
+    """
+    if not text:
+        return None
+    window = text[:_HEADER_WINDOW_SIZE]
+    match = _ROJ_RE.search(window)
+    if not match:
+        return None
+    roj = match.group("roj").strip()
+    roj = re.sub(r"\s*- ECLI:.*", "", roj)
+    normalized = _normalize_roj(roj)
+    if not normalized:
+        return None
+    candidate = _ensure_pdf_extension(normalized)
+    safe = _sanitize_filename(candidate)
+    if safe is None:
+        return None
+    if len(os.fsencode(safe)) > name_max:
+        return None
+    return safe
+
+
 def _fallback_filename(ref: DocumentRef) -> str:
-    """Deterministic filename built from ``ref`` fields."""
+    """Final fallback filename built from ``ref`` fields.
+
+    Used when the server sends no usable ``name=`` and the document text
+    does not contain a usable ROJ in the header window.
+    """
     return f"{ref.reference}_{ref.optimize}.pdf"
 
 
@@ -236,23 +294,35 @@ def _filename_from_content_type(
     content_type: str | None,
     ref: DocumentRef,
     name_max: int,
+    text: str | None = None,
 ) -> tuple[str, str]:
     """Choose a safe filename and report the reason for the choice.
+
+    Preference order:
+    1. Server-sent ``name=`` parameter when present and safe.
+    2. ROJ-derived name from ``text`` when a usable ROJ is found inside
+       the header window.
+    3. Deterministic ``<reference>_<optimize>.pdf`` fallback.
 
     Returns:
         A ``(filename, reason)`` tuple. ``reason`` is one of
         ``server_sent_name``, ``missing_name``, ``unsafe_name``, or
         ``overlong_name``.
     """
+
+    def _text_or_hash() -> str:
+        derived = _filename_from_text(text, ref, name_max)
+        return derived if derived is not None else _fallback_filename(ref)
+
     raw_name = _parse_content_type_name(content_type)
     if raw_name is None:
-        return _fallback_filename(ref), "missing_name"
+        return _text_or_hash(), "missing_name"
     safe = _sanitize_filename(raw_name)
     if safe is None:
-        return _fallback_filename(ref), "unsafe_name"
+        return _text_or_hash(), "unsafe_name"
     candidate = _ensure_pdf_extension(safe)
     if len(os.fsencode(candidate)) > name_max:
-        return _fallback_filename(ref), "overlong_name"
+        return _text_or_hash(), "overlong_name"
     return candidate, "server_sent_name"
 
 
@@ -326,13 +396,17 @@ def save_pdf(
     content_type: str | None,
     ref: DocumentRef,
     destination: str | os.PathLike[str],
+    *,
+    text: str | None = None,
 ) -> PdfSaveResult:
     """Save ``pdf_bytes`` into ``destination`` with a safe filename.
 
     The filename is taken from the ``name=`` parameter in ``content_type``
-    when present and safe; otherwise a deterministic fallback built from
-    ``ref.reference`` and ``ref.optimize`` is used. The destination
-    directory is created on demand.
+    when present and safe. When it is not usable, navaja tries to derive
+    the name from the ROJ found in the first lines of ``text``; if that
+    also fails, a deterministic fallback built from ``ref.reference`` and
+    ``ref.optimize`` is used. The destination directory is created on
+    demand.
 
     Collision strategy: if the target path already exists and contains
     identical bytes, the existing file is reported as already satisfied.
@@ -343,15 +417,16 @@ def save_pdf(
     example, a directory occupying the target path, or an unreadable
     existing file) are reported as failed saves with ``ok=False`` rather
     than raised. An overlong server-sent filename is detected before any
-    filesystem probe and is degraded to the deterministic fallback built
-    from ``ref``; the returned ``reason`` is ``overlong_name`` so the
-    caller can still tell the fallback was used.
+    filesystem probe and is degraded to the fallback; the returned
+    ``reason`` is ``overlong_name`` so the caller can still tell the
+    fallback was used.
 
     Args:
         pdf_bytes: the raw PDF bytes to persist.
         content_type: the Content-Type header value of the response.
         ref: the document reference used for the deterministic fallback.
         destination: directory where the file should be written.
+        text: optional extracted text used to derive a ROJ-based filename.
 
     Returns:
         A :class:`PdfSaveResult` describing the path written or the reason
@@ -392,7 +467,7 @@ def save_pdf(
         except (ValueError, OSError):
             name_max = 255
 
-    filename, name_reason = _filename_from_content_type(content_type, ref, name_max)
+    filename, name_reason = _filename_from_content_type(content_type, ref, name_max, text)
     candidate = dest / filename
     try:
         candidate.resolve().relative_to(dest.resolve())
@@ -439,6 +514,10 @@ def save_full_text_pdf(
     guard so that only a failure in :func:`resolve_pdf_destination` is
     reported as a destination-resolution failure.
 
+    The extracted text is forwarded to :func:`save_pdf` so the ROJ-based
+    filename fallback can be used when the server does not send a usable
+    ``name=`` value.
+
     Args:
         result: the outcome of the full-text fetch.
         ref: the parsed document reference (already known to the caller).
@@ -481,5 +560,6 @@ def save_full_text_pdf(
         result.content_type,
         ref,
         destination,
+        text=result.text,
     )
 
