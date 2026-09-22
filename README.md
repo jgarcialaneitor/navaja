@@ -4,7 +4,7 @@
 
 **Servidor MCP para investigación personal de jurisprudencia en [CENDOJ](https://www.poderjudicial.es/search/indexAN.jsp)**
 
-[![Tests](https://img.shields.io/badge/tests-348%20passed-brightgreen)](#-desarrollo)
+[![Tests](https://img.shields.io/badge/tests-353%20passed-brightgreen)](#-desarrollo)
 [![Python](https://img.shields.io/badge/python-3.12+-blue)](#-desarrollo)
 [![MCP](https://img.shields.io/badge/MCP-7%20herramientas-8A2BE2)](#-qué-es-navaja)
 
@@ -409,7 +409,7 @@ uv run pytest                          # determinista, contra fixtures guardados
 NAVAJA_LIVE=1 uv run pytest -m live    # opcional: golpea el sitio real
 ```
 
-**Suite actual: `348 passed, 2 skipped`.**
+**Suite actual: `353 passed, 2 skipped`.**
 
 Los tests **nunca** tocan el sitio real salvo que definas `NAVAJA_LIVE=1`.
 
