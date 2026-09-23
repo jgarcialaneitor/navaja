@@ -15,6 +15,7 @@ try:
 except ImportError:
     fcntl = None
 import html
+import json
 import os
 import re
 import secrets
@@ -344,6 +345,7 @@ class CaptchaServer(HTTPServer):
         token: str,
     ) -> None:
         self.token = token
+        self.nonce: str = secrets.token_hex(16)
         self._challenge = None
         self._challenge_id = 0
         self._closed = False
@@ -639,6 +641,20 @@ class _Handler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(len(image)))
             self.end_headers()
             self.wfile.write(image)
+            return
+
+        if path == f"/{token}/whoami":
+            payload = {
+                "listener": "navaja-captcha",
+                "nonce": self.server.nonce,
+                "pid": os.getpid(),
+            }
+            body = json.dumps(payload).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
             return
 
         challenge_id = self.server.current_challenge_id()

@@ -1057,3 +1057,81 @@ def test_generated_token_satisfies_allowed_charset_and_length(tmp_path):
         token, _reason = resolve_captcha_token(token_path=path)
         assert len(token) >= 16
         assert re.fullmatch(r"[A-Za-z0-9_-]+", token)
+
+
+# --- Whoami / stale-listener self-check tests -------------------------------
+
+
+def _wait_for_listener(url: str, timeout: float = 2.0) -> None:
+    """Poll ``url`` until the listener accepts a connection."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            resp = httpx.get(url)
+            if resp.status_code == 200:
+                return
+        except httpx.ConnectError:
+            pass
+        time.sleep(0.05)
+    raise TimeoutError(f"listener did not respond at {url}")
+
+
+def test_whoami_returns_listener_nonce_and_pid():
+    port = _free_port()
+    token = "whoami-token-0001"
+    server = CaptchaServer(("127.0.0.1", port), token=token)
+    try:
+        server.start()
+        _wait_for_listener(f"http://127.0.0.1:{port}/{token}/")
+
+        resp = httpx.get(f"http://127.0.0.1:{port}/{token}/whoami")
+        assert resp.status_code == 200
+        assert resp.headers["content-type"] == "application/json"
+        data = resp.json()
+        assert data["listener"] == "navaja-captcha"
+        assert data["nonce"] == server.nonce
+        assert data["pid"] == os.getpid()
+    finally:
+        server.stop()
+
+
+def test_whoami_with_wrong_token_returns_404():
+    port = _free_port()
+    token = "whoami-token-0002"
+    server = CaptchaServer(("127.0.0.1", port), token=token)
+    try:
+        server.start()
+        _wait_for_listener(f"http://127.0.0.1:{port}/{token}/")
+
+        resp = httpx.get(f"http://127.0.0.1:{port}/wrong-token/whoami")
+        assert resp.status_code == 404
+        assert "Not found" in resp.text
+    finally:
+        server.stop()
+
+
+def test_two_captcha_servers_have_different_nonces():
+    port1 = _free_port()
+    port2 = _free_port()
+    server1 = CaptchaServer(("127.0.0.1", port1), token="nonce-token-0001")
+    server2 = CaptchaServer(("127.0.0.1", port2), token="nonce-token-0002")
+    try:
+        assert server1.nonce != server2.nonce
+        assert server1.nonce
+        assert server2.nonce
+        int(server1.nonce, 16)
+        int(server2.nonce, 16)
+    finally:
+        server1.stop()
+        server2.stop()
+
+
+def test_captcha_server_nonce_is_stable():
+    port = _free_port()
+    server = CaptchaServer(("127.0.0.1", port), token="nonce-token-0003")
+    try:
+        first = server.nonce
+        second = server.nonce
+        assert first == second
+    finally:
+        server.stop()
