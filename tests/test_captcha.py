@@ -31,7 +31,10 @@ from navaja.captcha import (
     resolve_captcha_host,
     resolve_captcha_token,
     serve_captcha,
+    shared_captcha_server_nonce,
+    start_shared_captcha_server,
     stop_shared_captcha_server,
+    whoami_check,
 )
 
 TINY_PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 20
@@ -1057,3 +1060,169 @@ def test_generated_token_satisfies_allowed_charset_and_length(tmp_path):
         token, _reason = resolve_captcha_token(token_path=path)
         assert len(token) >= 16
         assert re.fullmatch(r"[A-Za-z0-9_-]+", token)
+
+
+# --- Whoami / stale-listener self-check tests -------------------------------
+
+
+def _wait_for_listener(url: str, timeout: float = 2.0) -> None:
+    """Poll ``url`` until the listener accepts a connection."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            resp = httpx.get(url)
+            if resp.status_code == 200:
+                return
+        except httpx.ConnectError:
+            pass
+        time.sleep(0.05)
+    raise TimeoutError(f"listener did not respond at {url}")
+
+
+def test_whoami_returns_listener_nonce_and_pid():
+    port = _free_port()
+    token = "whoami-token-0001"
+    server = CaptchaServer(("127.0.0.1", port), token=token)
+    try:
+        server.start()
+        _wait_for_listener(f"http://127.0.0.1:{port}/{token}/")
+
+        resp = httpx.get(f"http://127.0.0.1:{port}/{token}/whoami")
+        assert resp.status_code == 200
+        assert resp.headers["content-type"] == "application/json"
+        data = resp.json()
+        assert data["listener"] == "navaja-captcha"
+        assert data["nonce"] == server.nonce
+        assert data["pid"] == os.getpid()
+    finally:
+        server.stop()
+
+
+def test_whoami_with_wrong_token_returns_404():
+    port = _free_port()
+    token = "whoami-token-0002"
+    server = CaptchaServer(("127.0.0.1", port), token=token)
+    try:
+        server.start()
+        _wait_for_listener(f"http://127.0.0.1:{port}/{token}/")
+
+        resp = httpx.get(f"http://127.0.0.1:{port}/wrong-token/whoami")
+        assert resp.status_code == 404
+        assert "Not found" in resp.text
+    finally:
+        server.stop()
+
+
+def test_two_captcha_servers_have_different_nonces():
+    port1 = _free_port()
+    port2 = _free_port()
+    server1 = CaptchaServer(("127.0.0.1", port1), token="nonce-token-0001")
+    server2 = CaptchaServer(("127.0.0.1", port2), token="nonce-token-0002")
+    try:
+        assert server1.nonce != server2.nonce
+        assert server1.nonce
+        assert server2.nonce
+        int(server1.nonce, 16)
+        int(server2.nonce, 16)
+    finally:
+        server1.stop()
+        server2.stop()
+
+
+def test_captcha_server_nonce_is_stable():
+    port = _free_port()
+    server = CaptchaServer(("127.0.0.1", port), token="nonce-token-0003")
+    try:
+        first = server.nonce
+        second = server.nonce
+        assert first == second
+    finally:
+        server.stop()
+
+
+def test_shared_captcha_server_nonce_returns_none_when_not_registered():
+    stop_shared_captcha_server()
+    assert shared_captcha_server_nonce("127.0.0.1", _free_port()) is None
+
+
+def test_shared_captcha_server_nonce_returns_registered_nonce():
+    port = _free_port()
+    token = "nonce-registered-token01"
+    start_shared_captcha_server("127.0.0.1", port, token)
+    try:
+        server = captcha._captcha_servers[("127.0.0.1", port)]
+        assert shared_captcha_server_nonce("127.0.0.1", port) == server.nonce
+    finally:
+        stop_shared_captcha_server()
+
+
+# --- whoami_check tests -----------------------------------------------------
+
+
+def test_whoami_check_returns_dict_on_200():
+    port = _free_port()
+    token = "whoami-check-token-001"
+    server = CaptchaServer(("127.0.0.1", port), token=token)
+    try:
+        server.start()
+        _wait_for_listener(f"http://127.0.0.1:{port}/{token}/")
+
+        result = whoami_check("127.0.0.1", port, token, timeout=2.0)
+        assert result is not None
+        assert result["listener"] == "navaja-captcha"
+        assert result["nonce"] == server.nonce
+        assert result["pid"] == os.getpid()
+    finally:
+        server.stop()
+
+
+def test_whoami_check_returns_none_on_connection_refused():
+    port = _free_port()
+    assert _port_is_free("127.0.0.1", port)
+    assert whoami_check("127.0.0.1", port, "any-token-12345", timeout=0.5) is None
+
+
+def test_whoami_check_returns_none_on_timeout(monkeypatch):
+    """A listener that accepts but never responds causes a read timeout."""
+    port = _free_port()
+    token = "timeout-token-000001"
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.bind(("127.0.0.1", port))
+    sock.listen(1)
+    try:
+        # Accept connections in the background but never read or write.
+        accept_thread = threading.Thread(
+            target=lambda: sock.accept(), daemon=True
+        )
+        accept_thread.start()
+        assert whoami_check("127.0.0.1", port, token, timeout=0.2) is None
+    finally:
+        sock.close()
+
+
+def test_whoami_check_returns_none_on_non_json_body():
+    """A 200 response that is not JSON causes whoami_check to return None."""
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    class _HtmlHandler(BaseHTTPRequestHandler):
+        def log_message(self, fmt, *args):  # noqa: D102
+            return
+
+        def do_GET(self):  # noqa: N802
+            body = b"<html><body>not json</body></html>"
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+    port = _free_port()
+    token = "whoami-html-token-0001"
+    server = HTTPServer(("127.0.0.1", port), _HtmlHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        assert whoami_check("127.0.0.1", port, token, timeout=2.0) is None
+    finally:
+        server.shutdown()
+        server.server_close()

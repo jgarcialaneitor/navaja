@@ -15,6 +15,7 @@ import os
 import socket
 import threading
 import time
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Any
 
@@ -33,6 +34,7 @@ from navaja import (
 )
 from navaja.captcha import (
     CaptchaAnswer,
+    CaptchaServer,
     CaptchaTimeoutError,
     start_shared_captcha_server,
     stop_shared_captcha_server,
@@ -590,6 +592,137 @@ def test_estado_servidor_stable_token_set_reports_pre_call_state(monkeypatch, tm
     result2 = estado_servidor()
     assert result2["stable_token_set"] is True
     assert result2["captcha_url"] == result1["captcha_url"]
+
+
+def _free_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        return int(sock.getsockname()[1])
+
+
+def _wait_for_listener(url: str, timeout: float = 2.0) -> None:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            resp = httpx.get(url)
+            if resp.status_code == 200:
+                return
+        except httpx.ConnectError:
+            pass
+        time.sleep(0.05)
+    raise TimeoutError(f"listener did not respond at {url}")
+
+
+# --- estado_servidor self-check tests ---------------------------------------
+
+
+def test_estado_servidor_fast_path_uses_no_network_call(monkeypatch):
+    """With a live local listener, estado_servidor must not hit the network."""
+    port = _free_port()
+    token = "selfcheck-fast-token01"
+    monkeypatch.setenv("NAVAJA_CAPTCHA_HOST", "127.0.0.1")
+    monkeypatch.setenv("NAVAJA_CAPTCHA_PORT", str(port))
+    monkeypatch.setenv("NAVAJA_CAPTCHA_TOKEN", token)
+
+    called: list[Any] = []
+
+    def exploding_whoami_check(*args, **kwargs):
+        called.append((args, kwargs))
+        raise AssertionError("fast path must not call whoami_check")
+
+    monkeypatch.setattr(
+        "navaja.server.whoami_check", exploding_whoami_check
+    )
+
+    url = start_shared_captcha_server("127.0.0.1", port, token)
+    try:
+        server_obj = navaja.captcha._captcha_servers[("127.0.0.1", port)]
+        result = estado_servidor()
+
+        assert result["captcha_listening"] is True
+        assert result["pid"] == os.getpid()
+        assert result["nonce"] == server_obj.nonce
+        assert result["listener_conflict"] is False
+        assert result["listener_pid"] is None
+        assert result["captcha_url"] == url
+        assert not called
+    finally:
+        stop_shared_captcha_server()
+
+
+def test_estado_servidor_reports_conflict_with_other_navaja_listener(monkeypatch):
+    """Another navaja process on the same token/port is a conflict."""
+    port = _free_port()
+    token = "selfcheck-conflict-token1"
+    monkeypatch.setenv("NAVAJA_CAPTCHA_HOST", "127.0.0.1")
+    monkeypatch.setenv("NAVAJA_CAPTCHA_PORT", str(port))
+    monkeypatch.setenv("NAVAJA_CAPTCHA_TOKEN", token)
+
+    other = CaptchaServer(("127.0.0.1", port), token=token)
+    try:
+        other.start()
+        _wait_for_listener(f"http://127.0.0.1:{port}/{token}/")
+
+        result = estado_servidor()
+        assert result["captcha_listening"] is False
+        assert result["listener_conflict"] is True
+        assert result["listener_pid"] == os.getpid()
+        assert result["nonce"] is None
+        assert result["pid"] == os.getpid()
+        assert result["captcha_url"] == f"http://127.0.0.1:{port}/{token}/"
+    finally:
+        other.stop()
+
+
+def test_estado_servidor_no_listener_reports_no_conflict(monkeypatch):
+    port = _free_port()
+    token = "selfcheck-quiet-token01"
+    monkeypatch.setenv("NAVAJA_CAPTCHA_HOST", "127.0.0.1")
+    monkeypatch.setenv("NAVAJA_CAPTCHA_PORT", str(port))
+    monkeypatch.setenv("NAVAJA_CAPTCHA_TOKEN", token)
+
+    result = estado_servidor()
+    assert result["captcha_listening"] is False
+    assert result["listener_conflict"] is False
+    assert result["listener_pid"] is None
+    assert result["nonce"] is None
+    assert result["pid"] == os.getpid()
+
+
+def test_estado_servidor_non_navaja_listener_reports_no_conflict(monkeypatch):
+    """A port held by something that does not speak navaja is not a conflict."""
+
+    class _GarbageHandler(BaseHTTPRequestHandler):
+        def log_message(self, fmt, *args):  # noqa: D102
+            return
+
+        def do_GET(self):  # noqa: N802
+            body = b"garbage"
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+    port = _free_port()
+    token = "selfcheck-garbage-token1"
+    monkeypatch.setenv("NAVAJA_CAPTCHA_HOST", "127.0.0.1")
+    monkeypatch.setenv("NAVAJA_CAPTCHA_PORT", str(port))
+    monkeypatch.setenv("NAVAJA_CAPTCHA_TOKEN", token)
+
+    httpd = HTTPServer(("127.0.0.1", port), _GarbageHandler)
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+    try:
+        result = estado_servidor()
+        assert result["captcha_listening"] is False
+        assert result["listener_conflict"] is False
+        assert result["listener_pid"] is None
+        assert result["nonce"] is None
+        assert result["pid"] == os.getpid()
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
 
 
 def test_stable_token_path_reaches_serve_captcha(monkeypatch):
