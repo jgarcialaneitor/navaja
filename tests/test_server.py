@@ -46,6 +46,7 @@ from navaja.documents import PdfSaveResult
 from navaja.server import (
     _captcha_lifespan,
     buscar_sentencias,
+    cancelar_lote,
     close_shared_client,
     estado_servidor,
     listar_localizaciones,
@@ -1605,7 +1606,12 @@ def _reset_shared_queue():
 def test_batch_tools_are_registered():
     tools = asyncio.run(server.list_tools())
     names = {tool.name for tool in tools}
-    for name in ("iniciar_descargas", "estado_descargas", "recoger_descarga"):
+    for name in (
+        "iniciar_descargas",
+        "estado_descargas",
+        "recoger_descarga",
+        "cancelar_lote",
+    ):
         assert name in names
 
 
@@ -1903,3 +1909,77 @@ def test_estado_descargas_unknown_batch_id_returns_empty():
     result = navaja_server.estado_descargas("no-such-batch-id")
     assert result["ok"] is True
     assert result["jobs"] == []
+
+
+def test_cancelar_lote_unknown_batch_returns_unknown_batch():
+    result = navaja_server.cancelar_lote("no-such-batch-id")
+    assert result == {
+        "ok": False,
+        "error_code": "unknown_batch",
+        "error": "no batch with this id",
+        "batch_id": "no-such-batch-id",
+    }
+
+
+def test_cancelar_lote_cancels_queued_jobs_and_lets_running_finish(monkeypatch):
+    """cancelar_lote is a pass-through: queued jobs become cancelled, the
+    running job finishes normally, and estado_descargas surfaces the new
+    state and error_code."""
+    blocker = threading.Event()
+
+    class BlockingClient(CendojClient):
+        def fetch_full_text(self, url, *, host, port, timeout, token):
+            blocker.wait(timeout=10.0)
+            return FullTextResult(
+                ok=True,
+                content_type="text/html",
+                text="collected body",
+                pdf_bytes=None,
+                attempts=1,
+                requests=2,
+            )
+
+    monkeypatch.setattr("navaja.server.CendojClient", BlockingClient)
+
+    urls = [DOC_URL, DOC_URL, DOC_URL]
+    start = navaja_server.iniciar_descargas(urls)
+    batch_id = start["batch_id"]
+    job_ids = [job["job_id"] for job in start["jobs"]]
+
+    def first_is_running():
+        jobs = navaja_server.estado_descargas(batch_id)["jobs"]
+        return jobs and jobs[0]["state"] == "running"
+
+    assert _wait_for_jobs(first_is_running), "first job did not start"
+
+    result = navaja_server.cancelar_lote(batch_id)
+    assert result["ok"] is True
+    assert result["batch_id"] == batch_id
+    assert result["cancelled"] == 2
+    assert result["already_finished"] == 0
+    assert result["left_running"] == 1
+
+    blocker.set()
+
+    def all_terminal():
+        jobs = navaja_server.estado_descargas(batch_id)["jobs"]
+        return all(job["state"] in {"done", "cancelled"} for job in jobs)
+
+    assert _wait_for_jobs(all_terminal), "jobs did not reach terminal state"
+
+    jobs = navaja_server.estado_descargas(batch_id)["jobs"]
+    assert jobs[0]["state"] == "done"
+    assert jobs[1]["state"] == "cancelled"
+    assert jobs[2]["state"] == "cancelled"
+    assert jobs[1]["error_code"] == "cancelled"
+    assert jobs[2]["error_code"] == "cancelled"
+
+    finished = navaja_server.recoger_descarga(job_ids[0])
+    assert finished["ok"] is True
+    assert finished["text"] == "collected body"
+
+    for job_id in job_ids[1:]:
+        payload = navaja_server.recoger_descarga(job_id)
+        assert payload["ok"] is False
+        assert payload["error_code"] == "cancelled"
+        assert payload["job_id"] == job_id

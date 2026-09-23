@@ -11,7 +11,14 @@ from collections.abc import Callable
 
 import pytest
 
-from navaja.jobs import JobQueue, JobState, PENDING, UNKNOWN_JOB, _failure_payload
+from navaja.jobs import (
+    CANCELLED,
+    JobQueue,
+    JobState,
+    PENDING,
+    UNKNOWN_JOB,
+    _failure_payload,
+)
 
 
 def make_runner() -> tuple[Callable[[str], dict], Callable[[], None], Callable[[], None]]:
@@ -87,10 +94,12 @@ def test_job_state_values_and_casing() -> None:
     assert JobState.RUNNING == "running"
     assert JobState.DONE == "done"
     assert JobState.FAILED == "failed"
+    assert JobState.CANCELLED == "cancelled"
     assert JobState.QUEUED.value == "queued"
     assert JobState.RUNNING.value == "running"
     assert JobState.DONE.value == "done"
     assert JobState.FAILED.value == "failed"
+    assert JobState.CANCELLED.value == "cancelled"
 
 
 def test_failure_payload_is_generic_not_tool_shaped() -> None:
@@ -468,6 +477,7 @@ def test_state_reads_are_safe_while_workers_change_state() -> None:
                             JobState.RUNNING,
                             JobState.DONE,
                             JobState.FAILED,
+                            JobState.CANCELLED,
                         }
                         # A queued/running job must not already carry a final payload.
                         if state in (JobState.QUEUED, JobState.RUNNING):
@@ -684,5 +694,223 @@ def test_stop_does_not_hang_with_blocking_get() -> None:
         for job_id in [j.job_id for j in q._jobs]:
             payload = q.recoger(job_id)
             assert payload.get("url") is not None
+    finally:
+        q.stop()
+
+
+# --- batch cancellation tests ------------------------------------------------
+
+
+def test_cancel_batch_unknown_id_returns_unknown_batch() -> None:
+    q = JobQueue(runner=lambda url: {"ok": True})
+    try:
+        result = q.cancel_batch("no-such-batch")
+        assert result == {
+            "ok": False,
+            "error_code": "unknown_batch",
+            "error": "no batch with this id",
+            "batch_id": "no-such-batch",
+        }
+    finally:
+        q.stop()
+
+
+def test_cancel_batch_cancels_all_queued_jobs() -> None:
+    """A batch that is still entirely queued is cancelled without running."""
+    calls: list[str] = []
+    gate = threading.Event()
+
+    def runner(url: str) -> dict:
+        calls.append(url)
+        gate.wait(timeout=5)
+        return {"ok": True, "url": url}
+
+    q = JobQueue(runner=runner, max_concurrentes=1)
+    try:
+        # Pin the single worker on a first-batch job so the second batch stays
+        # entirely queued until we cancel it.
+        q.submit_many(["blocker"])
+        q._jobs[0].running.wait(timeout=5)
+
+        result = q.submit_many(["a", "b", "c"])
+        batch_id = result["batch_id"]
+        job_ids = result["job_ids"]
+
+        summary = q.cancel_batch(batch_id)
+        assert summary == {
+            "ok": True,
+            "batch_id": batch_id,
+            "cancelled": 3,
+            "already_finished": 0,
+            "left_running": 0,
+        }
+
+        # Release the blocker and let the worker drain.
+        gate.set()
+        q._jobs[0].finished.wait(timeout=5)
+
+        # Only the blocker ran; the cancelled jobs never reached the runner.
+        assert calls == ["blocker"]
+
+        for job_id in job_ids:
+            job = q._jobs_by_id[job_id]
+            assert job.state == JobState.CANCELLED
+            assert job.finished.is_set()
+            assert q.recoger(job_id) == CANCELLED(job_id)
+
+        for entry in q.estado(batch_id):
+            assert entry["state"] == JobState.CANCELLED
+            assert entry["error_code"] == "cancelled"
+    finally:
+        q.stop()
+
+
+def test_cancel_batch_leaves_running_job_alone() -> None:
+    """The RUNNING job is allowed to finish; only QUEUED jobs are cancelled."""
+    calls: list[str] = []
+    gate = threading.Event()
+
+    def runner(url: str) -> dict:
+        calls.append(url)
+        gate.wait(timeout=5)
+        return {"ok": True, "url": url, "payload": f"ok {url}"}
+
+    q = JobQueue(runner=runner, max_concurrentes=1)
+    try:
+        result = q.submit_many(["blocker", "a", "b"])
+        batch_id = result["batch_id"]
+        job_ids = result["job_ids"]
+
+        q._jobs[0].running.wait(timeout=5)
+
+        summary = q.cancel_batch(batch_id)
+        assert summary == {
+            "ok": True,
+            "batch_id": batch_id,
+            "cancelled": 2,
+            "already_finished": 0,
+            "left_running": 1,
+        }
+
+        # Cancelled jobs are already terminal.
+        for job_id in job_ids[1:]:
+            assert q._jobs_by_id[job_id].state == JobState.CANCELLED
+            assert q._jobs_by_id[job_id].finished.is_set()
+
+        gate.set()
+        q._jobs[0].finished.wait(timeout=5)
+
+        # The running job finished normally.
+        assert q._jobs_by_id[job_ids[0]].state == JobState.DONE
+        assert q.recoger(job_ids[0]) == {
+            "ok": True,
+            "url": "blocker",
+            "payload": "ok blocker",
+        }
+
+        # Cancelled jobs keep their cancellation payload.
+        for job_id in job_ids[1:]:
+            assert q.recoger(job_id) == CANCELLED(job_id)
+    finally:
+        q.stop()
+
+
+def test_cancel_batch_race_guard_skips_cancelled_job() -> None:
+    """A job cancelled while still in the work queue is never executed."""
+    calls: list[str] = []
+    gate = threading.Event()
+
+    def runner(url: str) -> dict:
+        calls.append(url)
+        gate.wait(timeout=5)
+        return {"ok": True, "url": url}
+
+    q = JobQueue(runner=runner, max_concurrentes=1)
+    try:
+        q.submit_many(["blocker"])
+        q._jobs[0].running.wait(timeout=5)
+
+        result = q.submit_many(["victim"])
+        batch_id = result["batch_id"]
+        victim_id = result["job_ids"][0]
+
+        q.cancel_batch(batch_id)
+
+        gate.set()
+        q._jobs[0].finished.wait(timeout=5)
+
+        # The worker must have drained the victim from the queue; the race
+        # guard ensures the runner was never invoked for it.
+        assert calls == ["blocker"]
+        assert q._jobs_by_id[victim_id].state == JobState.CANCELLED
+        assert q.recoger(victim_id) == CANCELLED(victim_id)
+    finally:
+        q.stop()
+
+
+def test_cancel_batch_is_idempotent() -> None:
+    """Cancelling twice reports the same final states without errors."""
+    calls: list[str] = []
+    gate = threading.Event()
+
+    def runner(url: str) -> dict:
+        calls.append(url)
+        gate.wait(timeout=5)
+        return {"ok": True, "url": url}
+
+    q = JobQueue(runner=runner, max_concurrentes=1)
+    try:
+        result = q.submit_many(["blocker", "a", "b"])
+        batch_id = result["batch_id"]
+
+        q._jobs[0].running.wait(timeout=5)
+
+        first = q.cancel_batch(batch_id)
+        assert first["cancelled"] == 2
+        assert first["already_finished"] == 0
+        assert first["left_running"] == 1
+
+        second = q.cancel_batch(batch_id)
+        assert second["ok"] is True
+        assert second["cancelled"] == 0
+        assert second["already_finished"] == 2
+        assert second["left_running"] == 1
+
+        gate.set()
+        q._jobs[0].finished.wait(timeout=5)
+
+        third = q.cancel_batch(batch_id)
+        assert third["ok"] is True
+        assert third["cancelled"] == 0
+        assert third["already_finished"] == 3
+        assert third["left_running"] == 0
+    finally:
+        q.stop()
+
+
+def test_cancelled_batch_is_prunable() -> None:
+    """Terminal cancelled batches are eligible for pruning like done/failed."""
+    q = JobQueue(runner=lambda url: {"ok": True})
+    try:
+        submissions = [q.submit_many([f"url-{i}"]) for i in range(12)]
+        for sub in submissions:
+            q.cancel_batch(sub["batch_id"])
+
+        # Trigger pruning now that every batch is terminal.
+        trigger = q.submit_many(["trigger"])
+        q.cancel_batch(trigger["batch_id"])
+
+        # 13 batches with a limit of 10 means the 3 oldest are pruned.
+        for sub in submissions[:3]:
+            assert q.estado(sub["batch_id"]) == []
+            assert q.cancel_batch(sub["batch_id"]) == {
+                "ok": False,
+                "error_code": "unknown_batch",
+                "error": "no batch with this id",
+                "batch_id": sub["batch_id"],
+            }
+
+        for sub in submissions[3:]:
+            assert len(q.estado(sub["batch_id"])) == 1
     finally:
         q.stop()
