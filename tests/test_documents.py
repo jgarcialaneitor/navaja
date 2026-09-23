@@ -295,7 +295,20 @@ def test_fetch_skips_captcha_when_site_returns_pdf_directly(monkeypatch):
 
 
 def test_fetch_rejects_non_cendoj_url():
-    with CendojClient() as client:
+    """A non-CENDOJ URL is refused before any network traffic (issue #16).
+
+    The mock transport fails the test with an AssertionError if the client
+    issues any request at all: validating the URL must happen before the
+    session bootstrap GET, or a cold client hits the real CENDOJ site for a
+    URL the code is about to reject.
+    """
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise AssertionError(
+            f"no request should be sent for a non-CENDOJ URL, got {request.url}"
+        )
+
+    with CendojClient(transport=httpx.MockTransport(handler)) as client:
         with pytest.raises(ValueError):
             client.fetch_full_text("https://example.com/document")
 

@@ -836,8 +836,12 @@ class CendojClient:
         Returns:
             A :class:`FullTextResult` describing the outcome.
         """
-        self._ensure_session()
+        # Validate the URL before any network traffic: a cold client would
+        # otherwise bootstrap the session (a real GET to the CENDOJ index)
+        # for a URL the code is about to reject with ValueError. Measured as
+        # a Windows CI flake in issue #16.
         ref = parse_document_url(url)
+        self._ensure_session()
 
         if prompt is None:
             print(f"Fetching full text for {url}", file=sys.stderr, flush=True)
