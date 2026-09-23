@@ -25,6 +25,7 @@
 | [📊 Paginación y el techo de 200](#-paginación-y-el-techo-de-200-registros) | [🔧 Configuración](#-configuración) |
 | [🚫 Cuando el sitio no responde](#-cuando-el-sitio-no-responde) | [🚀 Instalación](#-instalación) |
 | [🔒 Reglas de seguridad](#-reglas-de-seguridad) | [🧪 Desarrollo](#-desarrollo) |
+| [🌹 Agradecimientos](#-agradecimientos) | |
 
 ---
 
@@ -597,3 +598,15 @@ Qué demuestra esto:
 - Los metadatos del PDF son **más ricos** que los que produce el parser de resultados de búsqueda. El documento lleva `Órgano`, `Sede`, `Sección`, `Fecha`, `Nº de Recurso`, `Nº de Resolución`, `Procedimiento`, `Ponente`, `Tipo de Resolución` e `Id Cendoj`. La página de resultados ya publica `Municipio: Madrid`; el dato que el parser descartaba era la `Sala de lo Civil`, que ahora se expone como `sala`. `sede` sigue valiendo `null` para el Tribunal Supremo porque ni el título ni el ROJ llevan código de sede en esas resoluciones.
 
 Esta verificación se hizo con `navaja-doc` directamente, no a través de un cliente MCP.
+
+---
+
+## 🌹 Agradecimientos
+
+<div align="center">
+
+<img src="docs/img/gentle-ai-homenaje.jpg" alt="Built with Gentle-AI — AI-powered software" width="600">
+
+</div>
+
+navaja se construyó con [Gentle AI](https://github.com/Gentleman-Programming/gentle-ai), de [Gentleman Programming](https://github.com/Gentleman-Programming). Sin su harness y su forma de trabajar, este proyecto no habría pasado de idea a realidad. Gracias.
