@@ -41,5 +41,5 @@ Decision: vocabulary kept minimal and additive; existing keys keep meaning.
 - [ ] 1. Create branch, nonce in `CaptchaServer` + `/whoami` endpoint (TDD)
 - [x] 2. Self-check helper `whoami_check` in captcha.py (network, bounded) — commit `fb08a68`
 - [x] 3. Wire into `estado_servidor` (new keys, self-owned fast path) (TDD) — commit `fb08a68`
-- [ ] 4. README: document the new keys + conflict meaning
+- [x] 4. README: document the new keys + conflict meaning — commit `docs(readme)`
 - [ ] 5. Full suite + lint, work-unit commit, PR
