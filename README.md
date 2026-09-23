@@ -40,6 +40,7 @@
 | `iniciar_descargas` | Arranca un lote de descargas sin bloquear | ⚠️ Puede |
 | `estado_descargas` | Consulta barata del estado del lote | ❌ No |
 | `recoger_descarga` | Recoge el resultado de un trabajo terminado | ❌ No |
+| `cancelar_lote` | Cancela los trabajos en cola de un lote trabado | ❌ No |
 | `estado_servidor` | Instantánea de la configuración en ejecución | ❌ No |
 
 La búsqueda, los metadatos y los resúmenes automáticos salen directamente de la página pública de resultados. **Solo el paso de texto completo** puede disparar el captcha `Control Descargas masivas` del sitio.
@@ -240,6 +241,17 @@ recoger_descarga(job_id)
 ```
 
 La llamada **no es destructiva**: volver a llamarla con el mismo `job_id` devuelve la misma carga útil. Y esa carga tiene exactamente la misma forma que la de `ver_texto_completo`, así que el mismo código puede manejar ambos caminos.
+
+### 4️⃣ Cancelar (si algo se traba)
+
+```python
+cancelar_lote(batch_id)
+# → { ok, batch_id, cancelled, already_finished, left_running }
+```
+
+Si el sitio pide un captcha que nadie va a responder, los trabajos del lote pueden quedar esperando hasta `captcha_timeout` (300 s por documento por defecto). `cancelar_lote` corta esa espera: los trabajos aún en cola pasan a `cancelled` al instante, y el que ya está descargando se deja terminar (su resultado queda en `recoger_descarga` como siempre). Llamarlo dos veces es seguro y reporta los mismos conteos.
+
+Un trabajo cancelado devuelve `ok: false` con `error_code: "cancelled"` — misma forma que un fallo de descarga, así que un `estado_descargas` después del corte muestra el estado real de cada trabajo y el mismo código puede manejar cancelación y fallo.
 
 ### Límites y validación
 
