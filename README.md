@@ -171,7 +171,18 @@ Una pestaña abierta recoge el siguiente desafío **sin que la persona recargue*
 
 El listener sigue atado durante toda la vida del proceso, no solo durante un desafío. Es una **concesión deliberada**: un listener local algo más duradero a cambio de una URL que siempre responde algo útil. Aun así solo se ata a la interfaz privada validada (`0.0.0.0`, `::` y hosts vacíos se rechazan), y el token es obligatorio en todas las rutas. Un token incorrecto devuelve 404 en los dos estados.
 
-La herramienta `estado_servidor` informa de si el listener está atado (`captcha_listening`) y de la URL real y usable del formulario (`captcha_url`).
+La herramienta `estado_servidor` informa de si el listener está atado (`captcha_listening`) y de la URL real y usable del formulario (`captcha_url`). Ese dato solo se afirma cuando puede respaldarlo: si hay un listener vivo en este mismo proceso, no se toca la red; si no lo hay, navaja consulta su propio endpoint `/{token}/whoami` (con timeout acotado) y acepta un único JSON con un nonce por proceso:
+
+| Clave | Significado |
+| --- | --- |
+| `pid` | PID de este proceso |
+| `nonce` | Nonce del listener local registrado, o `null` |
+| `listener_conflict` | `true` cuando el puerto lo sostiene **otro** proceso navaja-captcha con otro nonce: la URL publicada apunta a ese otro proceso y abrirla mostrará su página en espera — los captchas que se manden ahí nunca llegarán a este proceso |
+| `listener_pid` | El PID que reporta el listener en conflicto, o `null` |
+| `captcha_listening` | Solo `true` si este proceso puede probar que el listener responde con su propio nonce |
+
+> [!TIP]
+> Si `listener_conflict` es `true`, suele haber dos navaja viejos corriendo a la vez (o un puerto ocupado por otro programa con `NAVAJA_CAPTCHA_PORT` sin cambiar): cerrá el proceso indicado en `listener_pid`, o cambiá de puerto con `NAVAJA_CAPTCHA_PORT`.
 
 > [!TIP]
 > La URL forma parte de la API **a propósito**: quien llama puede obtenerla de `estado_servidor` antes de lanzar ninguna descarga bloqueante, dársela a la persona, y esta la abre una vez y la deja abierta. El token de la URL controla el acceso al formulario HTTP; no pretende ocultarse de quien llama, porque cualquiera con acceso local ya puede leerlo del fichero de token persistido.
