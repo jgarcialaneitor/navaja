@@ -45,7 +45,7 @@ stuck batch costs up to N × `captcha_timeout` (300 s each by default), and
 ## Tasks
 
 - [ ] 1. Branch + this doc
-- [ ] 2. `JobState.CANCELLED` + `JobQueue.cancel_batch` with race guard (TDD)
-- [ ] 3. `cancelar_lote` server tool + recoger/estado_lote integration (TDD)
-- [ ] 4. README: tool row + cancelled vocabulary
+- [x] 2. `JobState.CANCELLED` + `JobQueue.cancel_batch` with race guard (TDD) — commit `325571e`
+- [x] 3. `cancelar_lote` server tool + recoger/estado_lote integration (TDD) — commit `325571e`
+- [x] 4. README: tool row + cancelled vocabulary — commit `3fca2d1`
 - [ ] 5. Full suite, work-unit commits, PR
