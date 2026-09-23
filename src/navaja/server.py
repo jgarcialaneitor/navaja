@@ -1,6 +1,6 @@
 """MCP server for personal CENDOJ case-law research.
 
-The server exposes seven tools:
+The server exposes eight tools:
 
 * ``buscar_sentencias`` — advanced search with filters, no captcha.
 * ``listar_localizaciones`` — the site's own location vocabulary.
@@ -8,6 +8,7 @@ The server exposes seven tools:
 * ``iniciar_descargas`` — start a non-blocking batch of full-text fetches.
 * ``estado_descargas`` — cheap metadata polling for the batch.
 * ``recoger_descarga`` — collect one finished batch result.
+* ``cancelar_lote`` — cancel the queued jobs of a batch.
 * ``estado_servidor`` — runtime configuration snapshot.
 
 It runs over the stdio transport, so stdout is reserved for JSON-RPC. Any
@@ -720,8 +721,8 @@ def estado_descargas(batch_id: str | None = None) -> dict:
         A dict with ``ok`` and ``jobs``. ``jobs`` is a list of
         ``{job_id, url, state, attempts, pdf_path, error_code}`` metadata
         records in submission order. ``state`` is one of ``queued``,
-        ``running``, ``done`` or ``failed``. An unknown ``batch_id``
-        returns an empty ``jobs`` list.
+        ``running``, ``done``, ``failed`` or ``cancelled``. An unknown
+        ``batch_id`` returns an empty ``jobs`` list.
     """
     queue = _get_queue()
     return {"ok": True, "jobs": queue.estado(batch_id)}
@@ -764,6 +765,32 @@ def recoger_descarga(job_id: str) -> dict:
     if isinstance(payload, dict) and payload.get("error_code") == "runner_failure":
         return _normalise_runner_failure(payload)
     return payload
+
+
+@server.tool()
+def cancelar_lote(batch_id: str) -> dict:
+    """Cancel the queued jobs of a batch.
+
+    Jobs still ``queued`` are cancelled immediately and become ``cancelled``.
+    The job currently ``running`` is left alone so it finishes normally; jobs
+    already ``done`` or ``failed`` keep their results. Calling this tool twice
+    on the same batch is safe and reports the same final counts.
+
+    A cancelled job's payload has ``ok: false`` and
+    ``error_code: "cancelled"``, so ``recoger_descarga`` returns the same
+    shape as a failed fetch and callers can distinguish cancellation from
+    success.
+
+    Args:
+        batch_id: the identifier returned by ``iniciar_descargas``.
+
+    Returns:
+        A dict with ``ok``, ``batch_id``, ``cancelled``,
+        ``already_finished`` and ``left_running``. An unknown ``batch_id``
+        returns ``ok: false`` with ``error_code: "unknown_batch"``.
+    """
+    queue = _get_queue()
+    return queue.cancel_batch(batch_id)
 
 
 @server.tool()

@@ -14,7 +14,8 @@ module's.
 
 Public API:
 
-* :class:`JobState` — ``queued`` | ``running`` | ``done`` | ``failed``.
+* :class:`JobState` — ``queued`` | ``running`` | ``done`` | ``failed`` |
+  ``cancelled``.
 * :class:`JobQueue` — bounded worker pool, registry, and non-blocking queries.
 * :func:`PENDING` — marker returned by :meth:`JobQueue.recoger` while a job is
   still queued or running.
@@ -46,6 +47,7 @@ class JobState(StrEnum):
     RUNNING = "running"
     DONE = "done"
     FAILED = "failed"
+    CANCELLED = "cancelled"
 
 
 @dataclass
@@ -80,6 +82,17 @@ def UNKNOWN_JOB(job_id: str) -> dict[str, Any]:
         "ok": False,
         "error_code": "unknown_job",
         "error": "no job with this id",
+        "text": None,
+        "job_id": job_id,
+    }
+
+
+def CANCELLED(job_id: str) -> dict[str, Any]:
+    """Payload returned by ``recoger`` for a job cancelled before it ran."""
+    return {
+        "ok": False,
+        "error_code": "cancelled",
+        "error": "job was cancelled before it ran",
         "text": None,
         "job_id": job_id,
     }
@@ -150,6 +163,12 @@ class JobQueue:
             return
 
         with self._lock:
+            if job.state == JobState.CANCELLED:
+                # Cancelled while the job was still in the work queue: do not
+                # run it and do not touch the payload/finished event that
+                # cancel_batch already set.  task_done() is still required.
+                self._work.task_done()
+                return
             job.state = JobState.RUNNING
         job.running.set()
         try:
@@ -327,6 +346,58 @@ class JobQueue:
     def start(self) -> None:
         """Start the worker threads; called automatically by ``submit``."""
         self._ensure_workers()
+
+    def cancel_batch(self, batch_id: str) -> dict[str, Any]:
+        """Cancel every queued job in ``batch_id``.
+
+        Queued jobs are marked ``CANCELLED`` with a cancellation payload and
+        their ``finished`` event is set so nothing blocks on them. Jobs that
+        are already ``DONE``/``FAILED``/``CANCELLED`` are left untouched, and
+        any ``RUNNING`` job is allowed to finish normally. Calling this method
+        more than once for the same batch is safe and reports the current
+        counts without error.
+
+        Args:
+            batch_id: the batch identifier returned by ``submit_many``.
+
+        Returns:
+            A dict with ``ok``, ``batch_id``, ``cancelled``,
+            ``already_finished`` and ``left_running``. An unknown or pruned
+            ``batch_id`` returns ``ok: false`` with ``error_code:
+            "unknown_batch"``.
+        """
+        with self._lock:
+            batch = self._batches.get(batch_id)
+            if batch is None:
+                return {
+                    "ok": False,
+                    "error_code": "unknown_batch",
+                    "error": "no batch with this id",
+                    "batch_id": batch_id,
+                }
+
+            cancelled = 0
+            already_finished = 0
+            left_running = 0
+            for job in batch:
+                if job.state == JobState.QUEUED:
+                    job.state = JobState.CANCELLED
+                    job.payload = CANCELLED(job.job_id)
+                    job.finished.set()
+                    cancelled += 1
+                elif job.state == JobState.RUNNING:
+                    left_running += 1
+                else:
+                    # DONE, FAILED or CANCELLED.
+                    already_finished += 1
+
+            return {
+                "ok": True,
+                "batch_id": batch_id,
+                "cancelled": cancelled,
+                "already_finished": already_finished,
+                "left_running": left_running,
+            }
 
     def stop(self) -> None:
         """Stop the queue idempotently with a bounded timeout.
