@@ -403,9 +403,9 @@ def test_supreme_court_result_urls_are_accepted_by_the_url_validator():
     assert first.optimize == "20260917"
     assert first.access_to_pdf_url == (
         "https://www.poderjudicial.es/search/contenidos.action"
-        "?action=accessToPDF&publicinterface=true&tab=AN"
+        "?action=accessToPDF&publicinterface=true&tab=TS"
         "&reference=ee62f935e8a3d299a0a8778d75e36f0d"
-        "&encode=true&optimize=20260917&databasematch=AN"
+        "&encode=true&optimize=20260917&databasematch=TS"
     )
 
     second = parse_document_url(urls[1])
@@ -423,16 +423,23 @@ def test_supreme_court_result_urls_are_accepted_by_the_url_validator():
 
 
 def test_url_validator_error_message_names_every_accepted_collection():
-    """The rejection message must describe what is actually accepted."""
+    """The rejection message is pinned in full (issue #7).
+
+    Substring assertions ("AN" in message) pass against messages that name
+    the collections in a misleading order or embed them in unrelated words.
+    The complete message is pinned instead; mutation-tested: any drift in the
+    template fails this pin (see the mutation round recorded in issue #7).
+    """
     with pytest.raises(ValueError) as excinfo:
         parse_document_url(
             "https://www.poderjudicial.es/search/XX/openDocument/"
             "aabbccddeeff00112233445566778899/20260911"
         )
 
-    message = str(excinfo.value)
-    assert "AN" in message
-    assert "TS" in message
+    assert str(excinfo.value) == (
+        "URL path must be /search/(AN|TS)/openDocument/"
+        "<16-or-32-hex-hash>/<YYYYMMDD>"
+    )
 
 
 @pytest.mark.live

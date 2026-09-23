@@ -39,6 +39,15 @@ class DocumentRef:
     access_to_pdf_url: str
     """URL that requests the full text."""
 
+    collection: str = "AN"
+    """CENDOJ collection segment from the URL path (``AN`` or ``TS``).
+
+    Drives both access parameters (``tab``/``databasematch``) and the captcha
+    post-back, mirroring the site's own openDocument page (issue #5, live
+    evidence 2026-09-23). Defaults to ``AN`` so callers constructing a ref by
+    hand keep the pre-#5 behaviour.
+    """
+
 
 @dataclass(frozen=True, slots=True)
 class FullTextResult:
@@ -92,21 +101,26 @@ def parse_document_url(url: str) -> DocumentRef:
             "URL path must be /search/(AN|TS)/openDocument/<16-or-32-hex-hash>/<YYYYMMDD>"
         )
 
-    _collection, reference, optimize = match.groups()
+    collection, reference, optimize = match.groups()
+    # Issue #5, resolved by live evidence (2026-09-23): the site's own
+    # openDocument page builds ``tab=<collection>&databasematch=<collection>``
+    # for both AN and TS paths, so the parsed collection drives both params
+    # instead of a hardcoded AN.
     params: dict[str, str] = {
         "action": "accessToPDF",
         "publicinterface": "true",
-        "tab": "AN",
+        "tab": collection,
         "reference": reference,
         "encode": "true",
         "optimize": optimize,
-        "databasematch": "AN",
+        "databasematch": collection,
     }
     access_url = f"{CONTENIDOS_URL}?{urlencode(params)}"
     return DocumentRef(
         reference=reference,
         optimize=optimize,
         access_to_pdf_url=access_url,
+        collection=collection,
     )
 
 
@@ -149,15 +163,17 @@ def _extract_text(content_type: str | None, data: bytes) -> str:
 
 
 def _captcha_post_data(ref: DocumentRef, answer: str) -> dict[str, str]:
+    # Echo the collection the access URL carried: a TS challenge must be
+    # answered with the same tab/databasematch it was issued under (issue #5).
     return {
         "action": "captcha",
         "prevaction": "accessToPDF",
         "publicinterface": "true",
-        "tab": "AN",
+        "tab": ref.collection,
         "reference": ref.reference,
         "encode": "true",
         "optimize": ref.optimize,
-        "databasematch": "AN",
+        "databasematch": ref.collection,
         "captcha": answer,
     }
 
