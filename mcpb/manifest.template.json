@@ -1,0 +1,79 @@
+{
+  "manifest_version": "0.4",
+  "name": "navaja",
+  "display_name": "Navaja — CENDOJ case-law research",
+  "version": "${VERSION}",
+  "description": "MCP server for personal CENDOJ case-law research: advanced search over Spanish case law, full-text download with human-solved captchas, and batch management.",
+  "author": {
+    "name": "jgarcialaneitor"
+  },
+  "server": {
+    "type": "uv",
+    "entry_point": "navaja_mcpb.py",
+    "mcp_config": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "${__dirname}",
+        "navaja_mcpb.py"
+      ]
+    }
+  },
+  "compatibility": {
+    "platforms": [
+      "darwin",
+      "linux",
+      "win32"
+    ],
+    "runtimes": {
+      "python": ">=3.12"
+    }
+  },
+  "tools": [
+    {
+      "name": "buscar_sentencias",
+      "description": "Advanced search over CENDOJ case law with filters; no captcha required."
+    },
+    {
+      "name": "listar_localizaciones",
+      "description": "List the site's own location vocabulary for use in search filters."
+    },
+    {
+      "name": "ver_texto_completo",
+      "description": "Fetch the full text of a resolution with human-in-the-loop captcha solving."
+    },
+    {
+      "name": "iniciar_descargas",
+      "description": "Start a non-blocking batch of full-text fetches."
+    },
+    {
+      "name": "estado_descargas",
+      "description": "Poll lightweight metadata for a batch of downloads."
+    },
+    {
+      "name": "recoger_descarga",
+      "description": "Collect the full payload for one finished batch job."
+    },
+    {
+      "name": "cancelar_lote",
+      "description": "Cancel the queued jobs of a batch."
+    },
+    {
+      "name": "estado_servidor",
+      "description": "Return runtime server configuration and the captcha form URL."
+    }
+  ],
+  "tools_generated": false,
+  "keywords": [
+    "cendoj",
+    "jurisprudence",
+    "spanish-law",
+    "legal",
+    "research"
+  ],
+  "license": "MIT",
+  "privacy_policies": [
+    "https://www.poderjudicial.es/CGP/ES/Aviso-legal"
+  ]
+}

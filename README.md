@@ -30,7 +30,7 @@
 
 ## 🧭 Qué es navaja
 
-`navaja-mcp` expone **siete herramientas** para un cliente MCP:
+`navaja-mcp` expone **ocho herramientas** para un cliente MCP:
 
 | Herramienta | Qué hace | ¿Captcha? |
 | --- | --- | :---: |
@@ -365,7 +365,19 @@ En Windows, si otra instancia de navaja ya está escuchando en el mismo puerto, 
 
 ## 🚀 Instalación
 
-navaja es un programa local que tu chat (Claude, ChatGPT, Cursor…) lanza en tu propia máquina y al que se conecta por el protocolo MCP. No se «instala en el chat» con un clic: hay que registrar en la configuración del cliente un comando que lo arranque. Abajo tienes tres caminos, ordenados de menos a más técnico.
+navaja es un programa local que tu chat (Claude, ChatGPT, Cursor…) lanza en tu propia máquina y al que se conecta por el protocolo MCP. Hay cuatro caminos, ordenados de menos a más técnico. Si usas **Claude Desktop en macOS o Windows**, el paquete `.mcpb` es un doble clic.
+
+### Opción A — Un clic con el paquete `.mcpb` (Claude Desktop)
+
+1. Descarga `navaja-<versión>.mcpb` desde la sección [Releases](https://github.com/jgarcialaneitor/navaja/releases) del repositorio.
+2. Haz **doble clic** en el archivo (o arrástralo a la ventana de Claude Desktop). Aparece el diálogo de instalación con las herramientas que trae.
+3. Acepta. Reinicia Claude por completo (menú ☰ → Quit / Salir) si te lo pide.
+4. Comprueba con: *¿Qué herramientas de navaja tienes disponibles?*
+
+El paquete no necesita Python ni nada preinstalado: Claude Desktop gestiona el runtime y las dependencias la primera vez que arranca el servidor (unos segundos la primera vez). Para regenerar el paquete desde el repositorio: `uv run python scripts/build_mcpb.py --out build/mcpb` y luego `npx @anthropic-ai/mcpb pack build/mcpb dist/navaja.mcpb`.
+
+> [!NOTE]
+> El doble clic instala el servidor; el **captcha sigue siendo humano** por diseño (no hay resolución automática). La primera descarga de texto completo te pedirá abrir la URL del formulario en el navegador — se explica más abajo.
 
 ### Requisito único: `uv`
 
@@ -383,7 +395,7 @@ powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | ie
 
 Cierra y vuelve a abrir la terminal después de instalarlo. Nada más: no hay que clonar el repositorio ni instalar nada por separado.
 
-### Opción A — Pídeselo a tu asistente
+### Opción B — Pídeselo a tu asistente
 
 Si tu asistente **puede ejecutar comandos** (Claude Code, Codex CLI, la app de ChatGPT de escritorio), no necesitas tocar ninguna configuración: copia y pega esto tal cual:
 
@@ -400,9 +412,9 @@ https://github.com/jgarcialaneitor/navaja
 ```
 
 > [!IMPORTANT]
-> En el **chat de Claude Desktop** el asistente **no** puede editar su propia configuración ni ejecutar comandos en tu máquina: te dirá paso a paso qué hacer, pero los pasos los haces tú (opción B). Para que el asistente instale navaja sin ayuda, usa Claude Code, Codex CLI o la app de ChatGPT de escritorio.
+> En el **chat de Claude Desktop** el asistente **no** puede editar su propia configuración ni ejecutar comandos en tu máquina: te dirá paso a paso qué hacer, pero los pasos los haces tú (opción C). Para que el asistente instale navaja sin ayuda, usa Claude Code, Codex CLI o la app de ChatGPT de escritorio.
 
-### Opción B — Manual en Claude Desktop
+### Opción C — Manual en Claude Desktop
 
 1. Abre Claude Desktop → menú ☰ → **File → Settings → Developer** (macOS) o **Configuración → Desarrollador** (Windows).
 2. Pulsa **Edit Config** y abre el fichero `claude_desktop_config.json` que se señala:
@@ -459,7 +471,7 @@ Si el servidor corre en un equipo distinto del que abre el navegador (por ejempl
 
 </details>
 
-### Opción C — ChatGPT de escritorio
+### Opción D — ChatGPT de escritorio
 
 La app de ChatGPT de escritorio soporta servidores MCP **locales** (motor Codex). El ChatGPT web **no**: ahí solo se pueden conectar servidores remotos, y navaja es un programa de tu máquina.
 
@@ -499,7 +511,7 @@ Busca en navaja sentencias sobre "cláusulas abusivas", muestra 10 y resúmelas.
 La primera vez que pidas el texto completo de una resolución, puede aparecer el captcha del sitio. El asistente te dará una **URL local del formulario** (viene en `captcha_url` de `estado_servidor` o del error): ábrela en tu navegador, escribe los caracteres de la imagen y deja la pestaña abierta para los siguientes desafíos. Los detalles están en [📄 Cómo funciona la descarga de texto completo](#-cómo-funciona-la-descarga-de-texto-completo).
 
 > [!NOTE]
-> Aún no existe la instalación de **un solo clic** (paquete `.mcpb`) para Claude Desktop. Con `uvx` el registro queda en dos campos fijos, así que las tres opciones de arriba son el camino hoy.
+> Instalación de **un solo clic** para Claude Desktop: usa la **opción A** (paquete `.mcpb`). Con `uvx` el registro queda en dos campos fijos, así que las opciones de arriba siguen valiendo para otros clientes.
 
 ---
 

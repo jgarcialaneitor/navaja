@@ -34,3 +34,7 @@ venv/
 
 # Local browser profile (cookies; must never be committed)
 .navaja-profile/
+
+# Generated MCP bundle artifacts
+build/
+dist/
