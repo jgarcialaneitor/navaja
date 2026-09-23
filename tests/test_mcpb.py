@@ -164,3 +164,49 @@ def test_staging_includes_files_required_by_pyproject(tmp_path):
     assert (out / "src" / "navaja" / "server.py").is_file()
     manifest = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["version"] == _pyproject_version()
+
+
+def test_staging_refuses_to_replace_populated_non_bundle_dir(tmp_path):
+    """A populated directory without the bundle markers must be preserved.
+
+    Regression for R3-destructive-output: stage() used to rmtree whatever
+    directory --out pointed at, so a mistaken target lost its contents.
+    """
+    build_mcpb = _load_build_script()
+    target = tmp_path / "precious"
+    target.mkdir()
+    (target / "sentinel.txt").write_text("keep me", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="non-bundle directory"):
+        build_mcpb.stage(target)
+
+    assert (target / "sentinel.txt").read_text(encoding="utf-8") == "keep me"
+    assert not (target / "manifest.json").exists()
+
+
+def test_staging_refuses_targets_containing_project_sources(tmp_path, monkeypatch):
+    """Staging over the checkout (or an ancestor of it) must be refused."""
+    build_mcpb = _load_build_script()
+    project_root = tmp_path / "navaja"
+    project_root.mkdir()
+    (project_root / "pyproject.toml").write_text("", encoding="utf-8")
+    monkeypatch.setattr(build_mcpb, "PROJECT_ROOT", project_root)
+
+    with pytest.raises(ValueError, match="project sources"):
+        build_mcpb.stage(project_root)
+
+    with pytest.raises(ValueError, match="project sources"):
+        build_mcpb.stage(tmp_path)
+
+
+def test_staging_replaces_previous_staging_output(tmp_path):
+    """Re-running the build over its own output stays allowed."""
+    build_mcpb = _load_build_script()
+    out = tmp_path / "mcpb"
+
+    build_mcpb.stage(out)
+    (out / "stale-file.txt").write_text("stale", encoding="utf-8")
+    build_mcpb.stage(out)
+
+    assert (out / "manifest.json").is_file()
+    assert not (out / "stale-file.txt").exists()

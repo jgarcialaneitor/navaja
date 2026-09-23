@@ -49,13 +49,62 @@ def generate_manifest(version: str) -> dict:
     return json.loads(rendered)
 
 
+STAGED_SOURCE_DIRECTORIES = ("src", "mcpb")
+
+
+def _ensure_safe_staging_target(bundle_root: Path) -> None:
+    """Refuse destructive staging targets before anything is deleted.
+
+    ``stage`` replaces the target directory wholesale, so a mistaken ``--out``
+    must never delete existing data (issue: R3-destructive-output).  The
+    target is rejected when it is (or contains) the project's own sources:
+
+    * the project root itself, or any directory that is an ancestor of the
+      project root (deleting it would delete the checkout);
+    * any staged source directory (``src/``, ``mcpb/``).
+
+    An existing *non-empty* target is only replaced when it looks like a
+    previously staged navaja bundle (contains ``manifest.json`` and
+    ``navaja_mcpb.py``); any other populated directory is refused so unrelated
+    contents can never be lost.
+    """
+    if bundle_root == PROJECT_ROOT or bundle_root in PROJECT_ROOT.parents:
+        raise ValueError(
+            f"staging target {bundle_root} contains the project sources"
+        )
+    for name in STAGED_SOURCE_DIRECTORIES:
+        source = PROJECT_ROOT / name
+        if source == bundle_root:
+            raise ValueError(
+                f"staging target {bundle_root} would replace staged "
+                f"source {source}"
+            )
+
+    if bundle_root.exists() and any(bundle_root.iterdir()):
+        owned = (
+            (bundle_root / "manifest.json").is_file()
+            and (bundle_root / "navaja_mcpb.py").is_file()
+        )
+        if not owned:
+            raise ValueError(
+                f"refusing to replace non-bundle directory {bundle_root}; "
+                "point --out at a fresh directory or a previous staging "
+                "output"
+            )
+
+
 def stage(bundle_root: Path) -> None:
     """Stage the bundle inputs into *bundle_root*.
 
     Copies ``pyproject.toml``, the ``src/`` package tree, the launcher, and
     ``.mcpbignore``, then writes the generated ``manifest.json``.  Existing
     staged contents are removed first so repeated builds are deterministic.
+
+    The target is validated first: directories that are (or contain) the
+    project sources, and populated directories that are not previous staging
+    outputs, are refused with :class:`ValueError` instead of being deleted.
     """
+    _ensure_safe_staging_target(bundle_root)
     version = _pyproject_version()
 
     if bundle_root.exists():
