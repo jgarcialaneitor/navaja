@@ -403,9 +403,9 @@ def test_supreme_court_result_urls_are_accepted_by_the_url_validator():
     assert first.optimize == "20260917"
     assert first.access_to_pdf_url == (
         "https://www.poderjudicial.es/search/contenidos.action"
-        "?action=accessToPDF&publicinterface=true&tab=AN"
+        "?action=accessToPDF&publicinterface=true&tab=TS"
         "&reference=ee62f935e8a3d299a0a8778d75e36f0d"
-        "&encode=true&optimize=20260917&databasematch=AN"
+        "&encode=true&optimize=20260917&databasematch=TS"
     )
 
     second = parse_document_url(urls[1])

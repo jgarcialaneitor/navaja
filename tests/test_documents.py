@@ -57,7 +57,6 @@ def _assert_access_url(ref: DocumentRef) -> None:
     assert params["optimize"] == [OPTIMIZE]
     assert params["databasematch"] == ["AN"]
 
-
 def test_parse_document_url_accepts_real_shape():
     ref = parse_document_url(DOC_URL)
     assert isinstance(ref, DocumentRef)
@@ -67,6 +66,12 @@ def test_parse_document_url_accepts_real_shape():
 
 
 def test_parse_document_url_accepts_real_ts_url():
+    """A TS path builds access parameters from the TS collection (issue #5).
+
+    Live evidence (2026-09-23): the CENDOJ openDocument page for a TS path
+    builds ``tab=TS&databasematch=TS``; the AN hardcode diverged from the
+    site's own parameters and was tolerated only by hash matching.
+    """
     url = "https://www.poderjudicial.es/search/TS/openDocument/bc29b4e30a2d7b90/20121016"
     ref = parse_document_url(url)
     assert isinstance(ref, DocumentRef)
@@ -77,19 +82,32 @@ def test_parse_document_url_accepts_real_ts_url():
     params = parse_qs(parsed.query)
     assert params["action"] == ["accessToPDF"]
     assert params["publicinterface"] == ["true"]
-    assert params["tab"] == ["AN"]
+    assert params["tab"] == ["TS"]
     assert params["reference"] == ["bc29b4e30a2d7b90"]
     assert params["encode"] == ["true"]
     assert params["optimize"] == ["20121016"]
-    assert params["databasematch"] == ["AN"]
+    assert params["databasematch"] == ["TS"]
 
 
-def test_parse_document_url_ts_and_an_urls_produce_same_access_url():
+def test_parse_document_url_collection_selects_access_params():
+    """The path's collection segment drives tab/databasematch (issue #5).
+
+    Live evidence (2026-09-23): the site's own openDocument page builds
+    ``tab=AN&databasematch=AN`` for AN paths and ``tab=TS&databasematch=TS``
+    for TS paths. The access URL therefore differs between collections only
+    in those two parameters; reference and optimize are carried unchanged.
+    """
     ts_url = "https://www.poderjudicial.es/search/TS/openDocument/1d15140b1eccb473/20151204"
     an_url = "https://www.poderjudicial.es/search/AN/openDocument/1d15140b1eccb473/20151204"
     ts_ref = parse_document_url(ts_url)
     an_ref = parse_document_url(an_url)
-    assert ts_ref.access_to_pdf_url == an_ref.access_to_pdf_url
+    assert ts_ref.reference == an_ref.reference
+    assert ts_ref.optimize == an_ref.optimize
+    assert "tab=TS" in ts_ref.access_to_pdf_url
+    assert "databasematch=TS" in ts_ref.access_to_pdf_url
+    assert "tab=AN" in an_ref.access_to_pdf_url
+    assert "databasematch=AN" in an_ref.access_to_pdf_url
+    assert ts_ref.access_to_pdf_url != an_ref.access_to_pdf_url
 
 
 def test_parse_document_url_accepts_16_character_hash():
