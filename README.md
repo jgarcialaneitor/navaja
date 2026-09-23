@@ -214,6 +214,16 @@ El desafío se queda **pegado a la sesión**: una vez resuelto, las siguientes p
 
 ## 📦 Descargas por lotes
 
+> [!IMPORTANT]
+> **Respeta las condiciones de uso del CENDOJ.** El [aviso legal del CGPJ](https://www.poderjudicial.es/sede/es/Ayuda/Aviso-Legal) permite consultar la base de datos de jurisprudencia **solo para uso particular** y dice expresamente: *«No está permitida la utilización de la base de datos para usos comerciales, ni la descarga masiva de información»*.
+>
+> - Usa los lotes para reunir **unas pocas resoluciones concretas** que ya has elegido tras buscar, no para volcar resultados de búsqueda enteros ni para rastrear la base de datos.
+> - El tope de **100 URLs por lote** es un límite técnico de navaja, **no un permiso** del sitio para descargar esa cantidad.
+> - Mantén `NAVAJA_MAX_CONCURRENTES` en `1` y no encadenes lotes seguidos.
+> - Construir una base de datos propia, redistribuir resoluciones o darles un uso comercial es **reutilización**, y requiere seguir el procedimiento del CENDOJ ([Reglamento 3/2010 del CGPJ](https://www.boe.es/buscar/doc.php?id=BOE-A-2010-17860)).
+>
+> El aviso legal advierte de que cualquier uso contrario *«podrá dar lugar a la adopción de las medidas legales que procedan»*. Esta nota resume las condiciones publicadas; no es asesoramiento jurídico.
+
 Para más de un documento, usa el flujo de tres pasos en lugar de muchas llamadas bloqueantes:
 
 ### 1️⃣ Arrancar
