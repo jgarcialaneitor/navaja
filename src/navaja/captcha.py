@@ -29,6 +29,8 @@ from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
+import httpx
+
 
 _TOKEN_RE = re.compile(r"^[A-Za-z0-9_-]+\Z")
 
@@ -836,6 +838,55 @@ def is_shared_captcha_server_running(host: str, port: int) -> bool:
             return False
         thread = server._thread
         return thread is not None and thread.is_alive()
+
+
+def shared_captcha_server_nonce(host: str, port: int) -> str | None:
+    """Return the nonce of the registered listener for ``(host, port)``.
+
+    Returns ``None`` when no server is registered for the address or when
+    the registered server has no nonce.
+    """
+    key = (host, port)
+    with _captcha_server_lock:
+        server = _captcha_servers.get(key)
+        if server is None:
+            return None
+        return getattr(server, "nonce", None)
+
+
+def whoami_check(
+    host: str,
+    port: int,
+    token: str,
+    *,
+    timeout: float = 2.0,
+) -> dict | None:
+    """Probe a captcha listener and return its identity payload.
+
+    Performs a single GET to ``http://{host}:{port}/{token}/whoami`` with
+    the given bounded ``timeout`` (connect + read). On any failure —
+    timeout, connection refused, non-200 response, invalid JSON, or any
+    exception — the function returns ``None`` and never raises.
+
+    The ``token`` is sent in the URL but is never logged.
+
+    Args:
+        host: interface address of the listener to probe.
+        port: TCP port of the listener to probe.
+        token: URL-path token to include in the request.
+        timeout: seconds before the request fails; default ``2.0``.
+
+    Returns:
+        The parsed JSON response as a ``dict`` on HTTP 200, otherwise ``None``.
+    """
+    url = f"http://{host}:{port}/{token}/whoami"
+    try:
+        response = httpx.get(url, timeout=timeout)
+        if response.status_code != 200:
+            return None
+        return response.json()
+    except Exception:
+        return None
 
 
 def serve_captcha(

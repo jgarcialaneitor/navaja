@@ -31,7 +31,10 @@ from navaja.captcha import (
     resolve_captcha_host,
     resolve_captcha_token,
     serve_captcha,
+    shared_captcha_server_nonce,
+    start_shared_captcha_server,
     stop_shared_captcha_server,
+    whoami_check,
 )
 
 TINY_PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 20
@@ -1135,3 +1138,91 @@ def test_captcha_server_nonce_is_stable():
         assert first == second
     finally:
         server.stop()
+
+
+def test_shared_captcha_server_nonce_returns_none_when_not_registered():
+    stop_shared_captcha_server()
+    assert shared_captcha_server_nonce("127.0.0.1", _free_port()) is None
+
+
+def test_shared_captcha_server_nonce_returns_registered_nonce():
+    port = _free_port()
+    token = "nonce-registered-token01"
+    start_shared_captcha_server("127.0.0.1", port, token)
+    try:
+        server = captcha._captcha_servers[("127.0.0.1", port)]
+        assert shared_captcha_server_nonce("127.0.0.1", port) == server.nonce
+    finally:
+        stop_shared_captcha_server()
+
+
+# --- whoami_check tests -----------------------------------------------------
+
+
+def test_whoami_check_returns_dict_on_200():
+    port = _free_port()
+    token = "whoami-check-token-001"
+    server = CaptchaServer(("127.0.0.1", port), token=token)
+    try:
+        server.start()
+        _wait_for_listener(f"http://127.0.0.1:{port}/{token}/")
+
+        result = whoami_check("127.0.0.1", port, token, timeout=2.0)
+        assert result is not None
+        assert result["listener"] == "navaja-captcha"
+        assert result["nonce"] == server.nonce
+        assert result["pid"] == os.getpid()
+    finally:
+        server.stop()
+
+
+def test_whoami_check_returns_none_on_connection_refused():
+    port = _free_port()
+    assert _port_is_free("127.0.0.1", port)
+    assert whoami_check("127.0.0.1", port, "any-token-12345", timeout=0.5) is None
+
+
+def test_whoami_check_returns_none_on_timeout(monkeypatch):
+    """A listener that accepts but never responds causes a read timeout."""
+    port = _free_port()
+    token = "timeout-token-000001"
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.bind(("127.0.0.1", port))
+    sock.listen(1)
+    try:
+        # Accept connections in the background but never read or write.
+        accept_thread = threading.Thread(
+            target=lambda: sock.accept(), daemon=True
+        )
+        accept_thread.start()
+        assert whoami_check("127.0.0.1", port, token, timeout=0.2) is None
+    finally:
+        sock.close()
+
+
+def test_whoami_check_returns_none_on_non_json_body():
+    """A 200 response that is not JSON causes whoami_check to return None."""
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    class _HtmlHandler(BaseHTTPRequestHandler):
+        def log_message(self, fmt, *args):  # noqa: D102
+            return
+
+        def do_GET(self):  # noqa: N802
+            body = b"<html><body>not json</body></html>"
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+    port = _free_port()
+    token = "whoami-html-token-0001"
+    server = HTTPServer(("127.0.0.1", port), _HtmlHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        assert whoami_check("127.0.0.1", port, token, timeout=2.0) is None
+    finally:
+        server.shutdown()
+        server.server_close()

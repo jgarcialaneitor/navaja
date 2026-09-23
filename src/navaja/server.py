@@ -44,8 +44,10 @@ from navaja.captcha import (
     is_shared_captcha_server_running,
     resolve_captcha_host,
     resolve_captcha_token,
+    shared_captcha_server_nonce,
     start_shared_captcha_server,
     stop_shared_captcha_server,
+    whoami_check,
 )
 from navaja.documents import (
     parse_document_url,
@@ -780,6 +782,19 @@ def estado_servidor() -> dict:
     to the HTTP form, rather than being hidden from the caller; anyone with
     local access can already read it from the persisted token file.
 
+    New keys added for stale-listener detection:
+
+    * ``pid`` — process id of the caller (this process).
+    * ``nonce`` — the local registry server's nonce for ``(host, port)`` when
+      a shared listener is registered, otherwise ``None``.
+    * ``listener_conflict`` — ``True`` when the URL's port is held by another
+      navaja-captcha listener with a different nonce. An agent reading this
+      should treat the published URL as unusable: it points at a different
+      process, so opening it will show that process's idle page and any
+      captcha challenge sent there will never be answered by this process.
+    * ``listener_pid`` — the pid reported by the conflicting listener, or
+      ``None`` when there is no conflict.
+
     This call is not side-effect free: when no stable token is configured and
     no token file exists, resolving the token generates and persists one.
     Because of that, ``stable_token_set`` describes the configuration state as
@@ -799,8 +814,41 @@ def estado_servidor() -> dict:
 
     token, _token_reason = resolve_captcha_token()
 
-    captcha_listening = is_shared_captcha_server_running(host, port)
+    this_pid = os.getpid()
+    our_nonce = shared_captcha_server_nonce(host, port)
     captcha_url = f"http://{host}:{port}/{token}/"
+
+    captcha_listening: bool
+    listener_conflict: bool
+    listener_pid: int | None
+
+    # Fast path: a live listener in our own registry is ours without network
+    # traffic. This is the common case during a captcha lifespan.
+    if is_shared_captcha_server_running(host, port):
+        captcha_listening = True
+        listener_conflict = False
+        listener_pid = None
+    else:
+        # No local live listener; probe the network to see who owns the port.
+        whoami = whoami_check(host, port, token, timeout=2.0)
+        if whoami is not None and whoami.get("listener") == "navaja-captcha":
+            their_nonce = whoami.get("nonce")
+            their_pid = whoami.get("pid")
+            if their_nonce is not None and their_nonce == our_nonce:
+                # Registry mismatch edge case: the network listener reports our
+                # nonce even though the local registry has no live server. Treat
+                # it as ours and stay truthful about the registry state.
+                captcha_listening = True
+                listener_conflict = False
+                listener_pid = None
+            else:
+                captcha_listening = False
+                listener_conflict = True
+                listener_pid = their_pid if isinstance(their_pid, int) else None
+        else:
+            captcha_listening = False
+            listener_conflict = False
+            listener_pid = None
 
     return {
         "host": host,
@@ -808,6 +856,10 @@ def estado_servidor() -> dict:
         "stable_token_set": stable_token_set,
         "captcha_listening": captcha_listening,
         "captcha_url": captcha_url,
+        "pid": this_pid,
+        "nonce": our_nonce,
+        "listener_conflict": listener_conflict,
+        "listener_pid": listener_pid,
     }
 
 
